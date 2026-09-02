@@ -34,19 +34,41 @@ class ProactiveDaemon:
         self.check_interval_seconds = check_interval_seconds
         self._running = False
         self._task: Optional[asyncio.Task] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._thread = None
 
-    def start(self):
+    def start(self, loop: Optional[asyncio.AbstractEventLoop] = None):
         if self._running:
             return
         self._running = True
-        self._task = asyncio.create_task(self._watcher_loop())
-        logger.info("Proactive reasoning daemon started.")
+        try:
+            running_loop = loop or asyncio.get_running_loop()
+            self._task = running_loop.create_task(self._watcher_loop())
+            logger.info("Proactive reasoning daemon started (in existing event loop).")
+        except RuntimeError:
+            # Fallback when started from synchronous context before uvicorn/asyncio loop starts
+            import threading
+            def _thread_runner():
+                self._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self._loop)
+                self._task = self._loop.create_task(self._watcher_loop())
+                try:
+                    self._loop.run_until_complete(self._task)
+                except asyncio.CancelledError:
+                    pass
+                finally:
+                    self._loop.close()
+
+            self._thread = threading.Thread(target=_thread_runner, daemon=True, name="ProactiveDaemonThread")
+            self._thread.start()
+            logger.info("Proactive reasoning daemon started (in dedicated background thread).")
 
     def stop(self):
         self._running = False
         if self._task and not self._task.done():
             self._task.cancel()
         logger.info("Proactive reasoning daemon stopped.")
+
 
     async def _watcher_loop(self):
         """Continuously inspects active proactive rules against real-time state."""
