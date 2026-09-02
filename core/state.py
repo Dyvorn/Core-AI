@@ -329,6 +329,23 @@ class StateManager:
         finally:
             conn.close()
 
+    def get_recent_execution_logs(self, limit: int = 50) -> List[Dict[str, Any]]:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "SELECT * FROM execution_logs ORDER BY id DESC LIMIT ?", (limit,)
+            )
+            rows = cursor.fetchall()
+            results = []
+            for row in reversed(rows):
+                item = dict(row)
+                item["payload"] = json.loads(item["payload"]) if item.get("payload") else None
+                results.append(item)
+            return results
+        finally:
+            conn.close()
+
+
     # --- User Profile & Identity Memory ---
     def get_user_profile(self, user_id: str = "primary_user") -> UserProfile:
         conn = self._get_connection()

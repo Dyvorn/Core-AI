@@ -327,6 +327,11 @@ def create_gateway_app(
         await connection_manager.broadcast_event("HUD_CARD", card.model_dump())
         return {"status": "dispatched", "card_id": card.card_id}
 
+    @app.get("/api/v1/logs")
+    def get_logs(limit: int = 50):
+        """Returns recent structured execution logs from database."""
+        return state_manager.get_recent_execution_logs(limit=min(limit, 200))
+
     @app.get("/mirror", include_in_schema=False)
     def serve_mirror_ui():
         """Serves the Smart Mirror & Wall Projection Ambient HUD Interface."""
@@ -345,9 +350,20 @@ def create_gateway_app(
             return FileResponse(roadmap_path)
         raise HTTPException(status_code=404, detail="Roadmap Visualizer file not found")
 
-
-
     # --- WebSocket Endpoints ---
+
+    @app.websocket("/ws/logs")
+    async def websocket_logs(websocket: WebSocket):
+        """Streams real-time execution and audit logs directly to attached terminals/dashboards."""
+        await websocket.accept()
+        connection_manager.broadcast_clients.add(websocket)
+        try:
+            recent = state_manager.get_recent_execution_logs(limit=30)
+            await websocket.send_text(json.dumps({"event": "LOG_BACKSCROLL", "data": recent}))
+            while True:
+                await websocket.receive_text()
+        except (WebSocketDisconnect, Exception):
+            connection_manager.broadcast_clients.discard(websocket)
 
     @app.websocket("/ws/events")
     async def websocket_events(websocket: WebSocket):
@@ -358,6 +374,7 @@ def create_gateway_app(
                 # Keep-alive receive
                 data = await websocket.receive_text()
         except WebSocketDisconnect:
+
             connection_manager.disconnect_broadcast(websocket)
         except Exception:
             connection_manager.disconnect_broadcast(websocket)

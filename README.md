@@ -281,44 +281,65 @@ pip install -r requirements.txt
 pip install pytest
 ```
 
-### 2. Running Automated Tests
+### 2. First-Run Setup (Zero Hardcoding)
+Configure your local operator profile, preferred name, aliases, and initial primary space:
+```bash
+python interfaces/cli/setup_wizard.py
+```
+
+### 3. Running Automated Tests
 Run the complete unit and integration test suite:
 ```bash
 python -m pytest tests
 ```
-*Expected output: `22 passed in ~26s`.*
+*Expected output: `24 passed in ~29s`.*
 
-### 3. Starting the Universal Core AI Gateway & Microkernel
+### 4. Interactive Operator Core Console (CLI Shell)
+Launch the rich interactive operator command center:
+```bash
+python interfaces/cli/core_console.py
+```
+- Solve arbitrary goals with real-time DAG pipeline visualization (`solve <goal>`).
+- Inspect and manage spatial zones dynamically (`zones`, `zone add <id> [name]`).
+- Inspect connected devices and security tiers (`devices`).
+- View and update operator profile (`profile`, `profile set <name>`).
+- Dispatch live HUD cards to ambient mirrors or wall projections (`hud <title> | <body>`).
+- Stream structured execution and audit logs (`logs [count]`).
+
+### 5. Starting the Universal Core AI Gateway & Microkernel
 Launch the microkernel, proactive reasoning daemon, and high-speed API gateway:
 ```bash
 python main.py
 ```
 - **Interactive Swagger REST Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Interactive Master Roadmap Visualizer**: [http://localhost:8000/roadmap](http://localhost:8000/roadmap)
 - **Ambient Smart Mirror & Wall Projection HUD**: [http://localhost:8000/mirror](http://localhost:8000/mirror)
-- **Real-Time WebSocket Gateway**: `ws://localhost:8000/ws/events`
+- **Real-Time Event WebSocket**: `ws://localhost:8000/ws/events`
+- **Real-Time Log Stream WebSocket**: `ws://localhost:8000/ws/logs`
 
-### 4. Zero-Friction Device Onboarding (1-Line Plug & Play)
+
+### 6. Zero-Friction Device Onboarding (1-Line Plug & Play)
 When you turn on a new laptop, Raspberry Pi, Arduino serial bridge, or Linux SBC, onboard it instantly with:
 ```bash
-python -m interfaces.install.enroll --server http://<core-ip>:8000 --device-name "Studio-Laptop" --device-type laptop --zone "home/indoor/studio" --secret core_sovereign_secret
+python -m interfaces.install.enroll --server http://<core-ip>:8000 --device-name "Laptop-01" --device-type laptop --zone "workspace" --secret core_sovereign_secret
 ```
 This registers the device in SQLite, obtains a secure session token, and connects it to the Core AI mesh.
 
-### 5. Security Tiers & Privacy Protection (Owner vs. Ambient vs. Guest)
+### 7. Security Tiers & Privacy Protection (Owner vs. Ambient vs. Guest)
 Core AI strictly defends personal privacy and enforces three distinct trust tiers:
 - **Host / Owner (`OWNER`)**: Full access to personal identity memory, sensitive files, private tools, and all spatial zones.
 - **Ambient Displays & Sensors (`AMBIENT`)**: Smart mirrors, wall projectors, room microphones. Can render HUD cards, play audio, and report environmental sensor data, but cannot dump private personal data.
 - **Guest Devices (`GUEST`)**: Untrusted devices on the local network (e.g. a friend's phone on WiFi, guest laptop). Personal profile access and critical tools are rejected (`HTTP 403 Forbidden`). Interaction requires explicit owner approval.
 
-### 6. Year-End 2026 Milestone: Multi-Zone Workspace & Living Sanctuary Unified
+### 8. Year-End 2026 Milestone: Multi-Zone Workspace & Living Sanctuary Unified
 By the end of 2026, Core AI serves as an active, seamless, overwatching harness connecting the operator's primary workspace/studio and personal living sanctuary:
 - Eliminates manual back-and-forth management between spaces.
 - Dynamically creates and tracks zones on-demand without hardcoded room assumptions.
 - Proactively handles peripheral states, audio interfaces, lighting profiles, and reminders.
 
-
-### 7. Anti-Slop & Truthful Capability Standard
+### 9. Anti-Slop & Truthful Capability Standard
 Core AI strictly adheres to the Truthful Capability Principle:
 - Zero hallucinations or false promises of capabilities it does not possess.
 - If an action or tool is unavailable, Core AI diagnoses the exact root cause, reports it transparently, and optionally synthesizes or requests the needed tool.
+
 

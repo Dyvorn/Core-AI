@@ -150,3 +150,16 @@ def test_gateway_guest_security_tier_rejection(gateway_client):
     res_update = client.post("/api/v1/profile", json={"preferred_name": "Hacker"}, headers={"X-Trust-Tier": "guest"})
     assert res_update.status_code == 403
 
+def test_gateway_get_execution_logs(gateway_client):
+    client, state = gateway_client
+
+    # Write a test log
+    state.log_execution(source="test_runner", level="INFO", message="Unit test executed", payload={"metric": 42})
+
+    res = client.get("/api/v1/logs?limit=5")
+    assert res.status_code == 200
+    logs = res.json()
+    assert len(logs) >= 1
+    assert any("Unit test executed" in l["message"] for l in logs)
+
+
