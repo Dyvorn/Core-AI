@@ -69,13 +69,14 @@
   2. Nothing OS Glyph Matrix integration: trigger Glyph LED patterns for AI thinking, alerts, and subtle status indications without turning on the screen.
   3. Lock screen widgets and quick settings tiles for 1-tap voice interaction.
 
-### Debt #107: Dynamic Spatial Anchoring & User Profile Memory `[OPEN]`
+### Debt #107: Dynamic Spatial Anchoring & User Profile Memory `[RESOLVED]`
 - **Context**: The AI needs persistent identity memory ("know who I am", names, nicknames like "Daevron", preferences) and spatial awareness of roaming vs. fixed devices.
-- **Current State**: Static node list in `config/nodes.yaml` with in-memory lookup.
-- **Needed**:
-  1. `user_profiles` table in SQLite (`core_ai.db`) for preferred name, persona style, and preferences updated via speech or settings.
-  2. `device_topology` table distinguishing **Fixed Anchor Devices** (studio mic, smart mirror, garden sensor) from **Roaming Devices** (laptop, phone, glasses).
-  3. Dynamic proximity and verbal anchoring: *"This laptop is in the studio right now"* or proximity to studio anchors automatically maps the roaming laptop to `home/indoor/studio`.
+- **Resolution**:
+  1. Built `user_profiles` table in SQLite with `get_user_profile`, `save_user_profile`, and `set_user_preferred_name` methods.
+  2. Built `device_topology` table distinguishing **Fixed Anchor Devices** from **Roaming Devices** with verbal and proximity anchoring (`update_device_zone`).
+  3. Implemented three security trust tiers (`OWNER`, `AMBIENT`, `GUEST`) protecting private profile memory with `403 Forbidden` defense gates.
+  4. Added zero-friction 1-line onboarding script in `interfaces/install/enroll.py`. Verified with 100% automated test coverage in `tests/test_gateway.py`.
+
 
 
 

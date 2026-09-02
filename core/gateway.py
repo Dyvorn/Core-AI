@@ -325,6 +325,16 @@ def create_gateway_app(
             return FileResponse(mirror_path)
         raise HTTPException(status_code=404, detail="Mirror UI file not found")
 
+    @app.get("/roadmap", include_in_schema=False)
+    def serve_roadmap_ui():
+        """Serves the Interactive Master Architectural Roadmap Visualizer."""
+        from fastapi.responses import FileResponse
+        roadmap_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../interfaces/mirror/roadmap_visualizer.html"))
+        if os.path.exists(roadmap_path):
+            return FileResponse(roadmap_path)
+        raise HTTPException(status_code=404, detail="Roadmap Visualizer file not found")
+
+
 
     # --- WebSocket Endpoints ---
 
