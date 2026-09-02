@@ -1,0 +1,21 @@
+system:
+  redis_url: "redis://localhost:6379/0"
+  db_path: "core_ai.db"
+  dynamic_tools_dir: "tools/dynamic"
+
+logging:
+  level: "INFO"
+  log_file: "logs/core_ai.log"
+  audit_jsonl: "logs/pipelines.jsonl"
+
+models:
+  planner: "ollama/qwen3.5:2b" # Standard lokales model für einfache tasks
+  fallback_planner: "gemini/gemini-2.5-flash"
+  deep_reasoning: "gemini/gemini-3.1-pro" # Für komplexe tasks
+  stt_model: "distil-whisper/distil-large-v3"
+  tts_voice: "default_voice" # Platzhalter für kokoro voice oder piper
+
+audio:
+  sample_rate: 16000
+  channels: 1
+

@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  core-ai:
+    build: .
+    container_name: core_ai_kernel
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ./tools/dynamic:/app/tools/dynamic
+      - ./core_ai.db:/app/core_ai.db
+    depends_on:
+      - redis
+    networks:
+      - core_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: core_ai_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - core_net
+
+volumes:
+  redis_data:
+
+networks:
+  core_net:
+    driver: bridge

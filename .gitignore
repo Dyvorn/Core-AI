@@ -1,0 +1,32 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual Environment
+.venv/
+env/
+venv/
+ENV/
+
+# Local databases and runtime state
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Environment secrets
+config/.env
+.env
+
+# Logs and runtime artifacts
+logs/*.log
+logs/*.txt
+logs/pipelines.jsonl
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

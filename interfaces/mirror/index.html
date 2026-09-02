@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Core AI — Ambient Smart Mirror & Projection HUD</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #05070c;
+      --card-bg: rgba(16, 24, 39, 0.65);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-emerald: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 3rem 3.5rem;
+      position: relative;
+    }
+
+    /* Ambient Glow & LED simulation */
+    .ambient-led-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+      opacity: 0.7;
+      transition: all 0.5s ease;
+      box-shadow: 0 0 20px var(--accent-cyan);
+    }
+
+    .ambient-led-bar.thinking {
+      background: linear-gradient(90deg, #ec4899, #8b5cf6, #3b82f6);
+      animation: pulse-glow 1.5s infinite alternate;
+    }
+
+    @keyframes pulse-glow {
+      0% { opacity: 0.4; filter: blur(2px); }
+      100% { opacity: 1; filter: blur(6px); }
+    }
+
+    /* Header & Clock */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .clock-widget {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .time-display {
+      font-size: 5.5rem;
+      font-weight: 200;
+      letter-spacing: -2px;
+      line-height: 1;
+      background: linear-gradient(180deg, #ffffff 40%, rgba(255,255,255,0.65));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .date-display {
+      font-size: 1.35rem;
+      font-weight: 300;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    .user-greeting {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 0.75rem 1.5rem;
+      border-radius: 9999px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald);
+    }
+
+    .user-greeting span {
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--text-main);
+    }
+
+    /* Center Stage: Ambient HUD Cards */
+    main {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem 0;
+    }
+
+    .hud-card-container {
+      width: 100%;
+      max-width: 650px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .hud-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 1.5rem;
+      padding: 2rem 2.5rem;
+      backdrop-filter: blur(24px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      animation: slide-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hud-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 12px var(--accent-cyan);
+    }
+
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateY(30px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .hud-title {
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+
+    .hud-badge {
+      font-size: 0.75rem;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 0.3rem 0.7rem;
+      background: rgba(0, 242, 254, 0.12);
+      color: var(--accent-cyan);
+      border-radius: 6px;
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      text-transform: uppercase;
+    }
+
+    .hud-body {
+      font-size: 1.15rem;
+      font-weight: 300;
+      line-height: 1.6;
+      color: #cbd5e1;
+    }
+
+    .hud-metrics {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .metric-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-key {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .metric-value {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Footer & System Status */
+    footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .zone-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .zone-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+    }
+  </style>
+</head>
+<body>
+  <div id="led-bar" class="ambient-led-bar"></div>
+
+  <header>
+    <div class="clock-widget">
+      <div id="clock-time" class="time-display">--:--</div>
+      <div id="clock-date" class="date-display">Connecting to Core AI...</div>
+    </div>
+    <div class="user-greeting">
+      <div id="connection-dot" class="status-dot"></div>
+      <span id="user-name">Core AI Node</span>
+    </div>
+  </header>
+
+  <main>
+    <div id="cards-container" class="hud-card-container">
+      <div class="hud-card" id="primary-card">
+        <div class="hud-header">
+          <h2 class="hud-title">Ambient Core Active</h2>
+          <span class="hud-badge">ONLINE</span>
+        </div>
+        <div class="hud-body">
+          Listening for ambient events, spatial triggers, and autonomous task completions.
+        </div>
+        <div class="hud-metrics">
+          <div class="metric-item">
+            <span class="metric-key">ZONE</span>
+            <span class="metric-value">home/indoor/mirror</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-key">SYSTEM</span>
+            <span class="metric-value">FastAPI Mesh</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="zone-indicator">
+      <div class="zone-dot"></div>
+      <span>SPATIAL ANCHOR: HOME STUDIO</span>
+    </div>
+    <div id="network-status">WEBSOCKET: CONNECTING...</div>
+  </footer>
+
+  <script>
+    // Clock updater
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock-time').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('clock-date').textContent = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Fetch initial Profile
+    async function loadProfile() {
+      try {
+        const res = await fetch('http://localhost:8000/api/v1/profile');
+        if (res.ok) {
+          const profile = await res.json();
+          document.getElementById('user-name').textContent = `${profile.preferred_name}'s Sanctuary`;
+        }
+      } catch (e) {
+        console.log('Using default profile until server connects');
+      }
+    }
+    loadProfile();
+
+    // WebSocket Gateway Bridge
+    const wsUrl = `ws://${window.location.hostname || 'localhost'}:8000/ws/events`;
+    let socket;
+
+    function connect() {
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        document.getElementById('network-status').textContent = 'WEBSOCKET: CONNECTED';
+        document.getElementById('connection-dot').style.backgroundColor = '#10b981';
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleCoreEvent(msg);
+        } catch (e) {
+          console.error('Invalid message from Core AI:', e);
+        }
+      };
+
+      socket.onclose = () => {
+        document.getElementById('network-status').textContent = 'WEBSOCKET: RECONNECTING...';
+        document.getElementById('connection-dot').style.backgroundColor = '#f59e0b';
+        setTimeout(connect, 3000);
+      };
+    }
+
+    function handleCoreEvent(msg) {
+      const ledBar = document.getElementById('led-bar');
+
+      if (msg.event === 'HUD_CARD') {
+        renderCard(msg.data);
+      } else if (msg.event === 'PIPELINE_STARTED') {
+        ledBar.classList.add('thinking');
+      } else if (msg.event === 'PIPELINE_COMPLETED') {
+        ledBar.classList.remove('thinking');
+        renderPipelineResult(msg.data);
+      }
+    }
+
+    function renderCard(card) {
+      const container = document.getElementById('cards-container');
+      const cardEl = document.createElement('div');
+      cardEl.className = 'hud-card';
+      if (card.accent_color) {
+        cardEl.style.setProperty('--accent-cyan', card.accent_color);
+      }
+
+      let metricsHtml = '';
+      if (card.metrics) {
+        metricsHtml = '<div class="hud-metrics">' + 
+          Object.entries(card.metrics).map(([k, v]) => `
+            <div class="metric-item">
+              <span class="metric-key">${k}</span>
+              <span class="metric-value">${v}</span>
+            </div>
+          `).join('') + '</div>';
+      }
+
+      cardEl.innerHTML = `
+        <div class="hud-header">
+          <h2 class="hud-title">${card.title}</h2>
+          <span class="hud-badge">HUD CARD</span>
+        </div>
+        <div class="hud-body">${card.subtitle || ''}</div>
+        ${metricsHtml}
+      `;
+
+      container.prepend(cardEl);
+      if (container.children.length > 3) {
+        container.removeChild(container.lastChild);
+      }
+    }
+
+    function renderPipelineResult(data) {
+      renderCard({
+        title: 'Task Completed',
+        subtitle: `Result: ${JSON.stringify(data.output)}`,
+        accent_color: data.status === 'completed' ? '#10b981' : '#ef4444',
+        metrics: {
+          STATUS: data.status,
+          PIPE: data.pipeline_id ? data.pipeline_id.slice(0, 8) : 'sys'
+        }
+      });
+    }
+
+    connect();
+  </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+pydantic>=2.0
+redis
+litellm
+faster-whisper
+silero-vad
+sounddevice
+numpy
+pyyaml
+python-dotenv
+fastapi
+uvicorn
+websockets
+# sqlite-vec (for future vector db usage)
+# kokoro-onnx (can be added depending on tts backend)
+soundfile
