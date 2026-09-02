@@ -285,9 +285,20 @@ def create_gateway_app(
         )
 
 
+    @app.get("/api/v1/zones")
+    def list_zones():
+        """Lists all dynamically discovered and created spatial zones."""
+        return state_manager.list_zones()
+
+    @app.post("/api/v1/zones")
+    def create_zone(zone_id: str, display_name: Optional[str] = None, description: Optional[str] = None):
+        """Explicitly declare a new spatial zone dynamically without hardcoding."""
+        return state_manager.ensure_zone_exists(zone_id, display_name, metadata={"description": description})
+
     @app.get("/api/v1/devices")
     def list_devices():
         return state_manager.list_all_devices()
+
 
     @app.post("/api/v1/devices/anchor")
     def anchor_device(req: DeviceAnchorRequest):

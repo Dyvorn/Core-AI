@@ -163,15 +163,25 @@ class FailureDiagnosis(BaseModel):
 
 # --- Phase 2: Ubiquitous Profiles, Edge Topology, & Proactive Schemas ---
 
+class ZoneRecord(BaseModel):
+    """Dynamic spatial zone created on-demand as the user mentions or connects rooms/spaces."""
+    zone_id: str  # e.g., 'studio', 'patio', 'garage', 'living_room'
+    display_name: str
+    description: Optional[str] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class UserProfile(BaseModel):
     """Personal identity memory: who the user is, nicknames, preferences, and persona settings."""
     user_id: str = "primary_user"
-    preferred_name: str = "Dyvorn"  # Primary handle
-    aliases: List[str] = Field(default_factory=lambda: ["Vyrn", "Refined"])
+    preferred_name: str = "User"  # Clean open-source default (configured by operator on first run)
+    aliases: List[str] = Field(default_factory=list)
     pronouns: Optional[str] = None
     preferred_tone: str = "friendly_concise"
     preferences: Dict[str, Any] = Field(default_factory=dict)
     updated_at: datetime = Field(default_factory=utc_now)
+
 
 
 

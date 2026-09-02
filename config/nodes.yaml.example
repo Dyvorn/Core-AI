@@ -1,0 +1,31 @@
+# Example Reference Topology: Core AI Ubiquitous Device Topology
+# All zones can be provisioned dynamically at runtime via speech or device enrollment.
+
+nodes:
+  - id: "room_workspace"
+    name: "Workspace Studio"
+    type: "room"
+    zone: "home/indoor/workspace"
+    capabilities: ["mic", "speaker", "screen"]
+    connectivity: "local"
+
+  - id: "room_living"
+    name: "Living Area"
+    type: "room"
+    zone: "home/indoor/living_room"
+    capabilities: ["mic", "speaker", "tv_screen"]
+    connectivity: "local"
+
+  - id: "vehicle_car"
+    name: "Connected Vehicle"
+    type: "vehicle_car"
+    zone: "mobile/vehicle/car"
+    capabilities: ["car_audio_in", "car_audio_out", "dashboard_card", "gps", "obd_telemetry"]
+    connectivity: "tailscale_mesh"
+
+  - id: "wearable_phone"
+    name: "Companion Phone"
+    type: "phone"
+    zone: "mobile/wearable/phone"
+    capabilities: ["mic", "speaker", "rich_screen", "gps", "push_notification"]
+    connectivity: "cellular"

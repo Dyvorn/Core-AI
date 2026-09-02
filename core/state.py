@@ -3,7 +3,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
-from core.schemas import PipelinePlan, PipelineStep, UserProfile, DeviceTopologyRecord, ProactiveTriggerRule
+from core.schemas import PipelinePlan, PipelineStep, UserProfile, DeviceTopologyRecord, ProactiveTriggerRule, ZoneRecord
 
 
 logger = logging.getLogger(__name__)
@@ -25,27 +25,9 @@ class StateManager:
         try:
             # Enable WAL mode for better concurrency
             conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
             
-            # 1. Room state
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS room_state (
-                    room_id TEXT PRIMARY KEY,
-                    state JSON,
-                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # 2. General key-value memory
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS memory (
-                    id TEXT PRIMARY KEY,
-                    key TEXT,
-                    value JSON,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-
-            # 3. Pipelines
+            # 1. Pipelines
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS pipelines (
                     id TEXT PRIMARY KEY,
@@ -58,6 +40,25 @@ class StateManager:
                     updated_at TIMESTAMP
                 )
             ''')
+            
+            # 2. Key-Value State
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS kv_state (
+                    key TEXT PRIMARY KEY,
+                    value JSON,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # 3. Room & Zone State
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS room_state (
+                    room_id TEXT PRIMARY KEY,
+                    state JSON,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
 
             # 4. Pipeline Steps
             conn.execute('''
@@ -115,7 +116,18 @@ class StateManager:
                 )
             ''')
 
-            # 8. Device Topology (Fixed spatial anchors vs. Roaming devices)
+            # 8. Dynamic Spatial Zones (Created on demand as the user adds rooms or spaces)
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS zones (
+                    zone_id TEXT PRIMARY KEY,
+                    display_name TEXT,
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    metadata JSON
+                )
+            ''')
+
+            # 9. Device Topology (Fixed spatial anchors vs. Roaming devices)
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS device_topology (
                     device_id TEXT PRIMARY KEY,
@@ -130,7 +142,7 @@ class StateManager:
                 )
             ''')
 
-            # 9. Proactive Trigger Rules
+            # 10. Proactive Trigger Rules
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS proactive_rules (
                     rule_id TEXT PRIMARY KEY,
@@ -147,7 +159,7 @@ class StateManager:
             ''')
 
             conn.commit()
-            logger.info("Database initialized successfully with pipeline, profile, topology, and proactive tables")
+            logger.info("Database initialized successfully with pipeline, profile, dynamic zones, and topology tables")
         except Exception as e:
             logger.error(f"Database initialization failed: {e}")
         finally:
@@ -329,13 +341,12 @@ class StateManager:
                 if data.get("updated_at") and isinstance(data["updated_at"], str):
                     data["updated_at"] = datetime.fromisoformat(data["updated_at"])
                 return UserProfile(**data)
-            # Default profile
-            default_profile = UserProfile(user_id=user_id, preferred_name="Dyvorn", aliases=["Vyrn", "Refined"])
+            # Default profile: neutral blank-slate for open-source deployment
+            default_profile = UserProfile(user_id=user_id, preferred_name="User", aliases=[])
             self.save_user_profile(default_profile)
             return default_profile
         finally:
             conn.close()
-
 
     def save_user_profile(self, profile: UserProfile):
         conn = self._get_connection()
@@ -358,17 +369,65 @@ class StateManager:
         finally:
             conn.close()
 
-    def set_user_preferred_name(self, preferred_name: str, user_id: str = "primary_user") -> UserProfile:
+    def set_user_preferred_name(self, preferred_name: str, aliases: Optional[List[str]] = None, user_id: str = "primary_user") -> UserProfile:
         profile = self.get_user_profile(user_id)
         profile.preferred_name = preferred_name
+        if aliases is not None:
+            profile.aliases = aliases
         profile.updated_at = datetime.now(timezone.utc)
         self.save_user_profile(profile)
         return profile
+
+    # --- Dynamic Spatial Zones (Zero Hardcoding) ---
+    def ensure_zone_exists(self, zone_id: str, display_name: Optional[str] = None, metadata: Optional[dict] = None) -> ZoneRecord:
+        """Ensures a spatial zone is registered dynamically on-the-fly without hardcoded assumptions."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT * FROM zones WHERE zone_id = ?", (zone_id,))
+            row = cursor.fetchone()
+            if row:
+                data = dict(row)
+                data["metadata"] = json.loads(data["metadata"]) if data.get("metadata") else {}
+                if data.get("created_at") and isinstance(data["created_at"], str):
+                    data["created_at"] = datetime.fromisoformat(data["created_at"])
+                return ZoneRecord(**data)
+            
+            # Create dynamically on-demand
+            name = display_name or zone_id.replace("_", " ").title()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            meta_json = json.dumps(metadata or {})
+            conn.execute('''
+                INSERT INTO zones (zone_id, display_name, created_at, metadata)
+                VALUES (?, ?, ?, ?)
+            ''', (zone_id, name, now_iso, meta_json))
+            conn.commit()
+            logger.info(f"Dynamically provisioned new spatial zone: '{zone_id}' ('{name}')")
+            return ZoneRecord(zone_id=zone_id, display_name=name, metadata=metadata or {})
+        finally:
+            conn.close()
+
+    def list_zones(self) -> List[ZoneRecord]:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT * FROM zones")
+            results = []
+            for row in cursor.fetchall():
+                data = dict(row)
+                data["metadata"] = json.loads(data["metadata"]) if data.get("metadata") else {}
+                if data.get("created_at") and isinstance(data["created_at"], str):
+                    data["created_at"] = datetime.fromisoformat(data["created_at"])
+                results.append(ZoneRecord(**data))
+            return results
+        finally:
+            conn.close()
 
     # --- Device Topology (Fixed vs. Roaming Devices) ---
     def register_or_update_device(self, record: DeviceTopologyRecord):
         conn = self._get_connection()
         try:
+            if record.current_zone:
+                self.ensure_zone_exists(record.current_zone)
+
             now_iso = datetime.now(timezone.utc).isoformat()
             conn.execute('''
                 INSERT OR REPLACE INTO device_topology
@@ -425,6 +484,7 @@ class StateManager:
             conn.close()
 
     def update_device_zone(self, device_id: str, zone: str, nearest_anchor_id: Optional[str] = None):
+        self.ensure_zone_exists(zone)
         conn = self._get_connection()
         try:
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -437,6 +497,7 @@ class StateManager:
             logger.info(f"Relocated device '{device_id}' to zone '{zone}' (anchor={nearest_anchor_id})")
         finally:
             conn.close()
+
 
     # --- Proactive Trigger Rules ---
     def save_proactive_rule(self, rule: ProactiveTriggerRule):

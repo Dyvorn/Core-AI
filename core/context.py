@@ -14,31 +14,50 @@ class ContextManager:
     - Wearables (smart glasses, phone, smartwatch)
     """
     
-    def __init__(self, config_path: str = "config/nodes.yaml"):
+    def __init__(self, config_path: str = "config/nodes.yaml", state_manager=None):
         self.nodes: Dict[str, NodeInfo] = {}
+        self.state_manager = state_manager
         self.load_nodes(config_path)
 
     def load_nodes(self, config_path: str):
         try:
-            with open(config_path, 'r', encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-                if data and 'nodes' in data:
-                    for node_data in data['nodes']:
-                        node = NodeInfo(**node_data)
-                        self.nodes[node.id] = node
-            logger.info(f"Loaded {len(self.nodes)} ubiquitous nodes from config")
+            import os
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                    if data and 'nodes' in data and data['nodes']:
+                        for node_data in data['nodes']:
+                            node = NodeInfo(**node_data)
+                            self.nodes[node.id] = node
+                logger.info(f"Loaded {len(self.nodes)} nodes from config")
         except Exception as e:
-            logger.error(f"Failed to load nodes from {config_path}: {e}")
+            logger.warning(f"Could not load static nodes from {config_path} (will use dynamic state discovery): {e}")
 
     def get_node(self, node_id: str) -> Optional[NodeInfo]:
-        return self.nodes.get(node_id)
+        if node_id in self.nodes:
+            return self.nodes[node_id]
+        
+        # Dynamic fallback to StateManager database
+        if self.state_manager:
+            device = self.state_manager.get_device_record(node_id)
+            if device:
+                return NodeInfo(
+                    id=device.device_id,
+                    name=device.name,
+                    type=device.device_type,
+                    capabilities=device.capabilities,
+                    zone=device.current_zone,
+                    connectivity="local"
+                )
+        return None
 
     def get_zone_for_node(self, node_id: str) -> str:
-        """Returns the hierarchical zone of the node (e.g. 'mobile/vehicle/car', 'home/indoor/office')."""
+        """Returns the hierarchical zone of the node, dynamically resolving if needed."""
         node = self.get_node(node_id)
         if node and node.zone:
             return node.zone
-        return "default_zone"
+        return "default"
+
 
     def get_room_for_node(self, node_id: str) -> str:
         """Backward-compatible helper for room-based workflows."""

@@ -310,11 +310,12 @@ Core AI strictly defends personal privacy and enforces three distinct trust tier
 - **Ambient Displays & Sensors (`AMBIENT`)**: Smart mirrors, wall projectors, room microphones. Can render HUD cards, play audio, and report environmental sensor data, but cannot dump private personal data.
 - **Guest Devices (`GUEST`)**: Untrusted devices on the local network (e.g. a friend's phone on WiFi, guest laptop). Personal profile access and critical tools are rejected (`HTTP 403 Forbidden`). Interaction requires explicit owner approval.
 
-### 6. Year-End 2026 Milestone: Studio & Living Area Unified
-By the end of 2026, Core AI serves as an active, seamless, overwatching harness connecting the user's **Studio** and **Bedroom/Living Area**:
-- Eliminates manual back-and-forth management between rooms.
-- Understands whether the user is in the studio or the living area based on fixed spatial anchors.
+### 6. Year-End 2026 Milestone: Multi-Zone Workspace & Living Sanctuary Unified
+By the end of 2026, Core AI serves as an active, seamless, overwatching harness connecting the operator's primary workspace/studio and personal living sanctuary:
+- Eliminates manual back-and-forth management between spaces.
+- Dynamically creates and tracks zones on-demand without hardcoded room assumptions.
 - Proactively handles peripheral states, audio interfaces, lighting profiles, and reminders.
+
 
 ### 7. Anti-Slop & Truthful Capability Standard
 Core AI strictly adheres to the Truthful Capability Principle:

@@ -1,60 +1,13 @@
-nodes:
-  # Indoor House Zones
-  - id: "room_office"
-    name: "Office Studio"
-    type: "room"
-    zone: "home/indoor/office"
-    capabilities: ["mic", "speaker", "screen"]
-    connectivity: "local"
+# Core AI Ubiquitous Device Topology Template
+# NOTE: All zones, anchors, and devices are dynamically discovered and created on-the-fly!
+# You DO NOT need to define rooms or vehicles here unless you want static presets.
+# Devices can auto-enroll via: python -m interfaces.install.enroll
 
-  - id: "room_living"
-    name: "Living Room"
-    type: "room"
-    zone: "home/indoor/living_room"
-    capabilities: ["mic", "speaker", "tv_screen"]
-    connectivity: "local"
-
-  # Outdoor & Ground Zones
-  - id: "ground_garden"
-    name: "Garden & Patio"
-    type: "outdoor_zone"
-    zone: "home/outdoor/garden"
-    capabilities: ["outdoor_speaker", "ambient_mic", "weather_sensors"]
-    connectivity: "local"
-
-  - id: "ground_workshop"
-    name: "Workshop & Garage"
-    type: "outdoor_zone"
-    zone: "home/outdoor/workshop"
-    capabilities: ["mic", "speaker", "industrial_tools"]
-    connectivity: "local"
-
-  # Vehicles
-  - id: "vehicle_car"
-    name: "Personal Car"
-    type: "vehicle_car"
-    zone: "mobile/vehicle/car"
-    capabilities: ["car_audio_in", "car_audio_out", "dashboard_card", "gps", "obd_telemetry"]
-    connectivity: "tailscale_mesh"
-
-  - id: "vehicle_bike"
-    name: "Bike Computer"
-    type: "vehicle_bike"
-    zone: "mobile/vehicle/bike"
-    capabilities: ["high_contrast_hud", "speed_cadence", "gps", "haptic_alert"]
-    connectivity: "ble"
-
-  # Personal Wearables & Edge Devices
-  - id: "wearable_glasses"
-    name: "Smart Glasses"
-    type: "smart_glasses"
-    zone: "mobile/wearable/glasses"
-    capabilities: ["hud_display", "bone_conduction_audio", "camera_fov", "glance_tracker"]
-    connectivity: "ble"
-
-  - id: "wearable_phone"
-    name: "Companion Phone"
-    type: "phone"
-    zone: "mobile/wearable/phone"
-    capabilities: ["mic", "speaker", "rich_screen", "gps", "camera", "push_notification"]
-    connectivity: "cellular"
+nodes: []
+# Optional examples:
+# - id: "room_workspace"
+#   name: "Primary Workspace"
+#   type: "room"
+#   zone: "home/indoor/workspace"
+#   capabilities: ["mic", "speaker", "screen"]
+#   connectivity: "local"

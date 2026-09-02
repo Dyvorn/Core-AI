@@ -38,21 +38,39 @@ def test_gateway_health_endpoint(gateway_client):
 def test_gateway_user_profile_crud(gateway_client):
     client, state = gateway_client
     
-    # 1. Fetch initial profile
+    # 1. Fetch initial profile on fresh install (blank-slate default)
     res1 = client.get("/api/v1/profile")
     assert res1.status_code == 200
-    assert res1.json()["preferred_name"] == "Dyvorn"
-    assert "Vyrn" in res1.json()["aliases"]
+    assert res1.json()["preferred_name"] == "User"
 
-    # 2. Update to "Vyrn" alias
-    res2 = client.post("/api/v1/profile", json={"preferred_name": "Vyrn", "preferred_tone": "focused"})
+    # 2. Update to custom user handle and preferences
+    res2 = client.post("/api/v1/profile", json={"preferred_name": "Dyvorn", "preferred_tone": "focused"})
     assert res2.status_code == 200
-    assert res2.json()["preferred_name"] == "Vyrn"
+    assert res2.json()["preferred_name"] == "Dyvorn"
     assert res2.json()["preferred_tone"] == "focused"
 
     # 3. Verify persisted in DB
     db_profile = state.get_user_profile()
-    assert db_profile.preferred_name == "Vyrn"
+    assert db_profile.preferred_name == "Dyvorn"
+
+def test_gateway_dynamic_zone_provisioning(gateway_client):
+    client, state = gateway_client
+
+    # 1. Initially zones list can be empty or default
+    res = client.get("/api/v1/zones")
+    assert res.status_code == 200
+
+    # 2. Dynamically declare a new zone on-the-fly without hardcoded assumptions
+    create_res = client.post("/api/v1/zones?zone_id=custom_workshop&display_name=My%20Custom%20Workshop")
+    assert create_res.status_code == 200
+    assert create_res.json()["zone_id"] == "custom_workshop"
+
+    # 3. Verify it shows up in list_zones
+    list_res = client.get("/api/v1/zones")
+    assert list_res.status_code == 200
+    zone_ids = [z["zone_id"] for z in list_res.json()]
+    assert "custom_workshop" in zone_ids
+
 
 
 def test_gateway_device_anchoring(gateway_client):
