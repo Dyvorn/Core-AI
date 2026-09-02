@@ -4,21 +4,59 @@
 
 ---
 
+### 🛡️ The #ANTISLOP Movement
+> *"We use AI to become more sustainable, smarter, and make human life genuinely easier — not to extract rent, hoard personal data, or pump low-effort corporate cash-grabs."*
+
+Core AI stands firmly against the modern plague of **AI Slop**:
+1. **Real Utility Over Hallucinated Hype**: Zero bloated minimum-viable wrappers or marketing buzzwords. If a capability isn't available, Core AI diagnoses why and reports the root cause transparently.
+2. **Human Elevation, Not Exploitation**: Technology should liberate human attention, remove friction between rooms and devices, and empower personal sovereignty.
+3. **Local Sovereignty & Sustainability**: Runs on your own silicon with 100% private data ownership under copyleft protection ([GNU AGPLv3](LICENSE)).
+
+---
+
+### 👥 Contributors & Stewardship
+
+| Role | Identity | GitHub / Handle | Focus |
+| :--- | :--- | :--- | :--- |
+| **Lead Architect & Maintainer** | **Dyvorn** *(aka Vyrn / Refined)* | [@Dyvorn](https://github.com/Dyvorn) | Core Microkernel, DAG Engine, Ubiquitous Mesh |
+| **Open Source Community** | *Community Contributors* | [Join Us](CONTRIBUTING.md) | Device Drivers, Spatial Plugins, Edge Nodes, Testing |
+
+---
+
+### ⚡ Full Technology Stack
+
+| Layer | Technologies & Protocols | Purpose |
+| :--- | :--- | :--- |
+| **Core Microkernel** | `Python 3.13+` • `Asyncio` • `Pydantic v2` | High-concurrency event loops, strict schema validation, zero-bloat foundation |
+| **Intelligence & Brain** | `DAG Engine` • `AST Security Gate` • `Dynamic Sandbox` | Autonomous multi-step planning, capability gap detection, verified self-extension |
+| **State & Persistence** | `SQLite (WAL mode)` • `Redis EventBus` *(InMemory fallback)* | Ultra-low latency thread-safe state, execution audit logs, pub/sub messaging |
+| **Universal Edge Gateway** | `FastAPI` • `Uvicorn` • `WebSockets` • `REST` | High-speed event streams (`/ws/events`, `/ws/logs`), OpenAPI docs, edge node mesh |
+| **Voice & Perception** | `Silero-VAD` • `faster-whisper (STT)` • `Piper / Edge-TTS` | Local voice activity detection, rapid transcription, and neural speech synthesis |
+| **Spatial & Proactive Engine**| `ProactiveDaemon` • `Spatial Topology Anchoring` | Background state monitoring, dynamic zone provisioning, cross-room device handoffs |
+| **Ambient & Edge Interfaces** | `Vanilla CSS (Glassmorphism)` • `Nothing OS Glyph LED` • `Core Console CLI` | Smart Mirror / Wall Projection HUD, tactile phone notifications, interactive operator shell |
+| **Hardware Interoperability** | `Home Assistant API` • `Tailscale WireGuard` • `PipeWire / ALSA` | Sovereign smart-home orchestration, encrypted mesh tunneling, audio routing |
+
+---
+
 ## 📖 Table of Contents
-1. [The Vision](#-the-vision)
-2. [Repository Structure](#-repository-structure)
-3. [Core Philosophy & Architecture](#-core-philosophy--architecture)
-4. [Subsystem Deep Dive](#-subsystem-deep-dive)
+1. [The #ANTISLOP Movement](#️-the-antislop-movement)
+2. [Contributors & Stewardship](#-contributors--stewardship)
+3. [Full Technology Stack](#-full-technology-stack)
+4. [The Vision](#-the-vision)
+5. [Repository Structure](#-repository-structure)
+6. [Core Philosophy & Architecture](#-core-philosophy--architecture)
+7. [Subsystem Deep Dive](#-subsystem-deep-dive)
    - [Tool Introspection & Registry](#1-tool-introspection--registry)
    - [Autonomous DAG Pipeline Engine](#2-autonomous-dag-pipeline-engine)
    - [Self-Extension & Dynamic Tool Synthesis](#3-self-extension--dynamic-tool-synthesis)
    - [Jarvis-Like Failure Awareness](#4-jarvis-like-failure-awareness)
    - [Multi-Sink Logging & Audit Trails](#5-multi-sink-logging--audit-trails)
-5. [Ubiquitous Device & Zone Ecosystem](#-ubiquitous-device--zone-ecosystem)
-6. [Multi-Platform & Operating System Strategy](#-multi-platform--operating-system-strategy)
-7. [Current Status: What Works vs. Roadmap](#-current-status-what-works-vs-roadmap)
-8. [Problem Logging & Technical Debt Ledger](#-problem-logging--technical-debt-ledger)
-9. [Getting Started & Quickstart](#-getting-started--quickstart)
+8. [Ubiquitous Device & Zone Ecosystem](#-ubiquitous-device--zone-ecosystem)
+9. [Multi-Platform & Operating System Strategy](#-multi-platform--operating-system-strategy)
+10. [Current Status: What Works vs. Roadmap](#-current-status-what-works-vs-roadmap)
+11. [Problem Logging & Technical Debt Ledger](#-problem-logging--technical-debt-ledger)
+12. [Getting Started & Quickstart](#-getting-started--quickstart)
+
 
 
 ---
