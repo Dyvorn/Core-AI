@@ -166,11 +166,13 @@ class FailureDiagnosis(BaseModel):
 class UserProfile(BaseModel):
     """Personal identity memory: who the user is, nicknames, preferences, and persona settings."""
     user_id: str = "primary_user"
-    preferred_name: str = "User"  # e.g. "Daevron"
+    preferred_name: str = "Dyvorn"  # Primary handle
+    aliases: List[str] = Field(default_factory=lambda: ["Vyrn", "Refined"])
     pronouns: Optional[str] = None
     preferred_tone: str = "friendly_concise"
     preferences: Dict[str, Any] = Field(default_factory=dict)
     updated_at: datetime = Field(default_factory=utc_now)
+
 
 
 class DeviceTopologyRecord(BaseModel):

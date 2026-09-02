@@ -45,10 +45,11 @@ gantt
 - **Universal Gateway**: FastAPI REST API and bidirectional WebSocket streams (`/ws/events`, `/ws/nodes/{id}`) with auto-generated OpenAPI documentation.
 - **Proactive Reasoning Daemon**: Background condition-action watcher evaluating state changes and dispatching proactive pipelines and alerts.
 - **Remote Edge Node Protocol**: Transparent network dispatching of tool executions to external edge nodes (car, phone, glasses).
-- **Personal Identity Memory**: Persistent `user_profiles` database tracking preferred name (*"Daevron"*), pronouns, and persona style, updated dynamically via natural language.
+- **Personal Identity Memory**: Persistent `user_profiles` database tracking preferred name (*"Dyvorn"*, aliases *Vyrn* / *Refined*), pronouns, and persona style, updated dynamically via natural language.
 - **Spatial Device Topology**: Distinguishes fixed spatial anchors (studio mic, smart mirror) from roaming devices (laptop, phone), supporting proximity and verbal anchoring.
 - **Security & Trust Tiers**: Enforces `OWNER`, `AMBIENT`, and `GUEST` permission levels, defending private user memory with `HTTP 403` rejections.
 - **Zero-Friction 1-Line Onboarding**: `interfaces/install/enroll.py` for enrolling any new laptop, SBC, or Arduino bridge in a single command.
+
 
 ### Phase 3: Studio & Living Room Unity (Year-End 2026 Target) `[IN PROGRESS]`
 - **Objective**: Create a seamless over-watching harness uniting the **Studio** and **Bedroom/Living Area**.

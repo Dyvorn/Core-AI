@@ -11,10 +11,11 @@ Core AI operates in untrusted and semi-trusted network environments (home LANs, 
 ```mermaid
 flowchart TD
     subgraph Trust Tiers
-        Owner[Host / Owner Tier: Lennard / Daevron] -->|Full Access| Core[Core AI Microkernel]
+        Owner["Host / Owner Tier: Dyvorn (Vyrn / Refined)"] -->|Full Access| Core[Core AI Microkernel]
         Ambient[Ambient Tier: Smart Mirrors, Wall Projectors] -->|Zone Scoped Only| Core
         Guest[Guest Tier: Friends' Phones on WiFi] -->|Guarded & Sandboxed| Core
     end
+
 
     subgraph Defense Gates
         Core --> AST[AST Security Gate]

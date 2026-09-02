@@ -70,7 +70,8 @@
   3. Lock screen widgets and quick settings tiles for 1-tap voice interaction.
 
 ### Debt #107: Dynamic Spatial Anchoring & User Profile Memory `[RESOLVED]`
-- **Context**: The AI needs persistent identity memory ("know who I am", names, nicknames like "Daevron", preferences) and spatial awareness of roaming vs. fixed devices.
+- **Context**: The AI needs persistent identity memory ("know who I am", names, nicknames like "Dyvorn" / "Vyrn" / "Refined", preferences) and spatial awareness of roaming vs. fixed devices.
+
 - **Resolution**:
   1. Built `user_profiles` table in SQLite with `get_user_profile`, `save_user_profile`, and `set_user_preferred_name` methods.
   2. Built `device_topology` table distinguishing **Fixed Anchor Devices** from **Roaming Devices** with verbal and proximity anchoring (`update_device_zone`).

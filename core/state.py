@@ -330,11 +330,12 @@ class StateManager:
                     data["updated_at"] = datetime.fromisoformat(data["updated_at"])
                 return UserProfile(**data)
             # Default profile
-            default_profile = UserProfile(user_id=user_id, preferred_name="User")
+            default_profile = UserProfile(user_id=user_id, preferred_name="Dyvorn", aliases=["Vyrn", "Refined"])
             self.save_user_profile(default_profile)
             return default_profile
         finally:
             conn.close()
+
 
     def save_user_profile(self, profile: UserProfile):
         conn = self._get_connection()

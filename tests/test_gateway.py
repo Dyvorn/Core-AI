@@ -41,17 +41,19 @@ def test_gateway_user_profile_crud(gateway_client):
     # 1. Fetch initial profile
     res1 = client.get("/api/v1/profile")
     assert res1.status_code == 200
-    assert res1.json()["preferred_name"] == "User"
+    assert res1.json()["preferred_name"] == "Dyvorn"
+    assert "Vyrn" in res1.json()["aliases"]
 
-    # 2. Update to "Daevron"
-    res2 = client.post("/api/v1/profile", json={"preferred_name": "Daevron", "preferred_tone": "focused"})
+    # 2. Update to "Vyrn" alias
+    res2 = client.post("/api/v1/profile", json={"preferred_name": "Vyrn", "preferred_tone": "focused"})
     assert res2.status_code == 200
-    assert res2.json()["preferred_name"] == "Daevron"
+    assert res2.json()["preferred_name"] == "Vyrn"
     assert res2.json()["preferred_tone"] == "focused"
 
     # 3. Verify persisted in DB
     db_profile = state.get_user_profile()
-    assert db_profile.preferred_name == "Daevron"
+    assert db_profile.preferred_name == "Vyrn"
+
 
 def test_gateway_device_anchoring(gateway_client):
     client, state = gateway_client
