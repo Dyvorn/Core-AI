@@ -26,6 +26,8 @@ from core.gateway import connection_manager
 from engines.voice_out import VoiceOutEngine
 from engines.voice_in import VoiceInEngine
 from brain.spoken_to import SpokenToReasoning, DiscourseRole
+from engines.audio_router import SpatialAudioRouter, route_spatial_audio, route_spatial_audio_schema
+from brain.spatial_handoff import SpatialHandoffEngine
 
 try:
     from colorama import init, Fore, Style
@@ -55,6 +57,7 @@ def print_help():
     print(f"  {GREEN}speak <text>{RESET}              - Synthesize neural speech via speakers")
     print(f"  {GREEN}spoken <text>{RESET}             - Test Spoken-To Reasoning classification on any phrase")
     print(f"  {GREEN}audio{RESET}                     - Inspect connected mics, studio interfaces & speakers")
+    print(f"  {GREEN}handoff <zone>{RESET}            - Transition spatial anchor & auto-route audio to new zone")
     print(f"  {GREEN}voice on / voice off{RESET}       - Toggle background microphone listening")
     print(f"  {GREEN}status{RESET}                    - Inspect system health, platform architecture & model status")
     print(f"  {GREEN}profile{RESET}                   - View or update operator identity and preferences")
@@ -85,6 +88,7 @@ def setup_kernel():
     registry.register_tool("list_dir_contents", list_dir_contents, list_dir_schema)
     registry.register_tool("calculate_math", calculate_math, calculate_math_schema)
     registry.register_tool("summarize_numbers", summarize_numbers, summarize_numbers_schema)
+    registry.register_tool("route_spatial_audio", route_spatial_audio, route_spatial_audio_schema)
     registry.discover_dynamic_tools()
 
     remote_dispatcher = RemoteToolDispatcher(registry=registry)
@@ -95,11 +99,19 @@ def setup_kernel():
     voice_out = VoiceOutEngine(default_voice="auto")
     voice_out.attach_to_bus(bus)
     spoken_to = SpokenToReasoning(state_manager=state, registry=registry, planner=planner)
+    audio_router = SpatialAudioRouter(state_manager=state)
+    spatial_handoff = SpatialHandoffEngine(
+        state_manager=state,
+        bus=bus,
+        audio_router=audio_router,
+        voice_out_engine=voice_out
+    )
 
-    return state, bus, registry, planner, engine, proactive, voice_out, spoken_to
+    return state, bus, registry, planner, engine, proactive, voice_out, spoken_to, audio_router, spatial_handoff
 
 def main():
-    state, bus, registry, planner, engine, proactive, voice_out, spoken_to = setup_kernel()
+    state, bus, registry, planner, engine, proactive, voice_out, spoken_to, audio_router, spatial_handoff = setup_kernel()
+
     
     profile = state.get_user_profile()
     active_name = profile.preferred_name
@@ -232,7 +244,34 @@ def main():
                 else:
                     print(f"{YELLOW}[!] Voice capture was not active.{RESET}")
 
+            elif cmd_lower == "audio":
+                devs = audio_router.list_system_audio_devices()
+                print(f"\n{BRIGHT}--- Connected Audio Inputs ({len(devs['inputs'])}) ---{RESET}")
+                for d in devs["inputs"]:
+                    print(f"  [{d['index']:2d}] 🎙️  {d['name']} (ch={d['max_input_channels']})")
+                print(f"\n{BRIGHT}--- Connected Audio Outputs ({len(devs['outputs'])}) ---{RESET}")
+                for d in devs["outputs"]:
+                    print(f"  [{d['index']:2d}] 🔊 {d['name']} (ch={d['max_output_channels']})")
+                routes = state.list_all_audio_routes()
+                if routes:
+                    print(f"\n{BRIGHT}--- Configured Zone Audio Routes ({len(routes)}) ---{RESET}")
+                    for r in routes:
+                        print(f"  • {YELLOW}{r.zone_id:<18}{RESET} : Mic='{r.input_device_name}' | Speaker='{r.output_device_name}'")
+                print()
+
+            elif cmd_lower.startswith("handoff ") or cmd_lower.startswith("relocate "):
+                target_z = user_input.split(maxsplit=1)[1].strip()
+                print(f"{CYAN}[*] Executing spatial handoff to zone '{target_z}'...{RESET}")
+                event = asyncio.run(spatial_handoff.execute_handoff(
+                    to_zone=target_z,
+                    from_zone=active_zone,
+                    reason="console_command"
+                ))
+                active_zone = target_z
+                print(f"{GREEN}[✓] Relocated to '{target_z}'! Audio re-routed & HUD card broadcast.{RESET}\n")
+
             elif cmd_lower == "profile":
+
                 p = state.get_user_profile()
                 print(f"\n{BRIGHT}--- Operator Profile ---{RESET}")
                 print(f"  Name:       {GREEN}{p.preferred_name}{RESET}")

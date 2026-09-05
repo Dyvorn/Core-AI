@@ -274,3 +274,39 @@ class DeviceEnrollmentResponse(BaseModel):
     message: str
 
 
+# --- Phase 3: Spatial Audio Routing & Cross-Zone Unity ---
+
+class AudioRouteRecord(BaseModel):
+    """Dynamic mapping between a spatial zone and its physical/network audio interfaces."""
+    zone_id: str
+    input_device_name: Optional[str] = None
+    output_device_name: Optional[str] = None
+    input_device_index: Optional[int] = None
+    output_device_index: Optional[int] = None
+    preferred_volume: float = 1.0
+    is_active: bool = True
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AudioRouteUpdateRequest(BaseModel):
+    """Payload to configure or update audio routing for an arbitrary zone."""
+    zone_id: str
+    input_device_name: Optional[str] = None
+    output_device_name: Optional[str] = None
+    preferred_volume: Optional[float] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class SpatialHandoffEvent(BaseModel):
+    """Emitted when an operator or roaming device transitions between zones."""
+    operator_id: str = "primary_user"
+    from_zone: Optional[str] = None
+    to_zone: str
+    active_device_id: Optional[str] = None
+    reason: str = "proximity_or_verbal"
+    auto_routed_audio: bool = True
+    timestamp: datetime = Field(default_factory=utc_now)
+
+
+

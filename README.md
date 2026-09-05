@@ -330,7 +330,7 @@ Run the complete unit and integration test suite:
 ```bash
 python -m pytest tests
 ```
-*Expected output: `24 passed in ~29s`.*
+*Expected output: `42 passed in ~35s`.*
 
 ### 4. Interactive Operator Core Console (CLI Shell)
 Launch the rich interactive operator command center:
@@ -338,6 +338,8 @@ Launch the rich interactive operator command center:
 python interfaces/cli/core_console.py
 ```
 - Solve arbitrary goals with real-time DAG pipeline visualization (`solve <goal>`).
+- Inspect audio hardware & active routes (`audio`).
+- Seamless cross-zone relocation & auto-routing (`handoff <zone_id>`).
 - Inspect and manage spatial zones dynamically (`zones`, `zone add <id> [name]`).
 - Inspect connected devices and security tiers (`devices`).
 - View and update operator profile (`profile`, `profile set <name>`).
@@ -355,29 +357,37 @@ python main.py
 - **Real-Time Event WebSocket**: `ws://localhost:8000/ws/events`
 - **Real-Time Log Stream WebSocket**: `ws://localhost:8000/ws/logs`
 
+### 6. Smart Mirror / Wall Projection Kiosk Mode
+Launch Chromium, Chrome, or Edge in fullscreen kiosk mode with automatic process watchdog and crash recovery:
+```bash
+python interfaces/mirror/launcher.py
+```
 
-### 6. Zero-Friction Device Onboarding (1-Line Plug & Play)
+
+
+### 7. Zero-Friction Device Onboarding (1-Line Plug & Play)
 When you turn on a new laptop, Raspberry Pi, Arduino serial bridge, or Linux SBC, onboard it instantly with:
 ```bash
 python -m interfaces.install.enroll --server http://<core-ip>:8000 --device-name "Laptop-01" --device-type laptop --zone "workspace" --secret core_sovereign_secret
 ```
 This registers the device in SQLite, obtains a secure session token, and connects it to the Core AI mesh.
 
-### 7. Security Tiers & Privacy Protection (Owner vs. Ambient vs. Guest)
+### 8. Security Tiers & Privacy Protection (Owner vs. Ambient vs. Guest)
 Core AI strictly defends personal privacy and enforces three distinct trust tiers:
 - **Host / Owner (`OWNER`)**: Full access to personal identity memory, sensitive files, private tools, and all spatial zones.
 - **Ambient Displays & Sensors (`AMBIENT`)**: Smart mirrors, wall projectors, room microphones. Can render HUD cards, play audio, and report environmental sensor data, but cannot dump private personal data.
 - **Guest Devices (`GUEST`)**: Untrusted devices on the local network (e.g. a friend's phone on WiFi, guest laptop). Personal profile access and critical tools are rejected (`HTTP 403 Forbidden`). Interaction requires explicit owner approval.
 
-### 8. Year-End 2026 Milestone: Multi-Zone Workspace & Living Sanctuary Unified
-By the end of 2026, Core AI serves as an active, seamless, overwatching harness connecting the operator's primary workspace/studio and personal living sanctuary:
+### 9. Multi-Zone Spatial Unity (Zero Hardcoding)
+Core AI serves as an active, seamless, overwatching harness connecting arbitrary zones (workspace studio, living sanctuary, workshop, patio, airplane hangar, etc.):
 - Eliminates manual back-and-forth management between spaces.
 - Dynamically creates and tracks zones on-demand without hardcoded room assumptions.
 - Proactively handles peripheral states, audio interfaces, lighting profiles, and reminders.
 
-### 9. Anti-Slop & Truthful Capability Standard
+### 10. Anti-Slop & Truthful Capability Standard
 Core AI strictly adheres to the Truthful Capability Principle:
 - Zero hallucinations or false promises of capabilities it does not possess.
 - If an action or tool is unavailable, Core AI diagnoses the exact root cause, reports it transparently, and optionally synthesizes or requests the needed tool.
+
 
 

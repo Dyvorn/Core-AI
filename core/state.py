@@ -3,10 +3,11 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
-from core.schemas import PipelinePlan, PipelineStep, UserProfile, DeviceTopologyRecord, ProactiveTriggerRule, ZoneRecord
+from core.schemas import PipelinePlan, PipelineStep, UserProfile, DeviceTopologyRecord, ProactiveTriggerRule, ZoneRecord, AudioRouteRecord
 
 
 logger = logging.getLogger(__name__)
+
 
 class StateManager:
     """Manages SQLite state including WAL-mode for high concurrency, pipeline states, and audit logs"""
@@ -158,8 +159,24 @@ class StateManager:
                 )
             ''')
 
+            # 11. Spatial Audio Routes (Dynamically binds spatial zones to audio interfaces)
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS audio_routes (
+                    zone_id TEXT PRIMARY KEY,
+                    input_device_name TEXT,
+                    output_device_name TEXT,
+                    input_device_index INTEGER,
+                    output_device_index INTEGER,
+                    preferred_volume REAL DEFAULT 1.0,
+                    is_active INTEGER DEFAULT 1,
+                    metadata JSON,
+                    updated_at TIMESTAMP
+                )
+            ''')
+
             conn.commit()
-            logger.info("Database initialized successfully with pipeline, profile, dynamic zones, and topology tables")
+            logger.info("Database initialized successfully with pipeline, profile, dynamic zones, topology, and audio routing tables")
+
         except Exception as e:
             logger.error(f"Database initialization failed: {e}")
         finally:
@@ -569,4 +586,76 @@ class StateManager:
             conn.commit()
         finally:
             conn.close()
+
+    # --- Dynamic Spatial Audio Routes ---
+    def get_audio_route(self, zone_id: str) -> Optional[AudioRouteRecord]:
+        """Fetches the active audio hardware routing record for an arbitrary spatial zone."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT * FROM audio_routes WHERE zone_id = ?", (zone_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            data = dict(row)
+            data["is_active"] = bool(data["is_active"])
+            data["metadata"] = json.loads(data["metadata"]) if data.get("metadata") else {}
+            if data.get("updated_at") and isinstance(data["updated_at"], str):
+                data["updated_at"] = datetime.fromisoformat(data["updated_at"])
+            return AudioRouteRecord(**data)
+        finally:
+            conn.close()
+
+    def set_audio_route(self, route: AudioRouteRecord):
+        """Binds a spatial zone to specific hardware or network audio interfaces with zero hardcoding."""
+        self.ensure_zone_exists(route.zone_id)
+        conn = self._get_connection()
+        try:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            conn.execute('''
+                INSERT OR REPLACE INTO audio_routes
+                (zone_id, input_device_name, output_device_name, input_device_index, output_device_index, preferred_volume, is_active, metadata, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                route.zone_id,
+                route.input_device_name,
+                route.output_device_name,
+                route.input_device_index,
+                route.output_device_index,
+                route.preferred_volume,
+                1 if route.is_active else 0,
+                json.dumps(route.metadata),
+                now_iso
+            ))
+            conn.commit()
+            logger.info(f"Updated audio route for zone '{route.zone_id}' (in='{route.input_device_name}', out='{route.output_device_name}')")
+        finally:
+            conn.close()
+
+    def list_all_audio_routes(self) -> List[AudioRouteRecord]:
+        """Lists all configured zone-to-audio hardware bindings."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT * FROM audio_routes")
+            results = []
+            for row in cursor.fetchall():
+                data = dict(row)
+                data["is_active"] = bool(data["is_active"])
+                data["metadata"] = json.loads(data["metadata"]) if data.get("metadata") else {}
+                if data.get("updated_at") and isinstance(data["updated_at"], str):
+                    data["updated_at"] = datetime.fromisoformat(data["updated_at"])
+                results.append(AudioRouteRecord(**data))
+            return results
+        finally:
+            conn.close()
+
+    def delete_audio_route(self, zone_id: str):
+        """Removes an audio route binding for a zone."""
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM audio_routes WHERE zone_id = ?", (zone_id,))
+            conn.commit()
+            logger.info(f"Deleted audio route for zone '{zone_id}'")
+        finally:
+            conn.close()
+
 

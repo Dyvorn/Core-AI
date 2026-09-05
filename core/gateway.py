@@ -14,16 +14,20 @@ from pydantic import BaseModel, Field
 from core.schemas import (
     BaseEvent, TextEvent, PipelinePlan, UserProfile,
     DeviceTopologyRecord, EdgeNodeRegistration, HUDCardPayload, ToolCallRequest, ToolCallResponse,
-    TrustTier, DeviceEnrollmentRequest, DeviceEnrollmentResponse
+    TrustTier, DeviceEnrollmentRequest, DeviceEnrollmentResponse,
+    AudioRouteRecord, AudioRouteUpdateRequest, SpatialHandoffEvent
 )
 from core.state import StateManager
 from core.bus import EventBus
 from tools.registry import ToolRegistry
 from brain.planner import Planner
 from brain.pipeline_engine import PipelineEngine
+from engines.audio_router import SpatialAudioRouter
+from brain.spatial_handoff import SpatialHandoffEngine
 import uuid
 
 logger = logging.getLogger("CoreAI.Gateway")
+
 
 
 class ConnectionManager:
@@ -124,8 +128,17 @@ def create_gateway_app(
 ) -> FastAPI:
     """Factory creating the configured FastAPI Gateway Application."""
 
+    audio_router = SpatialAudioRouter(state_manager=state_manager)
+    spatial_handoff = SpatialHandoffEngine(
+        state_manager=state_manager,
+        bus=bus,
+        audio_router=audio_router,
+        gateway_connection_manager=connection_manager
+    )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+
         # Startup: subscribe bus events to WebSocket broadcast
         def bus_event_bridge(data: dict):
             # Forward event bus traffic into the async event loop for WebSocket clients
@@ -327,7 +340,52 @@ def create_gateway_app(
         await connection_manager.broadcast_event("HUD_CARD", card.model_dump())
         return {"status": "dispatched", "card_id": card.card_id}
 
+    # --- Phase 3: Spatial Audio Routing & Cross-Zone Unity ---
+
+    @app.get("/api/v1/audio/devices")
+    def list_audio_devices():
+        """Introspects host audio hardware for microphones, studio monitors, and ambient speakers."""
+        return audio_router.list_system_audio_devices()
+
+    @app.get("/api/v1/audio/routes")
+    def list_audio_routes():
+        """Lists all dynamic zone-to-audio-device routes."""
+        return state_manager.list_all_audio_routes()
+
+    @app.get("/api/v1/audio/routes/{zone_id}")
+    def get_audio_route_for_zone(zone_id: str):
+        """Fetches active audio route for a specific zone, dynamically resolving device indices."""
+        return audio_router.get_route_for_zone(zone_id)
+
+    @app.post("/api/v1/audio/routes")
+    def set_audio_route_for_zone(req: AudioRouteUpdateRequest):
+        """Binds an arbitrary spatial zone to specific microphone and speaker hardware with zero hardcoding."""
+        in_idx = audio_router.resolve_device_index(req.input_device_name, kind="input")
+        out_idx = audio_router.resolve_device_index(req.output_device_name, kind="output")
+        route = AudioRouteRecord(
+            zone_id=req.zone_id,
+            input_device_name=req.input_device_name,
+            output_device_name=req.output_device_name,
+            input_device_index=in_idx,
+            output_device_index=out_idx,
+            preferred_volume=req.preferred_volume if req.preferred_volume is not None else 1.0,
+            metadata=req.metadata or {}
+        )
+        state_manager.set_audio_route(route)
+        return route
+
+    @app.post("/api/v1/spatial/handoff")
+    async def trigger_spatial_handoff(target_zone: str, from_zone: Optional[str] = None, reason: str = "api_trigger"):
+        """Executes a seamless cross-zone handoff (re-routing audio, updating HUD cards, firing scenes)."""
+        event = await spatial_handoff.execute_handoff(
+            to_zone=target_zone,
+            from_zone=from_zone,
+            reason=reason
+        )
+        return event
+
     @app.get("/api/v1/logs")
+
     def get_logs(limit: int = 50):
         """Returns recent structured execution logs from database."""
         return state_manager.get_recent_execution_logs(limit=min(limit, 200))
