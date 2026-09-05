@@ -60,7 +60,7 @@ def play_boot_sequence():
         "Initializing EventBus & Inter-Node Transport",
         "Registering Neural Model Router & DAG Planner",
         "Configuring Spatial Audio Matrix & Handoff Engine",
-        "Spawning Universal Gateway & Smart Mirror HUD Server"
+        "Spawning Universal Gateway (REST & WebSocket Mesh)"
     ]
     for step in steps:
         time.sleep(0.08)
@@ -73,7 +73,7 @@ def print_banner(operator_name: str, zone: str, port: int):
     print(f"{CYAN}|{RESET}   Self-Hosted - Privacy-First - Autonomous Problem Solver           {CYAN}|{RESET}")
     print(f"{CYAN}+=====================================================================+{RESET}")
     print(f"{CYAN}|{RESET}   Operator: {GREEN}{operator_name:<16}{RESET} Zone: {YELLOW}{zone:<16}{RESET} Status: {GREEN}ONLINE       {RESET}{CYAN}|{RESET}")
-    print(f"{CYAN}|{RESET}   Gateway:  {CYAN}http://localhost:{port:<5}{RESET} Mirror: {CYAN}/mirror{RESET} Roadmap: {CYAN}/roadmap{RESET}     {CYAN}|{RESET}")
+    print(f"{CYAN}|{RESET}   Gateway:  {CYAN}http://localhost:{port:<5}{RESET} API Docs: {CYAN}/docs{RESET} WebSocket: {CYAN}/ws/events{RESET}   {CYAN}|{RESET}")
     print(f"{CYAN}+=====================================================================+{RESET}\n")
     print(f"{MAGENTA}Type any goal to solve it, or type 'help' for built-in commands.{RESET}\n")
 
@@ -100,7 +100,7 @@ def print_help():
     print(f"  {GREEN}mesh connect <url>{RESET}        - Set central main server URL and test connection")
     print(f"  {GREEN}mesh export [path]{RESET}        - Export portable state bundle to migrate server")
     print(f"  {GREEN}mesh import <path>{RESET}        - Import state bundle to restore server on new machine")
-    print(f"  {GREEN}hud <title> | <body>{RESET}      - Dispatch an ambient HUD card to Smart Mirror")
+    print(f"  {GREEN}hud <title> | <body>{RESET}      - Dispatch an ambient HUD card to connected displays")
     print(f"  {GREEN}logs [N]{RESET}                  - View recent execution audit logs from SQLite")
     print(f"  {GREEN}proactive{RESET}                 - Run proactive watcher evaluation on demand")
     print(f"  {GREEN}clear{RESET}                     - Clear terminal screen")
@@ -447,7 +447,7 @@ def run_interactive_repl(
                     "body": body,
                     "accent_color": "#00ffcc"
                 }))
-                print(f"{GREEN}[OK] Dispatched ambient HUD card to mirror: '{title}'{RESET}")
+                print(f"{GREEN}[OK] Dispatched ambient HUD card to connected displays: '{title}'{RESET}")
 
             elif cmd_lower.startswith("logs"):
                 parts = user_input.split()

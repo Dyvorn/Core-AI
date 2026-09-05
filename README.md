@@ -11,23 +11,41 @@
 ```
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 55/55 TESTS PASSED ]  [ PYTHON: 3.13+ ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 56/56 TESTS PASSED ]  [ PYTHON: 3.13+ ]
 [ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]     [ ETHOS: #ANTISLOP ]
 ```
 
-> **A self-hosted, sovereign, and privacy-first AI companion built to integrate into daily life across your workspace, living spaces, grounds, vehicle, bicycle, smart mirror, and mobile devices. Zero big-tech cloud lock-in, zero hardcoded assumptions, and engineered for multi-year evolution.**
+> **A self-hosted, sovereign, and privacy-first AI companion built to integrate into daily life across your workspace, living spaces, grounds, vehicle, bicycle, wearables, and mobile devices. Zero big-tech cloud lock-in, zero hardcoded assumptions, and engineered for multi-year evolution.**
 
 ---
 
-### The #ANTISLOP Movement
+### Core Identity & The #ANTISLOP Movement
 
 > *"We use AI to become more sustainable, smarter, and make human life genuinely easier -- not to extract rent, hoard personal data, or pump low-effort corporate cash-grabs."*
+> — **Dyvorn**, Lead Architect
 
-Core AI stands firmly against the modern plague of **AI Slop**:
+Core AI is built around a non-negotiable sovereign identity and purpose:
 
-1. **Real Utility Over Hallucinated Hype**: Zero bloated minimum-viable wrappers or marketing buzzwords. If a capability is unavailable, Core AI inspects the host, diagnoses the root cause, and reports it transparently.
-2. **Human Elevation, Not Exploitation**: Technology must liberate human attention, remove friction across spaces and devices, and empower personal sovereignty.
-3. **Local Sovereignty & Sustainability**: Runs on your own silicon with 100% private data ownership under copyleft protection ([GNU AGPLv3](LICENSE)).
+1. **Human Elevation, Not Exploitation**: Technology must serve the human being, eliminate daily friction, and protect personal privacy. We reject intrusive corporate surveillance and walled-garden platforms.
+2. **Minimizing AI Compute Costs & Planetary Resource Impact (Water & Power)**:
+   Modern cloud AI data centers consume astronomical electrical grids and evaporate billions of liters of potable freshwater every year for evaporative cooling. Core AI is engineered to minimize unnecessary LLM inference:
+   - Deterministic DAG planning and rule-based heuristic routing resolve frequent tasks instantly with zero external API calls.
+   - On-device speech recognition (`faster-whisper`) and local audio synthesis run directly on host hardware.
+   - Dynamic Python tools run natively in memory rather than passing bloated token context windows through cloud servers.
+   We refuse to boil the planet's water supply to generate low-effort marketing slop.
+3. **100% Charity Commitment**:
+   Core AI is not a for-profit commercial scheme. If donations or sponsorships are ever accepted, **100% of all proceeds are directed to verified humanitarian and ecological charities** (providing clean drinking water, disaster relief, and nature conservation). We will never monetize your home, your life, or your sovereign data.
+4. **Zero Hardcoded Devices & Zero Hardcoded UIs (Dynamic Device Synthesis)**:
+   The open-source Core AI repository contains zero hardcoded gadget interfaces. Whether you build your own smart glasses, assemble a bicycle telemetry head unit, station a smart mirror, or deploy a headless Raspberry Pi in your workshop -- Core AI does not impose a static interface:
+   - Core AI connects over the terminal or Universal Gateway WebSocket mesh.
+   - It introspects the device's screen geometry, file tree, sensors, and capabilities.
+   - It reasons about the operator's lifestyle and current intent, and **autonomously synthesizes custom UIs, widgets, or telemetry streams on-demand**.
+   - Custom hardware adaptations belong in lightweight community plugins, keeping the core microkernel clean, fast, and unbloated.
+5. **Deep Contextual & Intent Reasoning**:
+   Core AI is not a reactive bot or a trigger-happy chatbot. It reasons continuously before acting:
+   - *Does this action make sense for what the operator is doing right now?*
+   - *What is the operator's true underlying intent?*
+   - *Are they deeply engaged in focused work, demonstrating Core AI to guests, resting, or commuting?*
 
 ---
 
@@ -50,7 +68,7 @@ Core AI stands firmly against the modern plague of **AI Slop**:
 | **Universal Edge Gateway** | `FastAPI` / `Uvicorn` / `WebSockets` / `REST` | High-speed event streams (`/ws/events`, `/ws/logs`), OpenAPI docs, edge node mesh |
 | **Spatial Audio & Unity** | `SoundDevice` / `SpatialHandoffEngine` / `SpatialContext` | Zone-to-hardware binding, cross-space audio transfer, dynamic acoustic routing |
 | **Voice & Perception** | `Silero-VAD` / `faster-whisper (STT)` / `Piper` / `Edge-TTS` | Local voice activity detection, rapid transcription, neural speech synthesis |
-| **Ambient & Edge Interfaces** | `Vanilla CSS (Glassmorphism)` / `Nothing OS Glyph` / `Core Console` | Smart Mirror / Wall Projection HUD, tactile phone feedback, interactive CLI shell |
+| **Ambient & Edge Interfaces** | `Dynamic UI Synthesis` / `Nothing OS Glyph` / `Core Terminal` | On-demand UI generation, tactile phone feedback, interactive CLI shell |
 | **Hardware Interoperability** | `Home Assistant API` / `Tailscale WireGuard` / `PipeWire` | Sovereign smart-home orchestration, encrypted mesh tunneling, audio routing |
 
 ---
@@ -281,15 +299,13 @@ Core AI/
 |   |   +-- enroll.py           # 1-line zero-friction edge device onboarding client
 |   |   +-- setup_service.py    # Interactive bootstrap & autostart installer (Y/N)
 |   |   +-- uninstall.py        # Clean zero-residue complete uninstaller
-|   +-- mirror/
-|       +-- index.html          # Ambient Smart Mirror / Wall Projection HUD interface
-|       +-- launcher.py         # Cross-platform fullscreen kiosk launcher with watchdog
-|       +-- roadmap_visualizer.html # Interactive master roadmap dashboard & milestone tracker
 +-- logs/                       # System & Audit Logs
 |   +-- core_ai.log             # Rotating system logs (5MB, 5 backups)
-+-- core.bat                    # Windows turnkey one-word command script (start/stop/update)
-+-- core.sh                     # Linux/macOS turnkey one-word command script
 |   +-- pipelines.jsonl         # Detailed JSONL audit records of all pipeline executions
++-- install.ps1                 # Windows PowerShell one-line bootstrap installer
++-- install.sh                  # Linux/macOS Bash one-line bootstrap installer
++-- core.bat                    # Windows turnkey CLI command center (run/setup/status/stop)
++-- core.sh                     # Linux/macOS turnkey CLI command center
 +-- tools/                      # Tool Ecosystem
 |   +-- dynamic/                # Self-generated tools written, verified, and saved by Core AI
 |   |   +-- hash_string.py      # Example auto-synthesized dynamic tool
@@ -472,13 +488,13 @@ Real-time audio route binding stored in SQLite and managed on the fly:
 | **Personal Identity Memory** | Phase 2 | `[COMPLETED]` | Dynamic operator profile in SQLite (`user_profiles`) |
 | **Dynamic Spatial Zones & Security**| Phase 2 | `[COMPLETED]` | Dynamic zone creation, `OWNER`/`AMBIENT`/`GUEST` tiers |
 | **1-Line Zero-Friction Enrollment** | Phase 2 | `[COMPLETED]` | `interfaces/install/enroll.py` automated token onboarding |
-| **Smart Mirror & Projection HUD** | Phase 2 | `[COMPLETED]` | Glassmorphism dashboard + interactive roadmap visualizer |
+| **Ambient HUD Card Protocol** | Phase 2 | `[COMPLETED]` | Generic WebSocket HUD payload dispatch to any connected display |
 | **Dynamic Spatial Audio Router** | Phase 3 | `[COMPLETED]` | `engines/audio_router.py` introspects soundcards dynamically |
-| **Cross-Zone Spatial Handoff** | Phase 3 | `[COMPLETED]` | `brain/spatial_handoff.py` auto-relocates audio and HUDs |
-| **Smart Mirror Kiosk Launcher** | Phase 3 | `[COMPLETED]` | `interfaces/mirror/launcher.py` watchdog crash recovery |
+| **Cross-Zone Spatial Handoff** | Phase 3 | `[COMPLETED]` | `brain/spatial_handoff.py` auto-relocates audio and context |
+| **Dynamic Hardware / UI Synthesis** | Phase 3 | `[COMPLETED]` | On-demand UI generation & community plugin architecture |
 | **Dynamic Model & Provider Router** | Core | `[COMPLETED]` | `brain/model_router.py` persistent roles & prompt overrides |
 | **Intercontinental Sovereign Mesh** | Core | `[COMPLETED]` | `core/mesh_client.py` offline fallback & machine migration |
-| **Automated Test Suite** | All | `[COMPLETED]` | **55/55 tests passing 100% green** (`pytest tests`) |
+| **Automated Test Suite** | All | `[COMPLETED]` | **56/56 tests passing 100% green** (`pytest tests`) |
 | **Mobile Companion & Nothing OS** | Phase 4 | `[ACTIVE]` | WebSocket client, rear Glyph Matrix LED driver, BLE bridge |
 | **Automotive & Bicycle SBC Unit** | Phase 5 | `[QUEUED]` | CAN-bus / OBD-II integration, bicycle computer bridge |
 | **Smart Glasses AR & Spatial Cam** | Phase 6 | `[QUEUED]` | Micro HUD projection, bone conduction, FOV camera |
@@ -634,22 +650,17 @@ Whenever you want to start, stop, or manage Core AI:
 
 Once your Main Server is running, onboard other devices around your home or workspace:
 
-- **Smart Mirror / Wall Projection Kiosk**:
-  Launch Chromium or Edge in kiosk mode with automatic watchdog:
-  ```bash
-  python interfaces/mirror/launcher.py
-  ```
 - **Laptops, SBCs & Raspberry Pi Nodes**:
-  Pair any edge machine into the mesh:
+  Pair any edge machine into the mesh in one command:
   ```bash
   python -m interfaces.install.enroll --server http://<core-ip>:8000 --device-name "Laptop-01" --device-type laptop --zone "workspace" --secret core_sovereign_secret
   ```
-- **Web Dashboards & APIs**:
-  - Swagger REST API: `http://localhost:8000/docs`
-  - Master Roadmap Visualizer: `http://localhost:8000/roadmap`
-  - Ambient Mirror HUD: `http://localhost:8000/mirror`
-  - Live Event WebSocket: `ws://localhost:8000/ws/events`
-  - Live Audit Log Stream: `ws://localhost:8000/ws/logs`
+- **Custom Hardware & Peripherals (Smart Glasses, Smart Mirrors, Bike Computers, SBCs)**:
+  Any device connects over the high-speed WebSocket stream (`ws://<core-ip>:8000/ws/events`). Core AI's dynamic synthesis engine inspects the device's display resolution, sensors, and file system, and autonomously generates custom UIs, widgets, or telemetry streams on-demand without hardcoded bloat.
+- **REST APIs & WebSockets**:
+  - Swagger REST API Docs: `http://localhost:8000/docs`
+  - Real-Time Event Stream: `ws://localhost:8000/ws/events`
+  - Real-Time Audit Log Stream: `ws://localhost:8000/ws/logs`
 
 ---
 

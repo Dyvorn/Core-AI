@@ -18,8 +18,8 @@ gantt
     Proactive Daemon & Remote Node Protocol :done, p2_2, 2026-09, 2026-09
     Spatial Anchoring & Trust Tiers       :done, p2_3, 2026-09, 2026-09
     section Phase 3: Studio & Living Unity
-    Smart Mirror Kiosk & Wall Projections  :active, p3_1, 2026-09, 2026-11
-    Studio Audio Routing & Cross-Room Handoff :active, p3_2, 2026-10, 2026-12
+    Ambient HUD Stream & Dynamic UI Synthesis :done, p3_1, 2026-09, 2026-10
+    Studio Audio Routing & Cross-Room Handoff :done, p3_2, 2026-09, 2026-10
     Year-End 2026 Milestone Launch       :milestone, m1, 2026-12, 0d
     section Phase 4: Mobile & Nothing OS
     Android Client & Tailscale Mesh        :p4_1, 2027-01, 2027-03
@@ -56,7 +56,7 @@ gantt
 - **Deliverables**:
   - **Dynamic Spatial Audio Routing Engine (`engines/audio_router.py`)**: Runtime audio device introspection and zone-to-soundcard binding with fallback defaults.
   - **Cross-Zone Spatial Handoff Engine (`brain/spatial_handoff.py`)**: Automatic re-targeting of microphones and speakers, ambient HUD card dispatching, and dynamic zone scene triggering (`SpatialHandoffEvent`).
-  - **Smart Mirror & Wall Projection Kiosk Launcher (`interfaces/mirror/launcher.py`)**: Cross-platform watchdog launcher for Chromium/Chrome/Edge in fullscreen kiosk mode.
+  - **Dynamic UI & Peripheral Synthesis**: On-demand autonomous UI and tool synthesis for any connected screen, glasses, or display without hardcoded core bloat.
   - **Gateway Spatial Audio Endpoints (`/api/v1/audio/*`, `/api/v1/spatial/handoff`)**: REST and WebSocket controls for spatial routing and transitions.
   - **Native Tool Integration**: `route_spatial_audio` registered in ToolRegistry for autonomous planner execution.
 
