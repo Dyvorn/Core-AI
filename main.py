@@ -9,6 +9,9 @@ import uvicorn
 from typing import Optional
 from dotenv import load_dotenv
 
+# Ensure project root is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
 from core.logging_setup import setup_logging
 from core.bus import EventBus
 from core.schemas import TextEvent, CommandEvent, AdaptiveResponseEvent, TTSRequestEvent
@@ -24,12 +27,84 @@ from brain.dynamic_generator import DynamicGenerator
 from brain.pipeline_engine import PipelineEngine
 from brain.planner import Planner
 from brain.proactive import ProactiveDaemon
+from brain.model_router import ModelRouter
+from brain.spoken_to import SpokenToReasoning, DiscourseRole
 from core.gateway import create_gateway_app, connection_manager
+from core.mesh_client import MeshClient
+from engines.audio_router import SpatialAudioRouter, route_spatial_audio, route_spatial_audio_schema
+from brain.spatial_handoff import SpatialHandoffEngine
 from engines.voice_in import VoiceInEngine
 from engines.voice_out import VoiceOutEngine
-from brain.spoken_to import SpokenToReasoning, DiscourseRole
 
 logger = logging.getLogger("CoreAI.Main")
+
+try:
+    from colorama import init, Fore, Style
+    init(autoreset=True)
+    CYAN = Fore.CYAN
+    GREEN = Fore.GREEN
+    YELLOW = Fore.YELLOW
+    RED = Fore.RED
+    MAGENTA = Fore.MAGENTA
+    BRIGHT = Style.BRIGHT
+    RESET = Style.RESET_ALL
+except ImportError:
+    CYAN = GREEN = YELLOW = RED = MAGENTA = BRIGHT = RESET = ""
+
+def play_boot_sequence():
+    print(f"\n{CYAN}======================================================================={RESET}")
+    print(f"{CYAN}  CORE AI :: SOVEREIGN LIFE OS - INITIALIZING MICROKERNEL{RESET}")
+    print(f"{CYAN}======================================================================={RESET}")
+    steps = [
+        "Mounting SQLite State Manager & Dynamic Topologies",
+        "Initializing EventBus & Inter-Node Transport",
+        "Registering Neural Model Router & DAG Planner",
+        "Configuring Spatial Audio Matrix & Handoff Engine",
+        "Spawning Universal Gateway & Smart Mirror HUD Server"
+    ]
+    for step in steps:
+        time.sleep(0.08)
+        print(f"  [+] {step:<54} [{GREEN}OK{RESET}]")
+    print(f"{CYAN}-----------------------------------------------------------------------{RESET}\n")
+
+def print_banner(operator_name: str, zone: str, port: int):
+    print(f"{CYAN}+=====================================================================+{RESET}")
+    print(f"{CYAN}|{BRIGHT}   CORE AI :: SOVEREIGN LIFE OS - COMMAND TERMINAL                    {RESET}{CYAN}|{RESET}")
+    print(f"{CYAN}|{RESET}   Self-Hosted - Privacy-First - Autonomous Problem Solver           {CYAN}|{RESET}")
+    print(f"{CYAN}+=====================================================================+{RESET}")
+    print(f"{CYAN}|{RESET}   Operator: {GREEN}{operator_name:<16}{RESET} Zone: {YELLOW}{zone:<16}{RESET} Status: {GREEN}ONLINE       {RESET}{CYAN}|{RESET}")
+    print(f"{CYAN}|{RESET}   Gateway:  {CYAN}http://localhost:{port:<5}{RESET} Mirror: {CYAN}/mirror{RESET} Roadmap: {CYAN}/roadmap{RESET}     {CYAN}|{RESET}")
+    print(f"{CYAN}+=====================================================================+{RESET}\n")
+    print(f"{MAGENTA}Type any goal to solve it, or type 'help' for built-in commands.{RESET}\n")
+
+def print_help():
+    print(f"\n{BRIGHT}Core Terminal Commands:{RESET}")
+    print(f"  {GREEN}solve <goal>{RESET}              - Solve any task via autonomous DAG pipeline (or type directly)")
+    print(f"  {GREEN}speak <text>{RESET}              - Synthesize neural speech via current zone speaker")
+    print(f"  {GREEN}spoken <text>{RESET}             - Test Spoken-To Reasoning classification on any phrase")
+    print(f"  {GREEN}audio{RESET}                     - Inspect connected mics, audio interfaces & zone routing")
+    print(f"  {GREEN}handoff <zone>{RESET}            - Transition spatial anchor & auto-route audio to new zone")
+    print(f"  {GREEN}voice on / voice off{RESET}       - Toggle background microphone listening")
+    print(f"  {GREEN}status{RESET}                    - Inspect system health, platform architecture & model status")
+    print(f"  {GREEN}profile{RESET}                   - View operator identity, aliases, and preferences")
+    print(f"  {GREEN}profile set <name> [alias]{RESET}- Update operator name and aliases")
+    print(f"  {GREEN}zones{RESET}                     - List all dynamically registered spatial zones")
+    print(f"  {GREEN}zone add <id> [name]{RESET}      - Register a new spatial zone on-the-fly")
+    print(f"  {GREEN}devices{RESET}                   - List connected devices and trust tier topology")
+    print(f"  {GREEN}tools{RESET}                     - View tool catalog (native + dynamic generated)")
+    print(f"  {GREEN}models{RESET}                    - Inspect configured AI providers, active models & health")
+    print(f"  {GREEN}model set <role> <model>{RESET}   - Assign model to role (planner, fallback, deep_reasoning)")
+    print(f"  {GREEN}api-key set <provider> <key>{RESET}- Set API key (gemini, openai, anthropic)")
+    print(f"  {GREEN}mesh{RESET}                      - Inspect intercontinental mesh status, role & server reachability")
+    print(f"  {GREEN}mesh role <main|edge>{RESET}     - Switch node role between main_server and edge_node")
+    print(f"  {GREEN}mesh connect <url>{RESET}        - Set central main server URL and test connection")
+    print(f"  {GREEN}mesh export [path]{RESET}        - Export portable state bundle to migrate server")
+    print(f"  {GREEN}mesh import <path>{RESET}        - Import state bundle to restore server on new machine")
+    print(f"  {GREEN}hud <title> | <body>{RESET}      - Dispatch an ambient HUD card to Smart Mirror")
+    print(f"  {GREEN}logs [N]{RESET}                  - View recent execution audit logs from SQLite")
+    print(f"  {GREEN}proactive{RESET}                 - Run proactive watcher evaluation on demand")
+    print(f"  {GREEN}clear{RESET}                     - Clear terminal screen")
+    print(f"  {GREEN}exit / quit{RESET}               - Cleanly shut down Core AI and background services\n")
 
 def setup_tools() -> ToolRegistry:
     registry = ToolRegistry(dynamic_dir="tools/dynamic")
@@ -52,8 +127,8 @@ def setup_tools() -> ToolRegistry:
     registry.register_tool("list_dir_contents", list_dir_contents, list_dir_schema)
     registry.register_tool("calculate_math", calculate_math, calculate_math_schema)
     registry.register_tool("summarize_numbers", summarize_numbers, summarize_numbers_schema)
+    registry.register_tool("route_spatial_audio", route_spatial_audio, route_spatial_audio_schema)
     
-    # Auto-discover any existing dynamic tools
     registry.discover_dynamic_tools()
     return registry
 
@@ -62,20 +137,404 @@ def parse_args():
     parser.add_argument("--voice", action="store_true", help="Enable full continuous voice loop (Mic STT + Speaker TTS)")
     parser.add_argument("--voice-in", action="store_true", help="Enable background microphone listening only")
     parser.add_argument("--no-tts", action="store_true", help="Disable audio speech output")
+    parser.add_argument("--headless", "--server-only", dest="headless", action="store_true", help="Run in headless server mode without interactive REPL")
     parser.add_argument("--model-size", default="distil-large-v3", help="faster-whisper model size (distil-large-v3, base, small, tiny)")
     parser.add_argument("--device", default=None, help="Audio input/output device index or name substring")
     parser.add_argument("--host", default=None, help="Gateway host binding (defaults to CORE_HOST or 0.0.0.0)")
     parser.add_argument("--port", type=int, default=None, help="Gateway port (defaults to CORE_PORT or 8000)")
     return parser.parse_args()
 
+def run_interactive_repl(
+    state: StateManager,
+    bus: EventBus,
+    registry: ToolRegistry,
+    planner: Planner,
+    engine: PipelineEngine,
+    proactive: ProactiveDaemon,
+    model_router: ModelRouter,
+    mesh_client: MeshClient,
+    spoken_to: SpokenToReasoning,
+    audio_router: SpatialAudioRouter,
+    spatial_handoff: SpatialHandoffEngine,
+    voice_out: Optional[VoiceOutEngine],
+    voice_in: Optional[VoiceInEngine],
+    port: int,
+    shutdown_event: threading.Event
+):
+    profile = state.get_user_profile()
+    active_name = profile.preferred_name
+    active_zone = profile.preferences.get("primary_space", "studio")
+    state.ensure_zone_exists(active_zone, display_name=f"{active_name}'s Primary Zone")
+
+    print_banner(active_name, active_zone, port)
+
+    while not shutdown_event.is_set():
+        try:
+            mic_ind = f" {RED}[REC]{RESET}" if (voice_in and voice_in.is_recording) else ""
+            prompt = f"{CYAN}Core{RESET} [{GREEN}{active_name}{RESET}@{YELLOW}{active_zone}{RESET}{mic_ind}] {BRIGHT}>{RESET} "
+            try:
+                user_input = input(prompt).strip()
+            except EOFError:
+                break
+
+            if not user_input:
+                continue
+
+            cmd_lower = user_input.lower()
+
+            if cmd_lower in ["exit", "quit"]:
+                print(f"\n{YELLOW}[*] Shutting down Core AI. Goodbye {active_name}!{RESET}")
+                shutdown_event.set()
+                break
+
+            elif cmd_lower == "help":
+                print_help()
+
+            elif cmd_lower == "clear":
+                os.system("cls" if os.name == "nt" else "clear")
+                print_banner(active_name, active_zone, port)
+
+            elif cmd_lower == "status":
+                status = get_system_status()
+                print(f"\n{BRIGHT}--- Core AI System Status ---{RESET}")
+                print(f"  Operator:     {GREEN}{active_name}{RESET}")
+                print(f"  Platform:     {status.get('os')} {status.get('release')} ({status.get('architecture')})")
+                print(f"  Active Model: {planner.get_active_model() or 'offline_heuristic'}")
+                print(f"  Tools Loaded: {len(registry.tools)}")
+                print(f"  Active Zones: {len(state.list_zones())}")
+                print(f"  Devices:      {len(state.list_all_devices())}")
+                print(f"  Voice Out:    {GREEN}Online (Edge Neural TTS + pyttsx3){RESET}" if voice_out else f"  Voice Out:    {YELLOW}Disabled{RESET}")
+                print(f"  Voice In:     {GREEN}Active (Listening){RESET}" if (voice_in and voice_in.is_recording) else f"  Voice In:     {YELLOW}Standby (type 'voice on'){RESET}")
+                print(f"  Gateway:      {GREEN}http://localhost:{port}{RESET}")
+                print()
+
+            elif cmd_lower == "audio":
+                devs = audio_router.list_system_audio_devices()
+                print(f"\n{BRIGHT}--- Connected Audio Inputs ({len(devs['inputs'])}) ---{RESET}")
+                for d in devs["inputs"][:8]:
+                    print(f"  [{d['index']:2d}] [MIC] {d['name']} (channels={d['max_input_channels']})")
+                print(f"\n{BRIGHT}--- Connected Audio Outputs ({len(devs['outputs'])}) ---{RESET}")
+                for d in devs["outputs"][:8]:
+                    print(f"  [{d['index']:2d}] [SPK] {d['name']} (channels={d['max_output_channels']})")
+                routes = state.list_all_audio_routes()
+                if routes:
+                    print(f"\n{BRIGHT}--- Configured Zone Audio Routes ({len(routes)}) ---{RESET}")
+                    for r in routes:
+                        print(f"  - {YELLOW}{r.zone_id:<18}{RESET} : Mic='{r.input_device_name}' | Speaker='{r.output_device_name}'")
+                print()
+
+            elif cmd_lower.startswith("handoff ") or cmd_lower.startswith("relocate "):
+                target_z = user_input.split(maxsplit=1)[1].strip()
+                print(f"{CYAN}[*] Executing spatial handoff to zone '{target_z}'...{RESET}")
+                event = asyncio.run(spatial_handoff.execute_handoff(
+                    to_zone=target_z,
+                    from_zone=active_zone,
+                    reason="console_command"
+                ))
+                active_zone = target_z
+                print(f"{GREEN}[OK] Relocated to '{target_z}'! Audio re-routed and HUD card broadcast.{RESET}\n")
+
+            elif cmd_lower.startswith("speak "):
+                text_to_speak = user_input[6:].strip()
+                print(f"{CYAN}[*] Synthesizing speech:{RESET} '{text_to_speak}'")
+                if voice_out:
+                    voice_out.synthesize_and_play(text_to_speak)
+                else:
+                    print(f"{YELLOW}[!] Voice Out is currently disabled (--no-tts).{RESET}")
+
+            elif cmd_lower == "voice on":
+                if voice_in and voice_in.is_recording:
+                    print(f"{YELLOW}[!] Voice capture is already listening.{RESET}")
+                else:
+                    print(f"{YELLOW}[*] Initializing VoiceInEngine (faster-whisper)...{RESET}")
+                    try:
+                        voice_in = VoiceInEngine(model_size="distil-large-v3")
+                        def on_speech(text: str):
+                            print(f"\n{MAGENTA}[SPEECH DETECTED]{RESET} \"{text}\"")
+                            prof = state.get_user_profile()
+                            dec = spoken_to.evaluate(text, profile=prof)
+                            print(f"  {CYAN}[Spoken-To Decision]{RESET} Role: {dec.discourse_role.value} | Action: {dec.action_type}")
+                            if not dec.should_respond:
+                                print(f"  {YELLOW}↳ Silently ignored (ambient / not addressed to Core AI){RESET}\n")
+                                print(prompt, end="", flush=True)
+                                return
+                            if dec.discourse_role == DiscourseRole.DEMONSTRATED and dec.autonomous_response:
+                                print(f"{CYAN}Core AI [Showcase]:{RESET} {dec.autonomous_response}\n")
+                                if voice_out:
+                                    voice_out.synthesize_and_play(dec.autonomous_response)
+                                print(prompt, end="", flush=True)
+                                return
+                            target_cmd = dec.clean_command or text
+                            plan = planner.plan_problem(target_cmd, context={"zone": active_zone, "operator": active_name})
+                            finished = asyncio.run(engine.execute_pipeline(plan))
+                            spoken = planner.formulate_spoken_response(finished, profile=prof)
+                            print(f"{CYAN}Core AI:{RESET} {spoken}\n")
+                            if voice_out:
+                                voice_out.synthesize_and_play(spoken)
+                            print(prompt, end="", flush=True)
+
+                        voice_in.start_listening(callback=on_speech)
+                        print(f"{GREEN}[OK] Voice capture online! Speak into your microphone anytime.{RESET}")
+                    except Exception as e:
+                        print(f"{RED}[ERROR] Failed to start voice capture: {e}{RESET}")
+
+            elif cmd_lower == "voice off":
+                if voice_in and voice_in.is_recording:
+                    voice_in.stop_listening()
+                    print(f"{YELLOW}[*] Voice capture stopped.{RESET}")
+                else:
+                    print(f"{YELLOW}[!] Voice capture was not active.{RESET}")
+
+            elif cmd_lower.startswith("spoken ") or cmd_lower.startswith("test-spoken "):
+                test_utterance = user_input.split(maxsplit=1)[1].strip()
+                dec = spoken_to.evaluate(test_utterance, profile=state.get_user_profile())
+                print(f"\n{BRIGHT}--- Spoken-To Reasoning Analysis ---{RESET}")
+                print(f"  Utterance:      '{test_utterance}'")
+                print(f"  Discourse Role: {CYAN}{dec.discourse_role.value}{RESET}")
+                print(f"  Action Type:    {GREEN if dec.should_respond else YELLOW}{dec.action_type}{RESET}")
+                print(f"  Should Respond: {GREEN if dec.should_respond else RED}{dec.should_respond}{RESET}")
+                print(f"  Confidence:     {dec.confidence:.2f}")
+                print(f"  Rationale:      {dec.rationale}")
+                if dec.clean_command:
+                    print(f"  Clean Command:  {GREEN}'{dec.clean_command}'{RESET}")
+                if dec.autonomous_response:
+                    print(f"  Chime-In Reply: {MAGENTA}'{dec.autonomous_response}'{RESET}")
+                print()
+
+            elif cmd_lower == "profile":
+                p = state.get_user_profile()
+                print(f"\n{BRIGHT}--- Operator Profile ---{RESET}")
+                print(f"  Name:        {GREEN}{p.preferred_name}{RESET}")
+                print(f"  Aliases:     {', '.join(p.aliases) if p.aliases else 'None'}")
+                print(f"  Tone:        {p.preferred_tone}")
+                print(f"  Primary Zone:{p.preferences.get('primary_space', 'studio')}")
+                print(f"  Updated At:  {p.updated_at}\n")
+
+            elif cmd_lower.startswith("profile set"):
+                parts = user_input.split(maxsplit=3)
+                if len(parts) >= 3:
+                    new_name = parts[2]
+                    alias = parts[3] if len(parts) > 3 else None
+                    state.set_user_preferred_name(new_name, alias=alias)
+                    active_name = new_name
+                    print(f"{GREEN}[OK] Operator identity updated to: {new_name}{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: profile set <name> [alias]{RESET}")
+
+            elif cmd_lower == "zones":
+                zones = state.list_zones()
+                print(f"\n{BRIGHT}--- Dynamically Discovered Spatial Zones ({len(zones)}) ---{RESET}")
+                for z in zones:
+                    print(f"  - {YELLOW}{z['zone_id']:<16}{RESET} Display: {z['display_name']} (Discovered: {z['created_at'][:19]})")
+                print()
+
+            elif cmd_lower.startswith("zone add"):
+                parts = user_input.split(maxsplit=3)
+                if len(parts) >= 3:
+                    zid = parts[2]
+                    zname = parts[3] if len(parts) > 3 else zid.title()
+                    state.ensure_zone_exists(zid, display_name=zname)
+                    print(f"{GREEN}[OK] Spatial zone '{zid}' registered.{RESET}")
+                else:
+                    print(f"{RED}[!] Usage: zone add <zone_id> [display_name]{RESET}")
+
+            elif cmd_lower == "devices":
+                devs = state.list_all_devices()
+                print(f"\n{BRIGHT}--- Connected Devices & Trust Topology ({len(devs)}) ---{RESET}")
+                for d in devs:
+                    anchor = "Fixed Anchor" if d["is_fixed_anchor"] else "Roaming"
+                    print(f"  - {CYAN}{d['device_id']:<16}{RESET} Type: {d['device_type']:<12} Zone: {d['current_zone']:<14} Tier: {GREEN}{d['trust_tier']:<8}{RESET} ({anchor})")
+                print()
+
+            elif cmd_lower == "tools":
+                cat = registry.get_tool_catalog()
+                print(f"\n{BRIGHT}--- Core AI Tool Catalog ({len(cat)} tools) ---{RESET}")
+                for t in cat:
+                    dyn_flag = f"{MAGENTA}[DYNAMIC]{RESET} " if t.get("is_dynamic") else f"{GREEN}[NATIVE]{RESET}  "
+                    print(f"  {dyn_flag}{t['name']:<24} {t.get('description', '')[:50]}")
+                print()
+
+            elif cmd_lower == "models":
+                summary = model_router.get_status_summary()
+                print(f"\n{BRIGHT}--- Configured AI Providers & Models ---{RESET}")
+                for prov, enabled in summary["configured_providers"].items():
+                    col = GREEN if enabled else YELLOW
+                    status_lbl = "Configured / Online" if enabled else "Not Configured / Offline"
+                    print(f"  - {prov:<16} : [{col}{status_lbl}{RESET}]")
+                print(f"\n{BRIGHT}--- Active Model Roles & Assignments ---{RESET}")
+                for role, info in summary["roles"].items():
+                    col = GREEN if info["online"] else YELLOW
+                    status_lbl = "ONLINE" if info["online"] else "OFFLINE (Heuristic Fallback)"
+                    print(f"  - {role:<16} : {CYAN}{info['model']:<26}{RESET} [{col}{status_lbl}{RESET}]")
+                print()
+
+            elif cmd_lower.startswith("model set"):
+                parts = user_input.split(maxsplit=3)
+                if len(parts) >= 4:
+                    role, m_name = parts[2], parts[3]
+                    model_router.set_model_preference(role, m_name)
+                    print(f"{GREEN}[OK] Assigned model '{m_name}' to role '{role}'.{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: model set <role> <model_name> (roles: planner, fallback, deep_reasoning, fast_local){RESET}\n")
+
+            elif cmd_lower.startswith("api-key set") or cmd_lower.startswith("key set"):
+                parts = user_input.split(maxsplit=3)
+                if len(parts) >= 4:
+                    provider, key_val = parts[2], parts[3]
+                    env_var = model_router.set_api_key(provider, key_val, persist_to_env=True)
+                    print(f"{GREEN}[OK] Saved API key for '{provider}' to {env_var} and config/.env.{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: api-key set <provider> <api_key> (providers: gemini, openai, anthropic){RESET}\n")
+
+            elif cmd_lower == "mesh":
+                is_online, ping_info = mesh_client.ping_main_server()
+                status_str = f"{GREEN}REACHABLE (Online){RESET}" if is_online else f"{YELLOW}UNREACHABLE ({ping_info.get('error', 'offline')}){RESET}"
+                print(f"\n{BRIGHT}--- Intercontinental Sovereign Mesh Status ---{RESET}")
+                print(f"  Node Role:        {CYAN}{mesh_client.role.upper()}{RESET}")
+                print(f"  Main Server URL:  {mesh_client.main_server_url}")
+                print(f"  Server Status:    {status_str}")
+                print(f"  Offline Buffer:   {len(mesh_client.offline_buffer)} items queued")
+                if mesh_client.role == "edge_node" and not is_online:
+                    print(f"  {YELLOW}↳ Autonomous Local Fallback is ACTIVE (never locked out).{RESET}")
+                print()
+
+            elif cmd_lower.startswith("mesh role"):
+                parts = user_input.split(maxsplit=2)
+                if len(parts) >= 3 and parts[2].lower() in ["main_server", "edge_node", "main", "edge"]:
+                    new_role = "main_server" if "main" in parts[2].lower() else "edge_node"
+                    mesh_client.save_configuration(role=new_role)
+                    print(f"{GREEN}[OK] Node role switched to: {new_role}{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: mesh role <main_server|edge_node>{RESET}\n")
+
+            elif cmd_lower.startswith("mesh connect"):
+                parts = user_input.split(maxsplit=2)
+                if len(parts) >= 3:
+                    new_url = parts[2]
+                    mesh_client.save_configuration(role=mesh_client.role, main_server_url=new_url)
+                    is_online, ping_info = mesh_client.ping_main_server()
+                    if is_online:
+                        print(f"{GREEN}[OK] Connected to Main Server at {new_url}!{RESET}\n")
+                    else:
+                        print(f"{YELLOW}[!] Main Server at {new_url} is currently unreachable ({ping_info.get('error')}). Local fallback ready.{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: mesh connect <http://host:port>{RESET}\n")
+
+            elif cmd_lower.startswith("mesh export"):
+                parts = user_input.split(maxsplit=2)
+                out_path = parts[2] if len(parts) >= 3 else "core_state_bundle.json"
+                mesh_client.export_state_bundle(export_path=out_path)
+                print(f"{GREEN}[OK] System state bundle exported to '{out_path}' for machine migration.{RESET}\n")
+
+            elif cmd_lower.startswith("mesh import"):
+                parts = user_input.split(maxsplit=2)
+                if len(parts) >= 3:
+                    in_path = parts[2]
+                    counts = mesh_client.import_state_bundle(in_path)
+                    print(f"{GREEN}[OK] State bundle restored: {counts}! Machine ready as Main Server.{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: mesh import <bundle_file.json>{RESET}\n")
+
+            elif cmd_lower.startswith("hud"):
+                payload_str = user_input[3:].strip()
+                if "|" in payload_str:
+                    title, body = [p.strip() for p in payload_str.split("|", 1)]
+                else:
+                    title, body = "Operator Alert", payload_str
+
+                asyncio.run(connection_manager.broadcast_event("hud_card", {
+                    "title": title,
+                    "body": body,
+                    "accent_color": "#00ffcc"
+                }))
+                print(f"{GREEN}[OK] Dispatched ambient HUD card to mirror: '{title}'{RESET}")
+
+            elif cmd_lower.startswith("logs"):
+                parts = user_input.split()
+                limit = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 10
+                recent = state.get_recent_execution_logs(limit=limit)
+                print(f"\n{BRIGHT}--- Recent Execution Audit Logs ({len(recent)}) ---{RESET}")
+                for log in recent:
+                    lvl_col = GREEN if log["level"] == "INFO" else (RED if log["level"] == "ERROR" else YELLOW)
+                    pipe_tag = f" [pipe:{log['pipeline_id'][:8]}]" if log.get("pipeline_id") else ""
+                    print(f"  [{log['timestamp']}] [{lvl_col}{log['level']:<7}{RESET}] [{log['source']}]{pipe_tag} {log['message']}")
+                print()
+
+            elif cmd_lower == "proactive":
+                print(f"{YELLOW}[*] Evaluating proactive state triggers...{RESET}")
+                asyncio.run(proactive.evaluate_triggers())
+                print(f"{GREEN}[OK] Proactive evaluation cycle complete.{RESET}")
+
+            else:
+                # Problem solving goal
+                goal = user_input
+                if cmd_lower.startswith("solve "):
+                    goal = user_input[6:].strip()
+
+                print(f"\n{CYAN}[*] Decomposing goal with Planner:{RESET} '{goal}'")
+
+                def local_exec(target_goal, ctx):
+                    plan = planner.plan_problem(target_goal, context=ctx)
+                    print(f"{CYAN}[+] Synthesized Pipeline DAG:{RESET} {len(plan.steps)} steps (ID: {plan.id[:8]})")
+                    for s in plan.steps:
+                        dep_str = f"(depends on: {', '.join(s.depends_on)})" if s.depends_on else "(independent)"
+                        print(f"    - Step '{s.id}': {s.name} -> tool '{s.tool_name}' {dep_str}")
+
+                    print(f"\n{YELLOW}[*] Executing pipeline concurrently...{RESET}")
+                    start_time = time.time()
+                    finished_plan = asyncio.run(engine.execute_pipeline(plan))
+                    elapsed = time.time() - start_time
+                    return finished_plan, elapsed
+
+                def fallback_notice(msg):
+                    print(f"\n{YELLOW}[!] {msg}{RESET}")
+
+                if mesh_client.role == "edge_node":
+                    mesh_res = mesh_client.execute_over_mesh(
+                        goal=goal,
+                        context={"zone": active_zone, "operator": active_name},
+                        local_executor=lambda g, c: local_exec(g, c),
+                        on_fallback_notice=fallback_notice
+                    )
+                    if mesh_res.get("execution_mode") == "remote_main_server":
+                        res_data = mesh_res["result"]
+                        print(f"{GREEN}[OK] Executed centrally on Main Server ({mesh_res['server_url']})!{RESET}")
+                        print(f"{CYAN}Core AI [Remote]:{RESET} {BRIGHT}{res_data.get('final_output') or 'Task complete.'}{RESET}\n")
+                        continue
+                    else:
+                        finished_plan, elapsed = mesh_res["result"]
+                else:
+                    finished_plan, elapsed = local_exec(goal, {"zone": active_zone, "operator": active_name})
+
+                if finished_plan.status == "completed":
+                    print(f"\n{GREEN}[OK] Pipeline Succeeded in {elapsed:.2f}s!{RESET}")
+                else:
+                    print(f"\n{RED}[FAILED] Pipeline Failed in {elapsed:.2f}s!{RESET}")
+
+                spoken = planner.formulate_spoken_response(finished_plan, profile=state.get_user_profile())
+                print(f"\n{CYAN}Core AI:{RESET} {BRIGHT}{spoken}{RESET}\n")
+
+                if voice_out:
+                    voice_out.synthesize_and_play(spoken)
+
+        except KeyboardInterrupt:
+            print(f"\n{YELLOW}[*] Session interrupted by operator. Exiting...{RESET}")
+            shutdown_event.set()
+            break
+        except Exception as e:
+            print(f"{RED}[-] Error: {e}{RESET}")
+
 def main():
     setup_logging()
     load_dotenv("config/.env")
     args = parse_args()
-    
-    logger.info("Initializing Core AI Microkernel with Universal Gateway, Proactive Engine & Voice Loop...")
-    
-    # 1. Init Core Services & State
+
+    if not args.headless:
+        play_boot_sequence()
+
+    logger.info("Initializing Core AI Microkernel with Universal Gateway, Proactive Engine & Model Router...")
+
+    # 1. State & Bus Core
     bus = EventBus()
     state = StateManager()
     context = ContextManager()
@@ -84,17 +543,19 @@ def main():
     operator_name = profile.preferred_name
     primary_zone = profile.preferences.get("primary_space", "studio")
     state.ensure_zone_exists(primary_zone, display_name=f"{operator_name}'s Primary Zone")
-    
-    # 2. Remote Edge Dispatcher (for physical car, phone, glasses tools)
+
+    # 2. Remote Edge Dispatcher
     remote_dispatcher = RemoteToolDispatcher(registry=registry)
-    
-    # 3. Brain Services
+
+    # 3. Model Router & Brain
+    model_router = ModelRouter(state_manager=state)
     dyn_gen = DynamicGenerator(registry=registry, state_manager=state)
-    planner = Planner(registry=registry, state_manager=state, dynamic_generator=dyn_gen)
+    planner = Planner(registry=registry, state_manager=state, dynamic_generator=dyn_gen, model_router=model_router)
     engine = PipelineEngine(registry=registry, state_manager=state, bus=bus)
     spoken_to = SpokenToReasoning(state_manager=state, registry=registry, planner=planner)
-    
-    # 4. Proactive Watcher Daemon
+    mesh_client = MeshClient(state_manager=state)
+
+    # 4. Proactive Daemon
     proactive = ProactiveDaemon(
         state_manager=state,
         planner=planner,
@@ -102,15 +563,27 @@ def main():
         bus=bus,
         check_interval_seconds=4.0
     )
-    
-    # 5. Voice Out Engine (Text-to-Speech)
+
+    # 5. Voice Out Engine
     voice_out: Optional[VoiceOutEngine] = None
     if not args.no_tts:
-        voice_out = VoiceOutEngine(default_voice="auto", output_device=args.device)
-        voice_out.attach_to_bus(bus, channel="tts_events")
-        logger.info("VoiceOutEngine online with Edge Neural TTS & pyttsx3 fallback.")
+        try:
+            voice_out = VoiceOutEngine(default_voice="auto", output_device=args.device)
+            voice_out.attach_to_bus(bus, channel="tts_events")
+            logger.info("VoiceOutEngine online with Edge Neural TTS & pyttsx3 fallback.")
+        except Exception as e:
+            logger.warning(f"VoiceOutEngine initialization skipped: {e}")
 
-    # 6. Universal Gateway App
+    # 6. Spatial Audio & Handoff
+    audio_router = SpatialAudioRouter(state_manager=state)
+    spatial_handoff = SpatialHandoffEngine(
+        state_manager=state,
+        bus=bus,
+        audio_router=audio_router,
+        voice_out_engine=voice_out
+    )
+
+    # 7. Universal Gateway App
     gateway_app = create_gateway_app(
         state_manager=state,
         registry=registry,
@@ -118,8 +591,8 @@ def main():
         pipeline_engine=engine,
         bus=bus
     )
-    
-    # Broadcast voice state helper
+
+    # Voice state broadcast helper
     def broadcast_voice_state(state_name: str, extra: dict = None):
         payload = {"state": state_name}
         if extra:
@@ -142,20 +615,11 @@ def main():
             logger.info(f"Received text event from zone '{effective_zone}': '{event.text}'")
             current_profile = state.get_user_profile()
 
-            # 1. Spoken-To Reasoning: Cognitive Addressee & Intent Analysis
             decision = spoken_to.evaluate(event.text, profile=current_profile)
-            logger.info(
-                f"[Spoken-To Reasoning] Role: {decision.discourse_role.value} | "
-                f"Action: {decision.action_type} | Respond: {decision.should_respond} | "
-                f"Rationale: {decision.rationale}"
-            )
-
-            # A. If operator is talking ABOUT Core AI or in ambient side-talk, stay completely silent
             if not decision.should_respond:
-                logger.info(f"[Spoken-To] Silently ignored non-addressed utterance: '{event.text}'")
+                logger.info(f"[Spoken-To] Silently ignored: '{event.text}'")
                 return
 
-            # B. If operator is SHOWCASING / demonstrating Core AI to someone else, chime in charismatically!
             if decision.discourse_role == DiscourseRole.DEMONSTRATED and decision.autonomous_response:
                 logger.info(f"[Spoken-To Showcase Chime-In]: '{decision.autonomous_response}'")
                 bus.publish("tts_events", TTSRequestEvent(
@@ -164,7 +628,7 @@ def main():
                     text=decision.autonomous_response
                 ))
                 asyncio.run(connection_manager.broadcast_event("hud_card", {
-                    "title": f"Core AI — Live Showcase",
+                    "title": "Core AI - Live Showcase",
                     "body": decision.autonomous_response,
                     "accent_color": "#ffaa00",
                     "zone": effective_zone
@@ -172,62 +636,36 @@ def main():
                 broadcast_voice_state("idle", {"zone": effective_zone})
                 return
 
-            # C. Direct command: use clean command stripped of vocatives
             command_text = decision.clean_command or event.text
-            
-            # Check for name change command
-            text_lower = command_text.lower()
-            if any(k in text_lower for k in ["call me", "name is", "nenne mich", "mein name ist"]):
-                parts = command_text.split()
-                new_name = parts[-1].strip("!?. ")
-                if len(new_name) > 1:
-                    state.set_user_preferred_name(new_name)
-                    logger.info(f"Updated user preferred name to: {new_name}")
-            
-            # Broadcast 'thinking' status
             broadcast_voice_state("thinking", {"query": command_text, "zone": effective_zone})
-
             room_context = {"zone": effective_zone, "device_type": event.get_device_type()}
-            
-            # 2. Plan DAG problem
+
             plan = planner.plan_problem(command_text, room_context)
-            
-            # 3. Execute pipeline
             finished_plan = asyncio.run(engine.execute_pipeline(plan))
-            
-            # 4. Formulate natural conversational spoken response
             response_text = planner.formulate_spoken_response(finished_plan, profile=current_profile)
-            
-            # 5. Dispatch to TTS audio channel
+
             bus.publish("tts_events", TTSRequestEvent(
                 source_node="brain",
                 room_id=effective_zone,
                 text=response_text
             ))
-            logger.info(f"Dispatched spoken response to '{effective_zone}': {response_text}")
-
-            # 6. Broadcast HUD update to smart mirrors / web dashboards
             asyncio.run(connection_manager.broadcast_event("hud_card", {
-                "title": f"Core AI — {current_profile.preferred_name}",
+                "title": f"Core AI - {current_profile.preferred_name}",
                 "body": response_text,
                 "accent_color": "#00ffcc" if finished_plan.status == "completed" else "#ff3366",
                 "zone": effective_zone
             }))
-            
             broadcast_voice_state("idle", {"zone": effective_zone})
-                
+
         except Exception as e:
             logger.error(f"Error handling text event: {e}", exc_info=True)
             broadcast_voice_state("idle", {"error": str(e)})
 
-    # Subscribe to central event bus
     bus.subscribe("text_events", handle_text_event)
     bus.start_listening()
-    
-    # Start Proactive Daemon
     proactive.start()
 
-    # 7. Voice In Engine (Microphone Capture & STT)
+    # Voice In Engine
     voice_in: Optional[VoiceInEngine] = None
     if args.voice or args.voice_in:
         try:
@@ -242,27 +680,52 @@ def main():
                 device_type="mic",
                 state_callback=lambda st: broadcast_voice_state(st, {"zone": primary_zone})
             )
-            logger.info(f"Voice capture active in primary zone: '{primary_zone}'. Speak anytime!")
+            logger.info(f"Voice capture active in zone: '{primary_zone}'.")
         except Exception as e:
-            logger.error(f"Failed to start VoiceInEngine ({e}). Core AI will continue in text/API mode.")
+            logger.error(f"Failed to start VoiceInEngine ({e}). Continuing in terminal mode.")
 
-    # Launch Gateway Web & WebSocket Server
+    # Background Universal Gateway Server
     host = args.host or os.getenv("CORE_HOST", "0.0.0.0")
     port = args.port or int(os.getenv("CORE_PORT", 8000))
+    shutdown_event = threading.Event()
+
+    config = uvicorn.Config(gateway_app, host=host, port=port, log_level="warning")
+    server = uvicorn.Server(config)
     
-    logger.info(f"Starting Core AI Gateway on http://{host}:{port}")
-    logger.info(f" -> Roadmap Dashboard: http://localhost:{port}/roadmap")
-    logger.info(f" -> Smart Mirror HUD:  http://localhost:{port}/mirror")
-    logger.info(f" -> Swagger API Docs:  http://localhost:{port}/docs")
-    if voice_in and voice_in.is_recording:
-        logger.info(f" Live Voice Loop: ACTIVE (Speak into your microphone!)")
-    
+    server_thread = threading.Thread(target=server.run, daemon=True, name="CoreGatewayThread")
+    server_thread.start()
+
+    logger.info(f"Core AI Universal Gateway running on http://{host}:{port}")
+
     try:
-        uvicorn.run(gateway_app, host=host, port=port, log_level="info")
+        if args.headless:
+            logger.info("Headless server mode active. Press Ctrl+C to terminate.")
+            while not shutdown_event.is_set():
+                time.sleep(0.5)
+        else:
+            # Interactive Core Terminal REPL
+            run_interactive_repl(
+                state=state,
+                bus=bus,
+                registry=registry,
+                planner=planner,
+                engine=engine,
+                proactive=proactive,
+                model_router=model_router,
+                mesh_client=mesh_client,
+                spoken_to=spoken_to,
+                audio_router=audio_router,
+                spatial_handoff=spatial_handoff,
+                voice_out=voice_out,
+                voice_in=voice_in,
+                port=port,
+                shutdown_event=shutdown_event
+            )
     except KeyboardInterrupt:
         logger.info("Shutdown requested by operator...")
     finally:
         logger.info("Stopping all background services cleanly...")
+        server.should_exit = True
         if voice_in:
             voice_in.stop_listening()
         if voice_out:

@@ -21,79 +21,109 @@ def prompt_yn(question: str, default: bool = True) -> bool:
             return False
         print("Please answer with 'y' or 'n'.")
 
+def create_desktop_launcher(root_dir: str):
+    try:
+        if os.name == "nt":
+            desktop_dir = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Desktop")
+            if os.path.isdir(desktop_dir):
+                bat_path = os.path.join(desktop_dir, "CoreAI.bat")
+                content = (
+                    "@echo off\r\n"
+                    f'cd /d "{root_dir}"\r\n'
+                    "call core.bat\r\n"
+                )
+                with open(bat_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                print(f"[OK] Created Desktop launcher: {bat_path}")
+                return bat_path
+        else:
+            desktop_dir = os.path.expanduser("~/Desktop")
+            if os.path.isdir(desktop_dir):
+                sh_path = os.path.join(desktop_dir, "CoreAI.desktop")
+                content = (
+                    "[Desktop Entry]\n"
+                    "Type=Application\n"
+                    "Name=Core AI Sovereign Terminal\n"
+                    f"Exec=bash -c 'cd \"{root_dir}\" && ./core.sh'\n"
+                    "Terminal=true\n"
+                )
+                with open(sh_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                os.chmod(sh_path, 0o755)
+                print(f"[OK] Created Desktop launcher: {sh_path}")
+                return sh_path
+    except Exception as e:
+        print(f"[WARNING] Could not create Desktop launcher: {e}")
+    return None
+
 def run_service_setup():
     print("\n" + "=" * 65)
-    print("  CORE AI :: SYSTEM BOOTSTRAP & AUTOSTART SETUP")
+    print("  CORE AI :: SYSTEM BOOTSTRAP & TERMINAL SETUP")
     print("=" * 65)
     print("Zero corporate telemetry. 100% self-hosted.\n")
 
     svc = ServiceManager()
     updater = CoreUpdater()
     state = StateManager()
+    root_dir = svc.root_dir
 
-    # 1. Autostart Question
-    enable_auto = prompt_yn("[?] Do you want Core AI to start automatically on system boot?", default=True)
-
-    # 2. Update Check Question
-    enable_update_check = prompt_yn("[?] Check for updates from GitHub on startup with automated test guard?", default=True)
-
-    # 3. Launch Style
-    print("\nLaunch Style on Startup:")
-    print("  1) Visible Terminal Window (Server Kernel Shell)")
-    print("  2) Headless Background Service")
-    choice = input("Select [1-2, Default=1]: ").strip()
-    in_terminal = choice != "2"
-
-    # 4. Identity & Zone Profile check
+    # 1. Identity & Zone Profile Check
     profile = state.get_user_profile()
     if profile.preferred_name == "User":
-        print("\nOperator profile is currently using default 'User'.")
-        run_identity = prompt_yn("[?] Would you like to configure your operator handle and primary space now?", default=True)
+        print("Operator profile is currently using default 'User'.")
+        run_identity = prompt_yn("[?] Configure your operator handle and primary space now?", default=True)
         if run_identity:
             run_identity_setup()
 
-    # Apply configuration
+    # 2. Desktop Launcher Question
+    enable_desktop = prompt_yn("[?] Place a 1-click launcher (CoreAI.bat) on your Desktop?", default=True)
+    if enable_desktop:
+        create_desktop_launcher(root_dir)
+
+    # 3. Autostart Question
+    enable_auto = prompt_yn("[?] Start Core AI automatically on system boot?", default=False)
+
+    # 4. Update Check Question
+    enable_update_check = prompt_yn("[?] Check for updates from GitHub on startup with automated test guard?", default=True)
+
+    # Apply Autostart Configuration
     if enable_auto:
-        # Create autostart launcher script that checks updates if enabled
         path = svc.get_autostart_path()
         if path:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             python_exe = sys.executable
-            root_dir = svc.root_dir
 
             if os.name == "nt":
                 update_cmd = f'"{python_exe}" -c "from core.updater import CoreUpdater; u = CoreUpdater(); u.apply_update()"\r\n' if enable_update_check else ""
                 content = (
                     f"@echo off\r\n"
-                    f"title Core AI Server Suite\r\n"
+                    f"title Core AI Sovereign Terminal\r\n"
                     f'cd /d "{root_dir}"\r\n'
                     f"{update_cmd}"
                     f'"{python_exe}" main.py\r\n'
                 )
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(content)
-                print(f"\n[OK] Created Windows autostart file at: {path}")
+                print(f"[OK] Configured Windows autostart at: {path}")
             else:
-                svc.enable_autostart(in_terminal=in_terminal)
-                print(f"\n[OK] Configured Linux autostart at: {path}")
+                svc.enable_autostart(in_terminal=True)
+                print(f"[OK] Configured Linux autostart at: {path}")
     else:
         svc.disable_autostart()
-        print("\n[OK] Autostart disabled.")
 
     print("\n" + "-" * 65)
     print("Bootstrap setup complete!")
-    print(f"  Autostart Enabled: {'YES' if enable_auto else 'NO'}")
-    print(f"  Startup Mode:      {'Terminal Window' if in_terminal else 'Headless Daemon'}")
+    print(f"  Desktop Launcher:  {'Created' if enable_desktop else 'None'}")
+    print(f"  Autostart on Boot: {'YES' if enable_auto else 'NO'}")
     print(f"  Auto-Update Guard: {'YES' if enable_update_check else 'NO'}")
     print("-" * 65)
 
-    # Prompt to start now
-    start_now = prompt_yn("\n[?] Would you like to start the Core AI Server Suite now?", default=True)
+    # 5. Launch Prompt
+    start_now = prompt_yn("\n[?] Launch Core AI Sovereign Terminal now?", default=True)
     if start_now:
-        ok, msg = svc.start(in_new_terminal=in_terminal)
-        print(f"[{'OK' if ok else 'INFO'}] {msg}")
-        if ok:
-            print("Server is online! Open browser at: http://localhost:8000/roadmap\n")
+        print("\nStarting Core AI...\n")
+        from main import main as launch_main
+        launch_main()
 
 if __name__ == "__main__":
     run_service_setup()

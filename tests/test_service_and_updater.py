@@ -33,3 +33,16 @@ def test_updater_test_runner():
     # Running test suite through updater should execute without error
     code, cur_commit, remote_commit = updater.check_for_updates()
     assert cur_commit is not None
+
+def test_desktop_launcher_creation(tmp_path, monkeypatch):
+    from interfaces.install.setup_service import create_desktop_launcher
+    fake_desktop = tmp_path / "Desktop"
+    fake_desktop.mkdir()
+    if os.name == "nt":
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    else:
+        monkeypatch.setenv("HOME", str(tmp_path))
+    res = create_desktop_launcher(root_dir=str(tmp_path))
+    assert res is not None
+    assert os.path.isfile(res)
+

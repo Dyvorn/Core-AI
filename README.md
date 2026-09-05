@@ -80,7 +80,7 @@ Core AI stands firmly against the modern plague of **AI Slop**:
   - [Dynamic Spatial Audio Routing Specimen](#dynamic-spatial-audio-routing-specimen)
 - [Current Status: What Works vs. Roadmap](#current-status-what-works-vs-roadmap)
 - [Problem Logging & Technical Debt Ledger](#problem-logging--technical-debt-ledger)
-- [Getting Started & Quickstart](#getting-started--quickstart)
+- [Getting Started & Sovereign Usage](#getting-started--sovereign-usage)
 
 ---
 
@@ -500,98 +500,162 @@ Whenever you discover a bug or limitation, record:
 
 ---
 
-## Getting Started & Quickstart
+## Getting Started & Sovereign Usage
 
-### Prerequisites
-- Python 3.10+ (Tested on Python 3.13)
-- Windows / Linux / macOS
+Core AI offers **two official paths**:
+1. **Sovereign One-Line Terminal Setup** (for operators deploying on their primary workstation, server, or mini-PC).
+2. **Developer Mode in IDE** (for contributors engineering the microkernel and DAG pipeline).
 
-### 1. Installation
-Activate your virtual environment and install dependencies:
+In both workflows, Core AI operates as a **Unified Sovereign Terminal**: running the kernel boots the background Universal Gateway (port 8000) for your smart mirror, mobile device, and edge nodes, plays a sleek ASCII boot sequence, and hosts the interactive command terminal in the very same window.
+
+---
+
+### Path A: Sovereign One-Line Bootstrap (Recommended)
+
+Run a single command in your terminal. It checks Python and Git, clones the repository, provisions an isolated virtual environment, installs dependencies, runs the interactive setup wizard, and drops straight into the Core AI Terminal:
+
+#### Windows (PowerShell)
+```powershell
+irm https://raw.githubusercontent.com/Dyvorn/Core-AI/master/install.ps1 | iex
+```
+
+#### Linux / macOS (Bash)
 ```bash
+curl -fsSL https://raw.githubusercontent.com/Dyvorn/Core-AI/master/install.sh | bash
+```
+
+During the 30-second setup, the terminal will ask:
+- **Operator Handle**: Your preferred name or call sign (e.g. `Dyvorn`).
+- **Primary Space**: Your starting spatial zone (e.g. `studio`, `lab`, `workshop`).
+- **Desktop Launcher**: Place a 1-click `CoreAI.bat` launcher on your Desktop (`[Y/n]`).
+- **Autostart on Boot**: Automatically boot Core AI on system startup (`[Y/n]`).
+- **Auto-Update Guard**: Verify GitHub updates with automated test guards on launch (`[Y/n]`).
+
+Once answered, Core AI boots immediately.
+
+---
+
+### Path B: Developer Mode (In Your IDE)
+
+For developers hacking on Core AI in VS Code, Cursor, or your preferred IDE:
+
+```bash
+# 1. Clone repository
+git clone https://github.com/Dyvorn/Core-AI.git
+cd Core-AI
+
+# 2. Set up virtual environment
+python -m venv .venv
+
 # Windows
-.venv\Scripts\activate
+.\.venv\Scripts\activate
 
 # Linux / macOS
 source .venv/bin/activate
 
+# 3. Install dependencies
 pip install -r requirements.txt
-pip install pytest
-```
 
-### 2. First-Run Setup (Zero Hardcoding)
-Configure your local operator profile, preferred name, aliases, and initial primary space:
-```bash
-python interfaces/cli/setup_wizard.py
-```
+# 4. Run automated test suite
+pytest tests
 
-### 3. Running Automated Tests
-Run the complete unit and integration test suite:
-```bash
-python -m pytest tests
-```
-*Expected output: `42 passed in ~35s`.*
-
-### 4. Interactive Operator Core Console (CLI Shell)
-Launch the interactive command center:
-```bash
-python interfaces/cli/core_console.py
-```
-- Solve arbitrary goals with real-time DAG pipeline visualization (`solve <goal>`).
-- Inspect audio hardware & active routes (`audio`).
-- Seamless cross-zone relocation & auto-routing (`handoff <zone_id>`).
-- Inspect and manage spatial zones dynamically (`zones`, `zone add <id> [name]`).
-- Inspect connected devices and security tiers (`devices`).
-- View and update operator profile (`profile`, `profile set <name>`).
-- Dispatch live HUD cards to ambient mirrors or wall projections (`hud <title> | <body>`).
-- Stream structured execution and audit logs (`logs [count]`).
-
-### 5. Starting the Universal Core AI Gateway & Microkernel
-Launch the microkernel, proactive reasoning daemon, and high-speed API gateway:
-```bash
+# 5. Launch Unified Core AI Terminal
 python main.py
 ```
-- **Interactive Swagger REST Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Interactive Master Roadmap Visualizer**: [http://localhost:8000/roadmap](http://localhost:8000/roadmap)
-- **Ambient Smart Mirror & Wall Projection HUD**: [http://localhost:8000/mirror](http://localhost:8000/mirror)
-- **Real-Time Event WebSocket**: `ws://localhost:8000/ws/events`
-- **Real-Time Log Stream WebSocket**: `ws://localhost:8000/ws/logs`
 
-### 6. Smart Mirror / Wall Projection Kiosk Mode
-Launch Chromium, Chrome, or Edge in fullscreen kiosk mode with automatic process watchdog and crash recovery:
-```bash
-python interfaces/mirror/launcher.py
-```
+> [!NOTE]
+> Running `python main.py` runs the Universal Gateway in the background on `http://localhost:8000` while providing you the interactive command shell in your IDE terminal.
+> If deploying in a headless container or systemd service, pass `--headless` or `--server-only`.
 
-### 7. Zero-Friction Device Onboarding (1-Line Plug & Play)
-Onboard any new laptop, Raspberry Pi, Arduino serial bridge, or Linux SBC in a single command:
-```bash
-python -m interfaces.install.enroll --server http://<core-ip>:8000 --device-name "Laptop-01" --device-type laptop --zone "workspace" --secret core_sovereign_secret
-```
+---
 
-### 8. Turnkey CLI Control (core.bat / core.sh)
-Manage your server suite, RAM, and processes directly with 1-word terminal commands:
-```bash
-# Windows
-.\core.bat setup        # Interactive bootstrap & autostart installer (Y/N)
-.\core.bat start        # Start Server Suite in visible terminal window
-.\core.bat stop         # Stop server suite and free GPU / RAM (for video editing)
-.\core.bat restart      # Restart Server Suite
-.\core.bat status       # Inspect PID, memory usage, and health
-.\core.bat update       # Check GitHub for updates with automated test guard
-.\core.bat console      # Launch interactive Cyber Operator Console
+### Unified Core Terminal Commands
 
-# Linux / macOS
-./core.sh setup
-./core.sh start
-./core.sh stop
-./core.sh status
-./core.sh update
-./core.sh console
-```
+Inside the terminal shell (`Core [Operator@zone] > `), type any natural language goal directly, or execute built-in commands:
 
-### 9. Zero-Residue Clean Uninstallation
-If you ever want to completely remove Core AI from your system without leaving any residual files behind:
+| Command | Action |
+| :--- | :--- |
+| `solve <goal>` | Synthesize and execute concurrent DAG pipeline (or type goal directly) |
+| `speak <text>` | Synthesize neural speech through current zone's speakers |
+| `spoken <text>` | Run Spoken-To Reasoning classification (detects showcase vs command) |
+| `voice on / off` | Toggle background continuous microphone listening (faster-whisper) |
+| `audio` | Introspect physical microphones, studio audio interfaces & active routes |
+| `handoff <zone>` | Shift spatial anchor to target zone & dynamically switch audio routing |
+| `status` | Inspect microkernel health, platform architecture & model assignments |
+| `profile` | View or update operator identity, preferred aliases, and tone |
+| `zones` | List all dynamically registered spatial zones (zero hardcoding) |
+| `zone add <id> [name]` | Register a new physical space on-the-fly |
+| `devices` | Inspect connected edge devices, trust tiers & roaming anchors |
+| `tools` | Inspect all loaded tools (native tools + dynamic synthesized tools) |
+| `models` | Inspect configured AI providers (Gemini, OpenAI, Anthropic, local) |
+| `model set <role> <model>` | Assign model to role (`planner`, `fallback`, `deep_reasoning`) |
+| `api-key set <prov> <key>` | Set API key persistently in `config/.env` |
+| `mesh` | Inspect intercontinental mesh status, node role & reachability |
+| `mesh role <main\|edge>` | Toggle between central main server and local offline edge node |
+| `mesh connect <url>` | Pair edge node to central server URL |
+| `mesh export / import` | Export or restore full SQLite state bundle for zero-downtime machine migration |
+| `hud <title> \| <body>` | Dispatch ambient HUD card to smart mirror / wall projection |
+| `logs [count]` | View recent execution audit logs stored in SQLite |
+| `proactive` | Trigger proactive state evaluation cycle on demand |
+| `clear` | Clear terminal screen |
+| `exit / quit` | Cleanly terminate all background servers, audio threads, and bus |
+
+---
+
+### 1-Click Desktop Launcher & CLI (`core.bat` / `core.sh`)
+
+Whenever you want to start, stop, or manage Core AI:
+
+- **Desktop**: Double-click `CoreAI.bat` on your Desktop to open the Sovereign Terminal.
+- **Terminal CLI**:
+  ```bash
+  # Windows
+  .\core.bat             # Launch Unified Terminal & Gateway Server
+  .\core.bat setup       # Re-run interactive bootstrap wizard
+  .\core.bat status      # Inspect process PID, memory usage, and health
+  .\core.bat stop        # Stop server suite and free GPU / RAM (for video editing)
+  .\core.bat update      # Update from GitHub with automated test guard
+  .\core.bat test        # Run pytest test suite (55+ tests)
+  .\core.bat uninstall   # Clean zero-residue uninstallation
+
+  # Linux / macOS
+  ./core.sh              # Launch Unified Terminal & Gateway Server
+  ./core.sh setup
+  ./core.sh status
+  ./core.sh stop
+  ./core.sh update
+  ./core.sh test
+  ./core.sh uninstall
+  ```
+
+---
+
+### Connecting Additional Edge Devices
+
+Once your Main Server is running, onboard other devices around your home or workspace:
+
+- **Smart Mirror / Wall Projection Kiosk**:
+  Launch Chromium or Edge in kiosk mode with automatic watchdog:
+  ```bash
+  python interfaces/mirror/launcher.py
+  ```
+- **Laptops, SBCs & Raspberry Pi Nodes**:
+  Pair any edge machine into the mesh:
+  ```bash
+  python -m interfaces.install.enroll --server http://<core-ip>:8000 --device-name "Laptop-01" --device-type laptop --zone "workspace" --secret core_sovereign_secret
+  ```
+- **Web Dashboards & APIs**:
+  - Swagger REST API: `http://localhost:8000/docs`
+  - Master Roadmap Visualizer: `http://localhost:8000/roadmap`
+  - Ambient Mirror HUD: `http://localhost:8000/mirror`
+  - Live Event WebSocket: `ws://localhost:8000/ws/events`
+  - Live Audit Log Stream: `ws://localhost:8000/ws/logs`
+
+---
+
+### Zero-Residue Clean Uninstallation
+
+If you ever want to completely remove Core AI from your machine:
 ```bash
 # Windows
 .\core.bat uninstall
@@ -599,8 +663,9 @@ If you ever want to completely remove Core AI from your system without leaving a
 # Linux / macOS
 ./core.sh uninstall
 ```
-Stops running processes, removes autostart entries, offers to export a backup bundle, and cleanly purges all runtime databases and logs.
+Stops running processes, removes autostart entries and desktop shortcuts, offers an optional state backup, and cleanly purges all runtime databases and logs.
 
 ---
 
 *Core AI is open-source software licensed under the [GNU Affero General Public License v3.0](LICENSE).*
+

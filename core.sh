@@ -10,14 +10,15 @@ else
     PYTHON="python3"
 fi
 
-COMMAND="${1:-help}"
+COMMAND="${1:-run}"
 
 case "$COMMAND" in
+    run|start|console)
+        shift || true
+        "$PYTHON" main.py "$@"
+        ;;
     setup)
         "$PYTHON" interfaces/install/setup_service.py
-        ;;
-    start)
-        "$PYTHON" -c "from core.service import ServiceManager; s = ServiceManager(); ok, msg = s.start(in_new_terminal=True); print(msg)"
         ;;
     stop)
         "$PYTHON" -c "from core.service import ServiceManager; s = ServiceManager(); ok, msg = s.stop(); print(msg)"
@@ -31,16 +32,13 @@ case "$COMMAND" in
     update)
         "$PYTHON" -c "from core.updater import CoreUpdater; u = CoreUpdater(); ok, msg = u.apply_update(); print(msg)"
         ;;
-    console)
-        "$PYTHON" interfaces/cli/core_console.py
-        ;;
     test)
         "$PYTHON" -m pytest tests
         ;;
     uninstall)
         "$PYTHON" interfaces/install/uninstall.py
         ;;
-    *)
+    help)
         echo ""
         echo "======================================================================="
         echo "  CORE AI :: SOVEREIGN LIFE OS COMMAND CLI"
@@ -48,15 +46,17 @@ case "$COMMAND" in
         echo "  Usage: ./core.sh <command>"
         echo ""
         echo "  Commands:"
-        echo "    setup       - Run interactive bootstrap and autostart setup (Y/N)"
-        echo "    start       - Start Core AI Server Suite"
-        echo "    stop        - Stop server suite and free RAM / GPU"
-        echo "    restart     - Restart Core AI Server Suite"
+        echo "    [no args]   - Launch Core AI Unified Terminal & Gateway Server"
+        echo "    run         - Launch Core AI Unified Terminal & Gateway Server"
+        echo "    setup       - Run interactive bootstrap & autostart setup (Y/N)"
         echo "    status      - Inspect running server status, PID, memory, and health"
+        echo "    stop        - Stop running background server suite"
         echo "    update      - Check GitHub for updates with automated test guard"
-        echo "    console     - Launch interactive Cyber Operator Console"
         echo "    test        - Run automated test suite (pytest)"
         echo "    uninstall   - Clean zero-residue uninstallation"
         echo ""
+        ;;
+    *)
+        "$PYTHON" main.py "$@"
         ;;
 esac

@@ -10,17 +10,22 @@ if exist ".venv\Scripts\python.exe" (
     set "PYTHON=python"
 )
 
-if "%1"=="" goto help
+if "%1"=="" goto run
+if "%1"=="run" goto run
+if "%1"=="console" goto run
+if "%1"=="start" goto run
 if "%1"=="help" goto help
 if "%1"=="setup" goto setup
-if "%1"=="start" goto start
 if "%1"=="stop" goto stop
 if "%1"=="restart" goto restart
 if "%1"=="status" goto status
 if "%1"=="update" goto update
-if "%1"=="console" goto console
 if "%1"=="test" goto test
 if "%1"=="uninstall" goto uninstall
+
+:run
+"%PYTHON%" main.py %*
+goto end
 
 :help
 echo.
@@ -30,13 +35,12 @@ echo =======================================================================
 echo   Usage: core ^<command^>
 echo.
 echo   Commands:
-echo     setup       - Run interactive bootstrap and autostart setup (Y/N)
-echo     start       - Start Core AI Server Suite (in visible terminal window)
-echo     stop        - Stop server suite and free RAM / GPU (for video editing)
-echo     restart     - Restart Core AI Server Suite
+echo     [no args]   - Launch Core AI Unified Terminal ^& Gateway Server
+echo     run         - Launch Core AI Unified Terminal ^& Gateway Server
+echo     setup       - Run interactive bootstrap ^& autostart setup (Y/N)
 echo     status      - Inspect running server status, PID, memory, and health
+echo     stop        - Stop running background server suite
 echo     update      - Check GitHub for updates with automated test guard
-echo     console     - Launch interactive Cyber Operator Console
 echo     test        - Run automated test suite (pytest)
 echo     uninstall   - Clean zero-residue uninstallation
 echo.
@@ -44,10 +48,6 @@ goto end
 
 :setup
 "%PYTHON%" interfaces\install\setup_service.py
-goto end
-
-:start
-"%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); ok, msg = s.start(in_new_terminal=True); print(msg)"
 goto end
 
 :stop
@@ -64,10 +64,6 @@ goto end
 
 :update
 "%PYTHON%" -c "from core.updater import CoreUpdater; u = CoreUpdater(); ok, msg = u.apply_update(); print(msg)"
-goto end
-
-:console
-"%PYTHON%" interfaces\cli\core_console.py
 goto end
 
 :test

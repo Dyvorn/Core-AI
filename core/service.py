@@ -1,8 +1,6 @@
 import os
 import sys
 import time
-import signal
-import psutil
 import subprocess
 import logging
 import urllib.request
@@ -12,9 +10,57 @@ logger = logging.getLogger(__name__)
 
 PID_FILE = ".core_ai.pid"
 
+def is_pid_alive(pid: int) -> bool:
+    """Verifies if a process ID is running using OS built-in commands."""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            res = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                timeout=2.0
+            )
+            return str(pid) in res.stdout
+        except Exception:
+            return False
+    else:
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+def kill_process_tree(pid: int) -> bool:
+    """Gracefully terminates a process and its child tree using OS native tools."""
+    if os.name == "nt":
+        try:
+            res = subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                capture_output=True,
+                text=True,
+                timeout=5.0
+            )
+            return res.returncode == 0
+        except Exception:
+            return False
+    else:
+        try:
+            import signal
+            os.kill(pid, signal.SIGTERM)
+            time.sleep(0.5)
+            if is_pid_alive(pid):
+                os.kill(pid, signal.SIGKILL)
+            return True
+        except Exception:
+            return False
+
+
 class ServiceManager:
     """
     Core AI Process & Service Lifecycle Manager:
+    - Zero external dependencies: pure Python standard library & OS native commands.
     - Starts the microkernel in background or terminal window.
     - Gracefully stops processes to free GPU, VRAM, and RAM (for video editing/gaming).
     - Status checking via PID inspection and Gateway health probes.
@@ -32,10 +78,8 @@ class ServiceManager:
         try:
             with open(self.pid_path, "r", encoding="utf-8") as f:
                 pid = int(f.read().strip())
-            if psutil.pid_exists(pid):
-                proc = psutil.Process(pid)
-                if proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE:
-                    return pid
+            if is_pid_alive(pid):
+                return pid
             # PID file stale
             self._clear_pid()
             return None
@@ -69,7 +113,7 @@ class ServiceManager:
 
     def start(
         self,
-        in_new_terminal: bool = False,
+        in_new_terminal: bool = True,
         port: int = 8000,
         extra_args: Optional[list] = None
     ) -> Tuple[bool, str]:
@@ -87,14 +131,12 @@ class ServiceManager:
         try:
             if in_new_terminal:
                 if os.name == "nt":
-                    # Windows: Start in new cmd window
                     proc = subprocess.Popen(
                         ["cmd.exe", "/k", "title Core AI Server Suite &&"] + cmd,
                         cwd=self.root_dir,
                         creationflags=subprocess.CREATE_NEW_CONSOLE
                     )
                 else:
-                    # Linux/macOS: Start in background or terminal
                     proc = subprocess.Popen(
                         cmd,
                         cwd=self.root_dir,
@@ -102,7 +144,6 @@ class ServiceManager:
                         stderr=subprocess.STDOUT
                     )
             else:
-                # Detached background process
                 log_file = open(os.path.join(self.root_dir, "logs", "server_daemon.log"), "a")
                 flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
                 proc = subprocess.Popen(
@@ -119,7 +160,7 @@ class ServiceManager:
         except Exception as e:
             return False, f"Failed to start Core AI server: {e}"
 
-    def stop(self, timeout: float = 5.0) -> Tuple[bool, str]:
+    def stop(self) -> Tuple[bool, str]:
         """
         Gracefully stops Core AI, freeing RAM, GPU, VRAM, and ports for video editing / gaming.
         """
@@ -128,23 +169,7 @@ class ServiceManager:
             return False, "Core AI is not currently running."
 
         try:
-            parent = psutil.Process(pid)
-            children = parent.children(recursive=True)
-
-            # Terminate children first
-            for child in children:
-                try:
-                    child.terminate()
-                except Exception:
-                    pass
-
-            parent.terminate()
-
-            # Wait for graceful exit
-            gone, alive = psutil.wait_procs(children + [parent], timeout=timeout)
-            for p in alive:
-                p.kill()
-
+            kill_process_tree(pid)
             self._clear_pid()
             logger.info(f"Core AI (PID {pid}) stopped successfully.")
             return True, f"Core AI server (PID {pid}) stopped. GPU and RAM freed."
@@ -153,7 +178,7 @@ class ServiceManager:
             return False, f"Error while stopping Core AI: {e}"
 
     def status(self, port: int = 8000) -> Dict[str, Any]:
-        """Returns detailed process, memory, and health status."""
+        """Returns detailed process and gateway health status."""
         pid = self.get_running_pid()
         is_healthy, health_data = self.check_health(port=port)
 
@@ -164,16 +189,6 @@ class ServiceManager:
             "port": port,
             "details": health_data
         }
-
-        if pid:
-            try:
-                proc = psutil.Process(pid)
-                mem = proc.memory_info()
-                info["memory_mb"] = round(mem.rss / (1024 * 1024), 2)
-                info["cpu_percent"] = proc.cpu_percent(interval=0.1)
-                info["status"] = proc.status()
-            except Exception:
-                pass
 
         return info
 
@@ -207,7 +222,6 @@ class ServiceManager:
             except Exception as e:
                 return False, f"Failed to write autostart file: {e}"
         else:
-            # Linux .desktop file
             python_exe = sys.executable
             main_script = os.path.join(self.root_dir, "main.py")
             content = f"[Desktop Entry]\nType=Application\nName=Core AI Server\nExec={python_exe} {main_script}\nPath={self.root_dir}\nTerminal={str(in_terminal).lower()}\n"
