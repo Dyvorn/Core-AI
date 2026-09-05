@@ -1,299 +1,483 @@
-# 🌐 Core AI — Sovereign Personal Companion & Ubiquitous Life OS
+# CORE AI
 
-> **A self-hosted, sovereign, and privacy-first AI companion built to integrate into daily life across your house, grounds, car, bike, smart glasses, smart mirror, and phone. No big-tech cloud lock-in, zero hardcoded assumptions, and designed for multi-year evolution.**
+```
++-----------------------------------------------------------------------------+
+|    ____ ___  ____  _____     _    ___                                       |
+|   / ___/ _ \|  _ \| ____|   / \  |_ _|                                      |
+|  | |  | | | | |_) |  _|    / _ \  | |                                       |
+|  | |__| |_| |  _ <| |___  / ___ \ | |                                       |
+|   \____\___/|_| \_\_____|/_/   \_\___|   Sovereign Ubiquitous Life OS       |
++-----------------------------------------------------------------------------+
+```
+
+```text
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 42/42 TESTS PASSED ]  [ PYTHON: 3.13+ ]
+[ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]     [ ETHOS: #ANTISLOP ]
+```
+
+> **A self-hosted, sovereign, and privacy-first AI companion built to integrate into daily life across your workspace, living spaces, grounds, vehicle, bicycle, smart mirror, and mobile devices. Zero big-tech cloud lock-in, zero hardcoded assumptions, and engineered for multi-year evolution.**
 
 ---
 
-### 🛡️ The #ANTISLOP Movement
-> *"We use AI to become more sustainable, smarter, and make human life genuinely easier — not to extract rent, hoard personal data, or pump low-effort corporate cash-grabs."*
+### The #ANTISLOP Movement
+
+> *"We use AI to become more sustainable, smarter, and make human life genuinely easier -- not to extract rent, hoard personal data, or pump low-effort corporate cash-grabs."*
 
 Core AI stands firmly against the modern plague of **AI Slop**:
-1. **Real Utility Over Hallucinated Hype**: Zero bloated minimum-viable wrappers or marketing buzzwords. If a capability isn't available, Core AI diagnoses why and reports the root cause transparently.
-2. **Human Elevation, Not Exploitation**: Technology should liberate human attention, remove friction between rooms and devices, and empower personal sovereignty.
+
+1. **Real Utility Over Hallucinated Hype**: Zero bloated minimum-viable wrappers or marketing buzzwords. If a capability is unavailable, Core AI inspects the host, diagnoses the root cause, and reports it transparently.
+2. **Human Elevation, Not Exploitation**: Technology must liberate human attention, remove friction across spaces and devices, and empower personal sovereignty.
 3. **Local Sovereignty & Sustainability**: Runs on your own silicon with 100% private data ownership under copyleft protection ([GNU AGPLv3](LICENSE)).
 
 ---
 
-### 👥 Contributors & Stewardship
+### Contributors & Stewardship
 
-| Role | Identity | GitHub / Handle | Focus |
+| Role | Identity | Profile / Contact | Focus Areas |
 | :--- | :--- | :--- | :--- |
-| **Lead Architect & Maintainer** | **Dyvorn** *(aka Vyrn / Refined)* | [@Dyvorn](https://github.com/Dyvorn) | Core Microkernel, DAG Engine, Ubiquitous Mesh |
-| **Open Source Community** | *Community Contributors* | [Join Us](CONTRIBUTING.md) | Device Drivers, Spatial Plugins, Edge Nodes, Testing |
+| **Lead Architect & Maintainer** | **Dyvorn** *(aka Vyrn / Refined)* | [@Dyvorn](https://github.com/Dyvorn) | Core Microkernel, DAG Engine, Spatial Mesh, Voice Pipeline |
+| **Open Source Community** | *Community Contributors* | [CONTRIBUTING.md](CONTRIBUTING.md) | Device Drivers, Edge Adapters, Hardware Plugins, Test Coverage |
 
 ---
 
-### ⚡ Full Technology Stack
+### Full Technology Stack
 
 | Layer | Technologies & Protocols | Purpose |
 | :--- | :--- | :--- |
-| **Core Microkernel** | `Python 3.13+` • `Asyncio` • `Pydantic v2` | High-concurrency event loops, strict schema validation, zero-bloat foundation |
-| **Intelligence & Brain** | `DAG Engine` • `AST Security Gate` • `Dynamic Sandbox` | Autonomous multi-step planning, capability gap detection, verified self-extension |
-| **State & Persistence** | `SQLite (WAL mode)` • `Redis EventBus` *(InMemory fallback)* | Ultra-low latency thread-safe state, execution audit logs, pub/sub messaging |
-| **Universal Edge Gateway** | `FastAPI` • `Uvicorn` • `WebSockets` • `REST` | High-speed event streams (`/ws/events`, `/ws/logs`), OpenAPI docs, edge node mesh |
-| **Voice & Perception** | `Silero-VAD` • `faster-whisper (STT)` • `Piper / Edge-TTS` | Local voice activity detection, rapid transcription, and neural speech synthesis |
-| **Spatial & Proactive Engine**| `ProactiveDaemon` • `Spatial Topology Anchoring` | Background state monitoring, dynamic zone provisioning, cross-room device handoffs |
-| **Ambient & Edge Interfaces** | `Vanilla CSS (Glassmorphism)` • `Nothing OS Glyph LED` • `Core Console CLI` | Smart Mirror / Wall Projection HUD, tactile phone notifications, interactive operator shell |
-| **Hardware Interoperability** | `Home Assistant API` • `Tailscale WireGuard` • `PipeWire / ALSA` | Sovereign smart-home orchestration, encrypted mesh tunneling, audio routing |
+| **Core Microkernel** | `Python 3.13+` / `Asyncio` / `Pydantic v2` | High-concurrency event loop, strict schema validation, zero-bloat foundation |
+| **Intelligence & Brain** | `DAG Engine` / `AST Security Gate` / `Dynamic Sandbox` | Autonomous multi-step planning, capability gap detection, verified self-extension |
+| **State & Persistence** | `SQLite (WAL mode)` / `Redis EventBus` *(InMemory fallback)* | Ultra-low latency thread-safe state, execution audit logs, pub/sub messaging |
+| **Universal Edge Gateway** | `FastAPI` / `Uvicorn` / `WebSockets` / `REST` | High-speed event streams (`/ws/events`, `/ws/logs`), OpenAPI docs, edge node mesh |
+| **Spatial Audio & Unity** | `SoundDevice` / `SpatialHandoffEngine` / `SpatialContext` | Zone-to-hardware binding, cross-space audio transfer, dynamic acoustic routing |
+| **Voice & Perception** | `Silero-VAD` / `faster-whisper (STT)` / `Piper` / `Edge-TTS` | Local voice activity detection, rapid transcription, neural speech synthesis |
+| **Ambient & Edge Interfaces** | `Vanilla CSS (Glassmorphism)` / `Nothing OS Glyph` / `Core Console` | Smart Mirror / Wall Projection HUD, tactile phone feedback, interactive CLI shell |
+| **Hardware Interoperability** | `Home Assistant API` / `Tailscale WireGuard` / `PipeWire` | Sovereign smart-home orchestration, encrypted mesh tunneling, audio routing |
 
 ---
 
-## 📖 Table of Contents
-1. [The #ANTISLOP Movement](#️-the-antislop-movement)
-2. [Contributors & Stewardship](#-contributors--stewardship)
-3. [Full Technology Stack](#-full-technology-stack)
-4. [The Vision](#-the-vision)
-5. [Repository Structure](#-repository-structure)
-6. [Core Philosophy & Architecture](#-core-philosophy--architecture)
-7. [Subsystem Deep Dive](#-subsystem-deep-dive)
-   - [Tool Introspection & Registry](#1-tool-introspection--registry)
-   - [Autonomous DAG Pipeline Engine](#2-autonomous-dag-pipeline-engine)
-   - [Self-Extension & Dynamic Tool Synthesis](#3-self-extension--dynamic-tool-synthesis)
-   - [Jarvis-Like Failure Awareness](#4-jarvis-like-failure-awareness)
-   - [Multi-Sink Logging & Audit Trails](#5-multi-sink-logging--audit-trails)
-8. [Ubiquitous Device & Zone Ecosystem](#-ubiquitous-device--zone-ecosystem)
-9. [Multi-Platform & Operating System Strategy](#-multi-platform--operating-system-strategy)
-10. [Current Status: What Works vs. Roadmap](#-current-status-what-works-vs-roadmap)
-11. [Problem Logging & Technical Debt Ledger](#-problem-logging--technical-debt-ledger)
-12. [Getting Started & Quickstart](#-getting-started--quickstart)
+## Table of Contents
 
-
-
----
-
-## 🌟 The Vision
-
-Core AI is not a simple chatbot or smart-speaker gimmick. It is designed as an **autonomous life assistant** that:
-- **Operates Ubiquitously**: Seamlessly transitions between your living room, garden/workshop, car, bicycle, smart glasses, smart mirror, and smartphone.
-- **Solves Problems Autonomously**: Analyzes goals against its current toolset, constructs multi-step execution pipelines (DAGs), and works until tasks are complete.
-- **Thinks & Executes Concurrently**: Runs independent tasks and tool calls in parallel ("multiple things at once").
-- **Builds Its Own Tools**: Detects missing capabilities, generates validated code, tests it in a sandbox, persists it to disk, and hot-loads it into the active runtime.
-- **Proactive & Aware**: Knows when something fails, diagnoses why, self-heals, and proactively assists (e.g. calling you while riding to work: *"You forgot to close the garage door, but don't worry, I locked it for you"*).
-- **100% Sovereign**: Runs on your own hardware via local models (Ollama, local STT/TTS) or encrypted private networks (Tailscale/WireGuard), completely independent of big-tech subscriptions or surveillance capitalism.
+- [System Architecture](#system-architecture)
+- [Core Philosophy & Invariants](#core-philosophy--invariants)
+  - [Zero Hardcoding: Hierarchical Spatial Topology](#1-zero-hardcoding-hierarchical-spatial-topology)
+  - [Protocol-Agnostic Event Mesh](#2-protocol-agnostic-event-mesh)
+  - [Distributed Edge Tool Dispatch](#3-distributed-edge-tool-dispatch)
+  - [Security Tiers & Privacy Defense](#4-security-tiers--privacy-defense)
+- [Subsystem Deep Dive](#subsystem-deep-dive)
+  - [Tool Introspection & Discovery](#1-tool-introspection--registry)
+  - [Autonomous DAG Pipeline Engine](#2-autonomous-dag-pipeline-engine)
+  - [Self-Extension & Dynamic Tool Synthesis](#3-self-extension--dynamic-tool-synthesis)
+  - [Jarvis-Like Failure Awareness](#4-jarvis-like-failure-awareness)
+  - [Multi-Sink Logging & Audit Trails](#5-multi-sink-logging--audit-trails)
+  - [Spatial Audio Routing & Cross-Zone Handoff](#6-spatial-audio-routing--cross-zone-handoff)
+- [Repository Structure](#repository-structure)
+- [Ubiquitous Device & Zone Ecosystem](#ubiquitous-device--zone-ecosystem)
+- [Multi-Platform & Operating System Strategy](#multi-platform--operating-system-strategy)
+- [Cool Little Extras](#cool-little-extras)
+  - [Interactive Shell Session Preview](#interactive-shell-session-preview)
+  - [Failure Diagnosis Specimen](#failure-diagnosis-specimen)
+  - [Nothing OS Glyph Matrix Pulse Spec](#nothing-os-glyph-matrix-pulse-spec)
+  - [Dynamic Spatial Audio Routing Specimen](#dynamic-spatial-audio-routing-specimen)
+- [Current Status: What Works vs. Roadmap](#current-status-what-works-vs-roadmap)
+- [Problem Logging & Technical Debt Ledger](#problem-logging--technical-debt-ledger)
+- [Getting Started & Quickstart](#getting-started--quickstart)
 
 ---
 
-## 📂 Repository Structure
+## System Architecture
+
+```text
+               +---------------------------------------------+
+               |         PHYSICAL REALITY & SENSORS          |
+               |  (Rooms, Workshop, Vehicles, Wearables)     |
+               +----------------------+----------------------+
+                                      |
+                                      v
+               +---------------------------------------------+
+               |           UNIVERSAL EDGE GATEWAY            |
+               |   FastAPI / WebSockets / Tailscale WireGuard|
+               +----------------------+----------------------+
+                                      |
+                         +------------+------------+
+                         |                         |
+                         v                         v
+               +-------------------+     +-------------------+
+               |  IN-MEMORY / REDIS|     |   PROACTIVE LOOP  |
+               |     EVENT BUS     |     |   DAEMON (STATE)  |
+               +---------+---------+     +---------+---------+
+                         |                         |
+                         +------------+------------+
+                                      |
+                                      v
+               +---------------------------------------------+
+               |            CORE AI MICROKERNEL              |
+               |                                             |
+               |   +-------------------------------------+   |
+               |   |  Autonomous DAG Pipeline Engine     |   |
+               |   |  - Concurrency ("Multiple At Once") |   |
+               |   |  - Dynamic Variable Piping          |   |
+               |   |  - Jarvis-Like Failure Awareness    |   |
+               |   +------------------+------------------+   |
+               |                      |                      |
+               |   +------------------v------------------+   |
+               |   |  AST Security Gate & Dynamic Sandbox|   |
+               |   |  - Tool Synthesis & Hot-Reload      |   |
+               |   +------------------+------------------+   |
+               |                      |                      |
+               |   +------------------v------------------+   |
+               |   |  Spatial Audio & Cross-Zone Handoff |   |
+               |   |  - SoundDevice Introspection        |   |
+               |   |  - Ambient Mirror / Projection HUD  |   |
+               |   +-------------------------------------+   |
+               +----------------------+----------------------+
+                                      |
+                      +---------------+---------------+
+                      |                               |
+                      v                               v
+            +-------------------+           +-------------------+
+            |  SQLITE (WAL MODE)|           |  ACTUATOR MESH    |
+            |  - State & Zones  |           |  - Audio Hardware |
+            |  - Audit Trails   |           |  - Edge Displays  |
+            |  - Operator Profil|           |  - Home Assistant |
+            +-------------------+           +-------------------+
+```
+
+---
+
+## Core Philosophy & Invariants
+
+### 1. Zero Hardcoding: Hierarchical Spatial Topology
+
+Hardcoding assumptions like *"everything is a living room"* breaks down when scaling to an outdoor workshop, garden, vehicle, bicycle, smart glasses, or airplane hangar. Core AI structures physical reality into flexible, hierarchical zones:
+
+```text
+zone: home/indoor/<space>       :: Studio, Office, Sanctuary, Kitchen
+zone: home/outdoor/<space>      :: Workshop, Garden, Patio, Hangar
+zone: mobile/vehicle/<type>     :: Car (OBD-II, Head-Unit), Bicycle (GPS, Cadence)
+zone: mobile/wearable/<type>    :: Smart Glasses (AR HUD, FOV Cam), Phone (Glyph, Push)
+```
+
+Every event (`BaseEvent`) carries its `spatial_context`, `device_type`, and `capabilities`. Operators provision new spaces on the fly without writing code.
+
+### 2. Protocol-Agnostic Event Mesh
+
+Devices communicate across distinct physical and network media:
+- **Local LAN**: High-bandwidth studio monitors, smart mirrors, home servers.
+- **WireGuard / Tailscale Mesh**: Secure private encrypted WAN connecting your vehicle and phone back to the core.
+- **BLE (Bluetooth Low Energy)**: Battery-constrained smart glasses and bicycle sensors bridging via mobile companion.
+
+The `EventBus` abstracts message passing with automatic in-memory fallback, allowing seamless transport transitions without altering core logic.
+
+### 3. Distributed Edge Tool Dispatch
+
+Tools are not confined to the central host. Through `ToolCallRequest.target_node`, operations execute wherever the physical capability exists:
+- **Central Host**: Heavy model inference, database persistence, audio routing.
+- **Phone Companion**: Sending notifications, tactile vibration patterns, cellular routing.
+- **Vehicle Unit**: Remote climate preconditioning, door locks, querying battery/fuel telemetry.
+- **Smart Glasses**: Displaying micro-glance HUD cards, low-latency bone conduction voice.
+
+### 4. Security Tiers & Privacy Defense
+
+Core AI enforces three immutable security tiers:
+
+| Tier | Identity | Scope & Privileges | Enforcement |
+| :--- | :--- | :--- | :--- |
+| **`OWNER`** | Host Operator | Full access to identity memory, private documents, critical actuator tools, and all spatial zones. | Full Access |
+| **`AMBIENT`** | Displays & Mics | Smart mirrors, wall projections, room microphones. Can render HUD cards, play audio, and stream sensor data. Cannot dump private identity profiles. | Scoped Access |
+| **`GUEST`** | Untrusted Network | Unknown devices on local network. Access to private profiles and sensitive tools is strictly rejected. Interaction requires explicit owner approval. | `HTTP 403 Forbidden` |
+
+---
+
+## Subsystem Deep Dive
+
+### 1. Tool Introspection & Registry
+- **File Reference**: [tools/registry.py](file:///g:/VSC_Projects/Core%20AI/tools/registry.py)
+- Maintains both native built-in tools and self-synthesized dynamic tools.
+- Generates runtime JSON schemas via `get_tool_catalog()` formatted for LLM reasoning.
+- Scans `tools/dynamic/` on startup with zero-restart hot-reloading (`reload_dynamic_tools()`).
+- Yields structured `StepResult` objects containing exact execution duration (`duration_ms`), success status, output payloads, and stacktraces.
+
+### 2. Autonomous DAG Pipeline Engine
+- **File Reference**: [brain/pipeline_engine.py](file:///g:/VSC_Projects/Core%20AI/brain/pipeline_engine.py)
+- Parses multi-step dependency graphs from arbitrary operational goals.
+- **Concurrent Execution ("Multiple Things At Once")**: Automatically identifies independent branches and runs them in parallel via `asyncio.gather` and thread worker pools.
+- **Dynamic Variable Piping**: Steps reference earlier outputs using runtime syntax like `{{steps.math_step.output.result}}` or `$step_id.field`.
+- Persists step state transitions directly to SQLite (`core_ai.db`).
+
+### 3. Self-Extension & Dynamic Tool Synthesis
+- **File Reference**: [brain/dynamic_generator.py](file:///g:/VSC_Projects/Core%20AI/brain/dynamic_generator.py)
+- When a required tool is missing:
+  1. **Code Generation**: Generates compliant Python implementations conforming to strict schema rules.
+  2. **Security Gate (AST Validation)**: Validates the abstract syntax tree to disallow unsafe packages (`subprocess`, `shutil`, `ctypes`) and dangerous calls (`fork`, `eval`, `exec`).
+  3. **Sandbox Verification**: Executes the generated code in an isolated dictionary namespace with test parameters.
+  4. **Persistence & Hot-Reload**: Writes the tool to `tools/dynamic/<tool_name>.py`, stores metadata in SQLite, and registers it into `ToolRegistry` with zero downtime.
+
+### 4. Jarvis-Like Failure Awareness
+- **File Reference**: [brain/pipeline_engine.py](file:///g:/VSC_Projects/Core%20AI/brain/pipeline_engine.py) & [brain/planner.py](file:///g:/VSC_Projects/Core%20AI/brain/planner.py)
+- When a tool returns an error status or throws an exception:
+  - Generates a structured `FailureDiagnosis` (failed step, tool name, error message, root-cause analysis, remediation strategy).
+  - Distinguishes between retryable faults (transient network glitches, parameter formatting) and fatal faults (missing hardware, unregistered tools).
+  - Triggers self-healing retries with exponential backoff or re-plans alternative tool routes.
+
+### 5. Multi-Sink Logging & Audit Trails
+- **File Reference**: [core/logging_setup.py](file:///g:/VSC_Projects/Core%20AI/core/logging_setup.py)
+- **High-Contrast Console**: Formatted log lines with timestamps, log levels, and subsystem tags.
+- **Rotating System Log**: `logs/core_ai.log` with automatic 5MB rotation and 5 archival backups.
+- **Immutable JSONL Audit Trail**: `logs/pipelines.jsonl` recording machine-readable lifecycle transitions for every pipeline execution.
+- **Database Logs**: Structured execution history stored in the `execution_logs` SQLite table.
+
+### 6. Spatial Audio Routing & Cross-Zone Handoff
+- **File References**: [engines/audio_router.py](file:///g:/VSC_Projects/Core%20AI/engines/audio_router.py) & [brain/spatial_handoff.py](file:///g:/VSC_Projects/Core%20AI/brain/spatial_handoff.py)
+- Dynamically queries host soundcards via `sounddevice.query_devices()` without hardcoding device indices.
+- Binds audio inputs and outputs to arbitrary zone IDs in SQLite.
+- Seamlessly transfers active microphone and speaker streams when the operator moves between spaces (`SpatialHandoffEvent`).
+- Dispatches ambient greeting and status HUD cards to the destination mirror or wall projection.
+
+---
+
+## Repository Structure
 
 ```text
 Core AI/
-├── brain/                      # Intelligence, Planning & Execution
-│   ├── dynamic_generator.py    # Synthesizes, verifies (AST + sandbox), & persists new tools
-│   ├── pipeline_engine.py      # Async DAG engine; concurrent step execution & variable resolution
-│   ├── planner.py              # Tool introspection, capability gap detector & DAG architect
-│   └── safety.py               # Human-in-the-loop validation for critical hardware actions
-├── config/                     # Configuration & Environment
-│   ├── nodes.yaml              # Multi-device topology (rooms, outdoor, car, bike, glasses, phone)
-│   ├── settings.yaml           # Model endpoints, logging paths, audio & bus settings
-│   └── .env.example            # API keys and local endpoint credentials template
-├── core/                       # Foundational Microkernel Services
-│   ├── bus.py                  # Protocol-agnostic EventBus (Redis with auto in-memory fallback)
-│   ├── context.py              # Ubiquitous ContextManager (spatial zones, device profiles)
-│   ├── logging_setup.py        # Multi-sink logger: Console, Rotating File, & JSONL audit
-│   ├── schemas.py              # Pydantic schemas (events, pipelines, dynamic tools, diagnosis)
-│   └── state.py                # SQLite WAL-mode state manager (pipelines, steps, audit logs)
-├── docs/                       # Project Documentation & Issue Tracking
-│   └── PROBLEMS_AND_DEBT.md    # Dedicated ledger tracking known bugs, edge cases & debt
-├── engines/                    # Audio Processing Engines
-│   ├── voice_in.py             # Silero-VAD + faster-whisper STT audio capture
-│   └── voice_out.py            # Text-To-Speech engine (Kokoro / Piper / Pyttsx3)
-├── interfaces/                 # Client Interfaces & Test Harnesses
-│   └── cli/
-│       ├── problem_solver_cli.py # Interactive CLI demo: concurrency, dynamic tools, awareness
-│       └── voice_test.py         # Voice pipeline interactive test harness
-├── logs/                       # System & Audit Logs
-│   ├── core_ai.log             # Rotating system logs (5MB, 5 backups)
-│   └── pipelines.jsonl         # Detailed JSONL audit records of all pipeline runs
-├── tools/                      # Tool Ecosystem
-│   ├── dynamic/                # Self-generated tools written, verified, and saved by Core AI
-│   │   └── hash_string.py      # Example auto-synthesized dynamic tool
-│   ├── native/                 # Built-in native tools
-│   │   ├── file_tools.py       # File reading, writing, and directory listing
-│   │   ├── home_assistant.py   # Home Assistant smart device integration mock
-│   │   ├── math_tools.py       # Safe mathematical evaluation & statistics
-│   │   └── system_tools.py     # System time and platform status
-│   └── registry.py             # Dynamic tool registry, catalog introspection, & safe execution
-├── tests/                      # Automated Test Suite (pytest)
-│   ├── test_bus.py             # EventBus pub/sub and in-memory queue tests
-│   ├── test_dynamic_generator.py # AST security validation & sandbox execution tests
-│   ├── test_logging.py         # JSONL pipeline audit and logger tests
-│   ├── test_pipeline_engine.py # DAG concurrency, variable piping, and retry tests
-│   ├── test_planner.py         # Introspection, gap detection, and model availability tests
-│   ├── test_registry.py        # Tool discovery, catalog schemas, and execution timing tests
-│   └── test_voice_pipeline.py  # Voice input initialization tests
-├── core_ai.db                  # SQLite database (pipelines, steps, dynamic tools, audit logs)
-├── requirements.txt            # Python dependencies
-└── main.py                     # Core AI microkernel runtime entrypoint
++-- brain/                      # Intelligence, Planning, & Spatial Unity
+|   +-- dynamic_generator.py    # Synthesizes, verifies (AST + sandbox), & persists new tools
+|   +-- pipeline_engine.py      # Async DAG engine; concurrent step execution & variable piping
+|   +-- planner.py              # Tool introspection, capability gap detector & DAG architect
+|   +-- proactive.py            # Proactive background watcher & conditional trigger daemon
+|   +-- safety.py               # Human-in-the-loop validation for critical actions
+|   +-- spatial_handoff.py      # Cross-zone spatial handoff & dynamic audio stream migration
++-- config/                     # Configuration & Environment
+|   +-- nodes.yaml              # Multi-device topology (rooms, outdoor, car, bike, glasses)
+|   +-- settings.yaml           # Model endpoints, logging paths, audio & bus settings
+|   +-- .env.example            # API keys and local endpoint credentials template
++-- core/                       # Foundational Microkernel Services
+|   +-- bus.py                  # Protocol-agnostic EventBus (Redis with auto in-memory fallback)
+|   +-- context.py              # Ubiquitous ContextManager (spatial zones, device profiles)
+|   +-- gateway.py              # FastAPI Universal Gateway (REST, WebSockets, OpenAPI)
+|   +-- logging_setup.py        # Multi-sink logger: Console, Rotating File, & JSONL audit
+|   +-- schemas.py              # Pydantic v2 schemas (events, pipelines, dynamic tools, spatial)
+|   +-- state.py                # SQLite WAL-mode state manager (pipelines, audio routes, profiles)
++-- docs/                       # Project Documentation & Issue Tracking
+|   +-- ROADMAP.md              # Long-term multi-year milestone roadmap (Phases 1-6)
+|   +-- PROBLEMS_AND_DEBT.md    # Dedicated ledger tracking known bugs, edge cases & debt
+|   +-- SESSION_HANDOVER.md     # Engineering handovers, architecture decisions, & session context
++-- engines/                    # Audio & Perception Processing Engines
+|   +-- audio_router.py         # Dynamic spatial audio hardware introspection & route binding
+|   +-- voice_in.py             # Silero-VAD + faster-whisper STT audio capture
+|   +-- voice_out.py            # Text-To-Speech engine (Kokoro / Piper / Pyttsx3)
++-- interfaces/                 # Client Interfaces & Test Harnesses
+|   +-- cli/
+|   |   +-- core_console.py     # Interactive rich operator command center shell
+|   |   +-- problem_solver_cli.py # Concurrency, dynamic tools, & failure awareness harness
+|   |   +-- setup_wizard.py     # Interactive zero-hardcoding operator profile initializer
+|   |   +-- voice_test.py       # Voice pipeline interactive test harness
+|   +-- install/
+|   |   +-- enroll.py           # 1-line zero-friction edge device onboarding client
+|   +-- mirror/
+|       +-- index.html          # Ambient Smart Mirror / Wall Projection HUD interface
+|       +-- launcher.py         # Cross-platform fullscreen kiosk launcher with watchdog
+|       +-- roadmap_visualizer.html # Interactive master roadmap dashboard & milestone tracker
++-- logs/                       # System & Audit Logs
+|   +-- core_ai.log             # Rotating system logs (5MB, 5 backups)
+|   +-- pipelines.jsonl         # Detailed JSONL audit records of all pipeline executions
++-- tools/                      # Tool Ecosystem
+|   +-- dynamic/                # Self-generated tools written, verified, and saved by Core AI
+|   |   +-- hash_string.py      # Example auto-synthesized dynamic tool
+|   +-- native/                 # Built-in native tools
+|   |   +-- file_tools.py       # File reading, writing, and directory listing
+|   |   +-- home_assistant.py   # Home Assistant smart device integration mock
+|   |   +-- math_tools.py       # Safe mathematical evaluation & statistics
+|   |   +-- spatial_tools.py    # Spatial audio routing tool for autonomous planner
+|   |   +-- system_tools.py     # System time and platform status
+|   +-- registry.py             # Dynamic tool registry, catalog introspection, & safe execution
++-- tests/                      # Automated Test Suite (pytest, 42/42 tests passing)
+|   +-- test_bus.py             # EventBus pub/sub and in-memory queue tests
+|   +-- test_dynamic_generator.py # AST security validation & sandbox execution tests
+|   +-- test_gateway.py         # REST & WebSocket endpoint tests
+|   +-- test_logging.py         # JSONL pipeline audit and logger tests
+|   +-- test_pipeline_engine.py # DAG concurrency, variable piping, and retry tests
+|   +-- test_planner.py         # Introspection, gap detection, and model availability tests
+|   +-- test_proactive.py       # Proactive daemon condition-action watcher tests
+|   +-- test_registry.py        # Tool discovery, catalog schemas, and execution timing tests
+|   +-- test_spatial.py         # Spatial context, dynamic zones, and security tiers tests
+|   +-- test_spatial_audio.py   # Dynamic audio routing, handoff, and soundcard tests
+|   +-- test_voice_pipeline.py  # Voice input initialization tests
++-- core_ai.db                  # SQLite database (pipelines, steps, dynamic tools, audio routes)
++-- requirements.txt            # Python dependencies
++-- main.py                     # Core AI microkernel runtime entrypoint
 ```
 
 ---
 
-## 🏛️ Core Philosophy & Architecture
+## Ubiquitous Device & Zone Ecosystem
 
-### 1. Zero Hardcoding: Spatial Topology Over "Rooms"
-Hardcoding assumptions like `"everything is a room"` breaks when scaling to a car, bike, garden, or smart glasses. Core AI structures physical reality into **`SpatialContext`** and **Hierarchical Zones**:
-- `home/indoor/<room>` — living room, office, bedroom, kitchen.
-- `home/outdoor/<area>` — garden, patio, driveway, workshop/garage.
-- `mobile/vehicle/<type>` — car (OBD-II, head-unit), bike (bike computer, GPS).
-- `mobile/wearable/<type>` — smart glasses (AR HUD, camera FOV), phone (push, rich screen).
+Configured dynamically or initialized via `config/nodes.yaml`:
 
-Every event (`BaseEvent`) carries its `spatial_context`, `device_type`, and `capabilities`, enabling the system to understand *where* the user is and *how* to interact.
-
-### 2. Protocol-Agnostic Event Mesh
-Devices connect across different physical media:
-- **Local LAN**: High-bandwidth room speakers, smart mirrors, home servers.
-- **WireGuard / Tailscale Mesh**: Secure private encrypted WAN connecting your car and phone back to the home core.
-- **BLE (Bluetooth Low Energy)**: Battery-constrained smart glasses and bike computers connecting through the smartphone.
-The `EventBus` abstracts message passing with automatic in-memory fallback, allowing transparent transport swapping without altering tool or brain logic.
-
-### 3. Distributed Edge Tool Dispatch
-Tools aren't restricted to the central server. Through `ToolCallRequest.target_node`, tools can run:
-- **Locally on Server**: Heavy computation, database lookups, file operations.
-- **On Phone**: Sending SMS, checking mobile contacts, vibration patterns.
-- **On Car**: Remote cabin preheating, door locks, querying battery/fuel telemetry.
-- **On Glasses**: Displaying HUD glance cards, capturing field-of-view images.
-
----
-
-## ⚙️ Subsystem Deep Dive
-
-### 1. Tool Introspection & Registry
-- **Location**: `tools/registry.py`
-- Maintains both native built-in tools and self-synthesized dynamic tools.
-- Exposes `get_tool_catalog()`, which provides rich schemas, descriptions, and parameter specifications formatted for LLM reasoning.
-- Automatically scans `tools/dynamic/` on startup and supports runtime hot-reloading (`reload_dynamic_tools()`).
-- Returns structured `StepResult` objects containing exact execution timing (`duration_ms`), success flags, return values, and full exception tracebacks.
-
-### 2. Autonomous DAG Pipeline Engine
-- **Location**: `brain/pipeline_engine.py`
-- Given a `PipelinePlan`, parses dependencies between steps.
-- **Concurrency ("Multiple things at once")**: Detects all steps whose dependencies are satisfied and executes them in parallel via `asyncio.gather` and thread worker pools.
-- **Dynamic Variable Piping**: Steps dynamically reference outputs from prior steps using syntax like `{{steps.math_step.output.result}}` or `$step_id.field`.
-- Manages state persistence at every step transition in SQLite (`core_ai.db`).
-
-### 3. Self-Extension & Dynamic Tool Synthesis
-- **Location**: `brain/dynamic_generator.py`
-- When the planner determines a needed tool is missing:
-  1. **Code Generation**: Generates Python implementation conforming to schema rules.
-  2. **Security Gate (AST Validation)**: Parses the AST to strictly disallow dangerous packages (`subprocess`, `shutil`, `ctypes`, etc.) and unsafe calls (`fork`, `eval`, `exec`).
-  3. **Sandbox Verification**: Executes the generated tool in an isolated dictionary namespace with sample arguments.
-  4. **Persistence & Hot-Reload**: Persists the tool to `tools/dynamic/<tool_name>.py`, saves metadata to the DB, and immediately registers it into `ToolRegistry` without restarting the server!
-
-### 4. Jarvis-Like Failure Awareness
-- **Location**: `brain/pipeline_engine.py` & `brain/planner.py`
-- When a tool returns an error status or raises an exception:
-  - Captures a structured `FailureDiagnosis` (failed step, tool name, error message, root-cause analysis, and suggested remediation).
-  - Distinguishes between retryable errors (missing arguments, transient network glitches) and fatal errors (missing files, unregistered tools).
-  - Logs warnings with full diagnostic context and triggers self-healing retries with backoff or re-planning.
-
-### 5. Multi-Sink Logging & Audit Trails
-- **Location**: `core/logging_setup.py`
-- **Colored Console**: Clean, colorized logs with timestamps, levels, and contextual tags.
-- **Rotating System Log**: `logs/core_ai.log` captures all system events with automatic 5MB rotation and 5 backups.
-- **JSONL Audit Trail**: `logs/pipelines.jsonl` provides an immutable, machine-readable chronological log of every pipeline lifecycle transition.
-- **Database Logs**: Full audit records persisted to the `execution_logs` table in `core_ai.db`.
-
----
-
-## 📡 Ubiquitous Device & Zone Ecosystem
-
-Defined in `config/nodes.yaml`:
-
-| Node ID | Zone | Type | Primary Capabilities | Transport |
-|---|---|---|---|---|
-| `room_office` | `home/indoor/office` | `room` | Mic, Speaker, Screen | Local LAN |
-| `room_living` | `home/indoor/living_room` | `room` | Mic, Speaker, TV Screen | Local LAN |
-| `ground_garden` | `home/outdoor/garden` | `outdoor_zone` | Outdoor Speaker, Ambient Mic, Sensors | Local LAN |
-| `ground_workshop` | `home/outdoor/workshop` | `outdoor_zone` | Mic, Speaker, Industrial Tools | Local LAN |
-| `vehicle_car` | `mobile/vehicle/car` | `vehicle_car` | Car Audio, Dashboard HUD Tile, GPS, OBD-II | Tailscale Mesh |
-| `vehicle_bike` | `mobile/vehicle/bike` | `vehicle_bike` | High-Contrast HUD, Cadence, GPS, Haptic | BLE / Phone Bridge |
+| Node ID | Zone ID | Form Factor | Primary Capabilities | Transport |
+| :--- | :--- | :--- | :--- | :--- |
+| `room_workspace` | `home/indoor/workspace` | `room` | Mic Array, Studio Monitor, Ambient HUD | Local LAN |
+| `room_sanctuary` | `home/indoor/sanctuary` | `room` | Hi-Fi Audio, Soft Lighting, Mic | Local LAN |
+| `ground_workshop`| `home/outdoor/workshop`  | `outdoor_zone` | Mic, PA Speaker, Industrial Telemetry | Local LAN |
+| `ground_hangar`  | `home/outdoor/hangar`    | `outdoor_zone` | Long-Range PA, Environmental Sensors | Local LAN / Mesh |
+| `vehicle_car`    | `mobile/vehicle/car`     | `vehicle_car` | Car Audio, Dashboard HUD Tile, GPS, OBD-II | Tailscale Mesh |
+| `vehicle_bike`   | `mobile/vehicle/bike`    | `vehicle_bike` | High-Contrast HUD, Cadence, GPS, Haptic | BLE / Phone Bridge |
 | `wearable_glasses`| `mobile/wearable/glasses`| `smart_glasses`| Micro HUD, Bone Conduction Audio, FOV Cam | BLE / Phone Bridge |
-| `wearable_phone` | `mobile/wearable/phone` | `phone` | Rich Screen, Push Notifications, GPS, Mic | Cellular |
+| `wearable_phone` | `mobile/wearable/phone`   | `phone` | Rich Screen, Push Notifications, GPS, Mic | Cellular / Mesh |
 
 ---
 
-## 🐧 Multi-Platform & Operating System Strategy
+## Multi-Platform & Operating System Strategy
 
-Core AI is designed with **strict platform neutrality and zero Windows-lock-in**. The system operates across a diverse spectrum of operating systems:
+Core AI is designed with **strict platform neutrality and zero OS vendor lock-in**:
 
-```mermaid
-graph TD
-    CoreAI[Core AI Architecture] --> Linux[Linux - Primary Production]
-    CoreAI --> Mobile[Android & Nothing OS - Mobile Companion]
-    CoreAI --> Embedded[Custom OS & Embedded Linux - SBCs/Vehicles]
-    CoreAI --> WinMac[Windows & macOS - Workstations]
-
-    Linux --> Server[Homelab / Cloud Server / Headless]
-    Linux --> Workstation[Arch / Fedora / Debian Daily Driver]
-    Linux --> Docker[Docker & Podman Containers]
-
-    Mobile --> NothingOS[Nothing OS - Glyph Matrix Integration]
-    Mobile --> Companion[Background Push & BLE Gateway]
-
-    Embedded --> Auto[Car Head-Unit & Raspberry Pi]
-    Embedded --> Bike[Bike Computer / Alpine Micro-Distro]
-    Embedded --> Mirror[Smart Mirror & Wall Projections]
+```text
+                            +-------------------+
+                            |  CORE AI RUNTIME  |
+                            +---------+---------+
+                                      |
+         +-----------------+----------+----------+-----------------+
+         |                 |                     |                 |
+         v                 v                     v                 v
+   +-----------+     +-----------+         +-----------+     +-----------+
+   |   LINUX   |     |  ANDROID  |         | EMBEDDED  |     |  WINDOWS  |
+   | (PRIMARY) |     | NOTHING OS|         |   LINUX   |     |   MACOS   |
+   +-----+-----+     +-----+-----+         +-----+-----+     +-----+-----+
+         |                 |                     |                 |
+   +-----+-----+     +-----+-----+         +-----+-----+     +-----+-----+
+   | Arch/Fedora     | Glyph LED           | Car SBC /   |     | Workstation
+   | Debian/Alpine   | Matrix              | Raspberry Pi|     | Local Dev
+   | PipeWire/ALSA   | Quick Tiles         | Alpine/Yocto|     | Cross-Plat
+   | Systemd Units   | BLE Bridge          | Kiosk HUD   |     | POSIX Py3
+   +-----------+     +-----------+         +-----------+     +-----------+
 ```
 
-### 1. Linux (Primary Production & Daily-Driver Target)
-- **Role**: The core production environment for home servers, automotive SBCs, and primary personal workstations.
-- **Supported Distros**: Arch, Debian, Ubuntu, Fedora, Alpine.
-- **Audio Stack**: Seamless integration with PipeWire, PulseAudio, and native ALSA drivers.
-- **Process Management**: Native `systemd` user units and headless background daemons.
+### 1. Linux (Primary Production & Workstation Target)
+- **Role**: Primary host for home servers, automotive SBCs, and main developer rigs.
+- **Distros**: Arch, Debian, Ubuntu, Fedora, Alpine.
+- **Audio Stack**: Direct PipeWire, PulseAudio, and ALSA integration via `sounddevice`.
+- **Daemons**: Native `systemd` user services and headless background execution.
 
 ### 2. Android & Nothing OS (Tier-1 Mobile Companion)
-- **Role**: Ubiquitous companion bridge while moving outside the home.
+- **Role**: Ubiquitous companion bridge outside the physical home.
 - **Nothing OS Specialization**:
-  - **Glyph Matrix Integration**: Uses the rear Glyph LED interface for subtle ambient feedback (e.g. pulsing glyph patterns when Core AI is thinking, executing an action, or alerting you quietly without turning on the screen).
-  - **Ambient Widgets & Quick Tiles**: Fast 1-tap voice invocation and status display.
-- **Edge Gateway**: The phone routes cellular traffic and bridges Bluetooth Low Energy (BLE) peripherals (smart glasses, bike sensors) back to Core AI.
+  - **Glyph Matrix Integration**: Rear Glyph LEDs render subtle ambient feedback (pulsing glyph patterns while Core AI reasons, quiet flashes on completion, discreet security warnings).
+  - **Quick Tiles & Ambient Widgets**: 1-tap voice invocation and status indicators.
+- **Edge Gateway**: Bridges Bluetooth Low Energy (BLE) peripherals (smart glasses, bike sensors) back to Core AI over cellular wireguard.
 
 ### 3. Custom OS & Embedded Linux (Automotive, Bike, Smart Mirror, Projections)
-- **Role**: Dedicated appliance controllers.
-- **Targets**:
-  - **Smart Mirror & Wall Projections**: Lightweight micro-browsers (Chromium kiosk / WebGL / Canvas) rendering ambient `AdaptiveResponseEvent` HUD cards.
-  - **Vehicle (Car & Bike)**: Minimalist Alpine/Yocto/Buildroot Linux builds running on ARM/x86 SBCs with direct CAN-bus/OBD-II and GPS access.
+- **Smart Mirror & Wall Projections**: Lightweight micro-browsers running in fullscreen kiosk mode displaying real-time HUD cards.
+- **Automotive & Bike**: Minimalist Alpine/Yocto builds on ARM/x86 SBCs with direct CAN-bus/OBD-II and GPS access.
 
-### 4. Windows (Transitionary Development)
-- **Role**: Current active development environment.
-- **Guarantees**: Zero Win32-locked dependencies, cross-platform UTF-8 console encoding, standard POSIX-compliant Python library usage.
+### 4. Windows & macOS (Portable Development)
+- Cross-platform UTF-8 console output, POSIX-compliant file paths, and zero Windows-specific binary dependencies.
 
-### 5. Turnkey Containerization (Docker & Podman)
-Deploy Core AI on any Linux server, unRAID, TrueNAS, or homelab in a single command:
-```bash
-docker compose up -d
+---
+
+## Cool Little Extras
+
+### Interactive Shell Session Preview
+
+An authentic trace from the `Core Console` showing concurrent multi-step DAG planning and dynamic variable piping:
+
+```text
+>>> solve compute the sha256 hash of 'AntiSlop-2026' and print current time
+[CoreAI.Planner] Introspecting catalog: 6 native tools, 1 dynamic tools found.
+[CoreAI.DAG] Formulating execution graph:
+  +-- [Step 1: hash_string] target: 'AntiSlop-2026' (dynamic tool)
+  +-- [Step 2: get_time] timezone: 'UTC' (native tool)
+  Dependency check: Independent steps detected -> executing concurrently.
+[CoreAI.DAG] Step 'hash_string' dispatched to worker pool...
+[CoreAI.DAG] Step 'get_time' dispatched to worker pool...
+[CoreAI.DAG] Step 'hash_string' completed in 1.42ms -> output: 7f83b165...
+[CoreAI.DAG] Step 'get_time' completed in 0.88ms -> output: 2026-09-05T22:45:00Z
+[CoreAI.Audit] Persisted execution log to SQLite and logs/pipelines.jsonl.
+Pipeline completed successfully in 2.30ms.
 ```
-All persistent databases (`core_ai.db`), configuration files (`config/`), dynamically synthesized tools (`tools/dynamic/`), and logs (`logs/`) mount to host volumes.
+
+### Failure Diagnosis Specimen
+
+When an error occurs, Core AI outputs structured diagnostic data rather than failing silently:
+
+```json
+{
+  "failed_step": "fetch_weather",
+  "tool_name": "weather_api",
+  "error_message": "ConnectionRefusedError: [Errno 111] Connection refused at 10.0.0.45:8080",
+  "root_cause": "Local environmental sensor bridge at 10.0.0.45 is offline or unreachable.",
+  "suggested_fix": "Verify power to workshop sensor node or fall back to outdoor_meteo_backup.",
+  "is_retryable": true,
+  "retry_strategy": "exponential_backoff_3x"
+}
+```
+
+### Nothing OS Glyph Matrix Pulse Spec
+
+The rear Glyph LED hardware patterns mapped to Core AI operational states:
+
+```text
+Idle State:
+LED [ ] ------------------------------------------------ (Off / Low Ambient)
+
+Thinking / DAG Reasoning:
+LED [*] ~~~~~~ [***] ~~~~~~ [*] ~~~~~~ [***] ~~~~~~~~~~~ (Subtle Sine Wave Pulse)
+
+Action Completed:
+LED [***] ---------------------------------------------- (Single 150ms Soft Flash)
+
+Security Alert / Guest Warning:
+LED [***] [   ] [***] [   ] [***] ---------------------- (Triple Staccato Burst)
+```
+
+### Dynamic Spatial Audio Routing Specimen
+
+Real-time audio route binding stored in SQLite and managed on the fly:
+
+```text
++-------------------+----------------------------+----------------------------+---------+
+| ZONE ID           | INPUT DEVICE               | OUTPUT DEVICE              | STATUS  |
++-------------------+----------------------------+----------------------------+---------+
+| workspace         | Studio Mic Array (USB)     | Reference Monitors (Ch 1-2)| ACTIVE  |
+| sanctuary         | Acoustic Ceiling Mic (In 3)| Hi-Fi DAC (USB-C)          | ACTIVE  |
+| workshop          | Industrial Mic (Line In)   | Overhead Horn (Line Out)   | STANDBY |
+| hangar            | Long-Range Array           | PA Main (Ch 3-4)           | STANDBY |
++-------------------+----------------------------+----------------------------+---------+
+```
 
 ---
 
-## 📊 Current Status: What Works vs. Roadmap
+## Current Status: What Works vs. Roadmap
 
-
-| Feature / Capability | Status | Notes |
-|---|---|---|
-| **Tool Introspection & Discovery** | ✅ Working | Registry scans native + dynamic tools; provides full catalog schemas |
-| **Multi-Step DAG Pipeline Planner** | ✅ Working | Heuristic and LLM decomposition with dependency graph |
-| **Concurrent Step Execution** | ✅ Working | Independent steps run in parallel via `asyncio.gather` |
-| **Dynamic Variable Piping** | ✅ Working | `{{steps.<id>.output.<field>}}` resolved recursively at runtime |
-| **Dynamic Tool Synthesis & Sandbox** | ✅ Working | AST security gate + isolated sandbox + disk save + runtime reload |
-| **Jarvis-Like Failure Awareness** | ✅ Working | Diagnoses root cause, provides fixes, handles retries |
-| **Multi-Sink Logging** | ✅ Working | Console + `core_ai.log` + `pipelines.jsonl` + SQLite `execution_logs` |
-| **In-Memory Bus Fallback** | ✅ Working | Zero-setup testing without requiring running Redis container |
-| **Fast Model Health Checking** | ✅ Working | Socket/env pre-checks avoid long timeouts on offline LLMs |
-| **Automated Test Suite** | ✅ Working | 13/13 unit and integration tests passing (`pytest tests`) |
-| **Smart Mirror & Wall Projection UI** | 🔄 Planned | Web/Canvas frontends rendering `AdaptiveResponseEvent` HUD cards |
-| **Proactive Agent Watcher Loop** | 🔄 Planned | Autonomous background daemon detecting conditions and triggering calls |
-| **Edge Node Network Transport** | 🔄 Planned | WebSocket / Tailscale proxy for remote tool execution on car/glasses |
-| **Long-Term Vector Memory** | 🔄 Planned | `sqlite-vec` or local embeddings for associative personal memory |
+| Capability / Subsystem | Phase | Status | Verification Reference |
+| :--- | :--- | :--- | :--- |
+| **Tool Introspection & Discovery** | Phase 1 | `[COMPLETED]` | Scans native + dynamic tools; provides full schemas |
+| **Multi-Step DAG Pipeline Planner** | Phase 1 | `[COMPLETED]` | Heuristic and LLM decomposition with dependency graph |
+| **Concurrent Step Execution** | Phase 1 | `[COMPLETED]` | Independent steps run in parallel via `asyncio.gather` |
+| **Dynamic Variable Piping** | Phase 1 | `[COMPLETED]` | `{{steps.<id>.output.<field>}}` resolved at runtime |
+| **Dynamic Tool Synthesis & Sandbox** | Phase 1 | `[COMPLETED]` | AST security gate + isolated sandbox + disk save |
+| **Jarvis-Like Failure Awareness** | Phase 1 | `[COMPLETED]` | Diagnoses root causes, suggests fixes, auto-retries |
+| **Multi-Sink Logging** | Phase 1 | `[COMPLETED]` | Console + `core_ai.log` + `pipelines.jsonl` + SQLite |
+| **In-Memory Bus Fallback** | Phase 1 | `[COMPLETED]` | Zero-setup testing without requiring external Redis |
+| **Universal Edge Gateway** | Phase 2 | `[COMPLETED]` | FastAPI REST + WebSockets (`/ws/events`, `/ws/logs`) |
+| **Proactive Reasoning Daemon** | Phase 2 | `[COMPLETED]` | Autonomous background condition-action evaluation |
+| **Personal Identity Memory** | Phase 2 | `[COMPLETED]` | Dynamic operator profile in SQLite (`user_profiles`) |
+| **Dynamic Spatial Zones & Security**| Phase 2 | `[COMPLETED]` | Dynamic zone creation, `OWNER`/`AMBIENT`/`GUEST` tiers |
+| **1-Line Zero-Friction Enrollment** | Phase 2 | `[COMPLETED]` | `interfaces/install/enroll.py` automated token onboarding |
+| **Smart Mirror & Projection HUD** | Phase 2 | `[COMPLETED]` | Glassmorphism dashboard + interactive roadmap visualizer |
+| **Dynamic Spatial Audio Router** | Phase 3 | `[COMPLETED]` | `engines/audio_router.py` introspects soundcards dynamically |
+| **Cross-Zone Spatial Handoff** | Phase 3 | `[COMPLETED]` | `brain/spatial_handoff.py` auto-relocates audio and HUDs |
+| **Smart Mirror Kiosk Launcher** | Phase 3 | `[COMPLETED]` | `interfaces/mirror/launcher.py` watchdog crash recovery |
+| **Automated Test Suite** | All | `[COMPLETED]` | **42/42 tests passing 100% green** (`pytest tests`) |
+| **Mobile Companion & Nothing OS** | Phase 4 | `[ACTIVE]` | WebSocket client, rear Glyph Matrix LED driver, BLE bridge |
+| **Automotive & Bicycle SBC Unit** | Phase 5 | `[QUEUED]` | CAN-bus / OBD-II integration, bicycle computer bridge |
+| **Smart Glasses AR & Spatial Cam** | Phase 6 | `[QUEUED]` | Micro HUD projection, bone conduction, FOV camera |
 
 ---
 
-## 📝 Problem Logging & Technical Debt Ledger
+## Problem Logging & Technical Debt Ledger
 
-To ensure issues and edge-cases are **never lost** over this multi-year project, all bugs, limitations, and architectural debts are logged in:
+To ensure issues and edge-cases are **never lost** over this multi-year initiative, all bugs, limitations, and architectural debts are logged in:
 
-👉 **[docs/PROBLEMS_AND_DEBT.md](file:///g:/VSC_Projects/Core%20AI/docs/PROBLEMS_AND_DEBT.md)**
+**[docs/PROBLEMS_AND_DEBT.md](file:///g:/VSC_Projects/Core%20AI/docs/PROBLEMS_AND_DEBT.md)**
 
 Whenever you discover a bug or limitation, record:
 1. Issue ID & Component.
@@ -304,7 +488,7 @@ Whenever you discover a bug or limitation, record:
 
 ---
 
-## 🚀 Getting Started & Quickstart
+## Getting Started & Quickstart
 
 ### Prerequisites
 - Python 3.10+ (Tested on Python 3.13)
@@ -315,6 +499,10 @@ Activate your virtual environment and install dependencies:
 ```bash
 # Windows
 .venv\Scripts\activate
+
+# Linux / macOS
+source .venv/bin/activate
+
 pip install -r requirements.txt
 pip install pytest
 ```
@@ -333,7 +521,7 @@ python -m pytest tests
 *Expected output: `42 passed in ~35s`.*
 
 ### 4. Interactive Operator Core Console (CLI Shell)
-Launch the rich interactive operator command center:
+Launch the interactive command center:
 ```bash
 python interfaces/cli/core_console.py
 ```
@@ -363,31 +551,12 @@ Launch Chromium, Chrome, or Edge in fullscreen kiosk mode with automatic process
 python interfaces/mirror/launcher.py
 ```
 
-
-
 ### 7. Zero-Friction Device Onboarding (1-Line Plug & Play)
-When you turn on a new laptop, Raspberry Pi, Arduino serial bridge, or Linux SBC, onboard it instantly with:
+Onboard any new laptop, Raspberry Pi, Arduino serial bridge, or Linux SBC in a single command:
 ```bash
 python -m interfaces.install.enroll --server http://<core-ip>:8000 --device-name "Laptop-01" --device-type laptop --zone "workspace" --secret core_sovereign_secret
 ```
-This registers the device in SQLite, obtains a secure session token, and connects it to the Core AI mesh.
 
-### 8. Security Tiers & Privacy Protection (Owner vs. Ambient vs. Guest)
-Core AI strictly defends personal privacy and enforces three distinct trust tiers:
-- **Host / Owner (`OWNER`)**: Full access to personal identity memory, sensitive files, private tools, and all spatial zones.
-- **Ambient Displays & Sensors (`AMBIENT`)**: Smart mirrors, wall projectors, room microphones. Can render HUD cards, play audio, and report environmental sensor data, but cannot dump private personal data.
-- **Guest Devices (`GUEST`)**: Untrusted devices on the local network (e.g. a friend's phone on WiFi, guest laptop). Personal profile access and critical tools are rejected (`HTTP 403 Forbidden`). Interaction requires explicit owner approval.
+---
 
-### 9. Multi-Zone Spatial Unity (Zero Hardcoding)
-Core AI serves as an active, seamless, overwatching harness connecting arbitrary zones (workspace studio, living sanctuary, workshop, patio, airplane hangar, etc.):
-- Eliminates manual back-and-forth management between spaces.
-- Dynamically creates and tracks zones on-demand without hardcoded room assumptions.
-- Proactively handles peripheral states, audio interfaces, lighting profiles, and reminders.
-
-### 10. Anti-Slop & Truthful Capability Standard
-Core AI strictly adheres to the Truthful Capability Principle:
-- Zero hallucinations or false promises of capabilities it does not possess.
-- If an action or tool is unavailable, Core AI diagnoses the exact root cause, reports it transparently, and optionally synthesizes or requests the needed tool.
-
-
-
+*Core AI is open-source software licensed under the [GNU Affero General Public License v3.0](LICENSE).*
