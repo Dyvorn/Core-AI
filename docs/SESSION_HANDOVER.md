@@ -1,13 +1,13 @@
-# Core AI — Session Handover & Action Plan
+# Core AI -- Session Handover & Action Plan
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 51/51 TESTS PASSED ]  [ PYTHON: 3.13+ ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 55/55 TESTS PASSED ]  [ PYTHON: 3.13+ ]
 [ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]     [ ETHOS: #ANTISLOP ]
 ```
 
 - **Date**: September 5, 2026  
 - **Lead Architect**: Dyvorn (*aka Vyrn / Refined*)  
-- **System Status**: All 51 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
+- **System Status**: All 55 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
 
 ---
 
@@ -54,12 +54,19 @@ All hardcoded assumptions have been eradicated. Core AI boots as a **pure day-ze
 - `docs/INTERCONTINENTAL_MESH.md`: Architectural blueprint for planetary mesh, offline fallback, and machine migration.
 - `interfaces/cli/setup_wizard.py`: Upgraded with AI provider selection and mesh role configuration.
 
+### 6. Process Lifecycle, Self-Updater & Zero-Residue Removal
+- `core/service.py`: Process controller managing startup, graceful stop (freeing RAM/GPU/VRAM for video editing and gaming), PID tracking, and OS autostart.
+- `core/updater.py`: Automated self-updater checking GitHub on boot, pulling updates, and running `pytest tests` with rollback protection.
+- `interfaces/install/setup_service.py`: Interactive bootstrap wizard asking Y/N questions for autostart, updates, and launch mode.
+- `interfaces/install/uninstall.py`: Complete clean uninstaller leaving zero residual files or background zombies.
+- `core.bat` & `core.sh`: One-word CLI wrappers (`core setup`, `core start`, `core stop`, `core update`, `core uninstall`).
+
 ---
 
 ## Automated Verification Status
 
 ```text
-============================= 51 passed in 17.55s =============================
+============================= 55 passed in 19.96s =============================
 - tests/test_bus.py (1)
 - tests/test_dynamic_generator.py (2)
 - tests/test_gateway.py (8)
@@ -71,6 +78,7 @@ All hardcoded assumptions have been eradicated. Core AI boots as a **pure day-ze
 - tests/test_proactive.py (1)
 - tests/test_registry.py (2)
 - tests/test_remote_dispatcher.py (2)
+- tests/test_service_and_updater.py (4)
 - tests/test_spatial_audio.py (5)
 - tests/test_spoken_to.py (8)
 - tests/test_voice_pipeline.py (6)

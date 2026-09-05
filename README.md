@@ -11,7 +11,7 @@
 ```
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 51/51 TESTS PASSED ]  [ PYTHON: 3.13+ ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 55/55 TESTS PASSED ]  [ PYTHON: 3.13+ ]
 [ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]     [ ETHOS: #ANTISLOP ]
 ```
 
@@ -258,7 +258,9 @@ Core AI/
 |   +-- logging_setup.py        # Multi-sink logger: Console, Rotating File, & JSONL audit
 |   +-- mesh_client.py          # Intercontinental mesh client & autonomous offline fallback
 |   +-- schemas.py              # Pydantic v2 schemas (events, pipelines, dynamic tools, spatial)
+|   +-- service.py              # Service & process suite controller (start, stop, RAM/GPU free)
 |   +-- state.py                # SQLite WAL-mode state manager (pipelines, audio routes, profiles)
+|   +-- updater.py              # Self-updater with automated test-guard & rollback
 +-- docs/                       # Project Documentation & Issue Tracking
 |   +-- CUSTOMIZATION_AND_MODELS.md # AI provider setup, model roles, & per-task overrides
 |   +-- INTERCONTINENTAL_MESH.md    # Global mesh architecture, offline fallback, & migration
@@ -277,12 +279,16 @@ Core AI/
 |   |   +-- voice_test.py       # Voice pipeline interactive test harness
 |   +-- install/
 |   |   +-- enroll.py           # 1-line zero-friction edge device onboarding client
+|   |   +-- setup_service.py    # Interactive bootstrap & autostart installer (Y/N)
+|   |   +-- uninstall.py        # Clean zero-residue complete uninstaller
 |   +-- mirror/
 |       +-- index.html          # Ambient Smart Mirror / Wall Projection HUD interface
 |       +-- launcher.py         # Cross-platform fullscreen kiosk launcher with watchdog
 |       +-- roadmap_visualizer.html # Interactive master roadmap dashboard & milestone tracker
 +-- logs/                       # System & Audit Logs
 |   +-- core_ai.log             # Rotating system logs (5MB, 5 backups)
++-- core.bat                    # Windows turnkey one-word command script (start/stop/update)
++-- core.sh                     # Linux/macOS turnkey one-word command script
 |   +-- pipelines.jsonl         # Detailed JSONL audit records of all pipeline executions
 +-- tools/                      # Tool Ecosystem
 |   +-- dynamic/                # Self-generated tools written, verified, and saved by Core AI
@@ -472,7 +478,7 @@ Real-time audio route binding stored in SQLite and managed on the fly:
 | **Smart Mirror Kiosk Launcher** | Phase 3 | `[COMPLETED]` | `interfaces/mirror/launcher.py` watchdog crash recovery |
 | **Dynamic Model & Provider Router** | Core | `[COMPLETED]` | `brain/model_router.py` persistent roles & prompt overrides |
 | **Intercontinental Sovereign Mesh** | Core | `[COMPLETED]` | `core/mesh_client.py` offline fallback & machine migration |
-| **Automated Test Suite** | All | `[COMPLETED]` | **51/51 tests passing 100% green** (`pytest tests`) |
+| **Automated Test Suite** | All | `[COMPLETED]` | **55/55 tests passing 100% green** (`pytest tests`) |
 | **Mobile Companion & Nothing OS** | Phase 4 | `[ACTIVE]` | WebSocket client, rear Glyph Matrix LED driver, BLE bridge |
 | **Automotive & Bicycle SBC Unit** | Phase 5 | `[QUEUED]` | CAN-bus / OBD-II integration, bicycle computer bridge |
 | **Smart Glasses AR & Spatial Cam** | Phase 6 | `[QUEUED]` | Micro HUD projection, bone conduction, FOV camera |
@@ -562,6 +568,38 @@ Onboard any new laptop, Raspberry Pi, Arduino serial bridge, or Linux SBC in a s
 ```bash
 python -m interfaces.install.enroll --server http://<core-ip>:8000 --device-name "Laptop-01" --device-type laptop --zone "workspace" --secret core_sovereign_secret
 ```
+
+### 8. Turnkey CLI Control (core.bat / core.sh)
+Manage your server suite, RAM, and processes directly with 1-word terminal commands:
+```bash
+# Windows
+.\core.bat setup        # Interactive bootstrap & autostart installer (Y/N)
+.\core.bat start        # Start Server Suite in visible terminal window
+.\core.bat stop         # Stop server suite and free GPU / RAM (for video editing)
+.\core.bat restart      # Restart Server Suite
+.\core.bat status       # Inspect PID, memory usage, and health
+.\core.bat update       # Check GitHub for updates with automated test guard
+.\core.bat console      # Launch interactive Cyber Operator Console
+
+# Linux / macOS
+./core.sh setup
+./core.sh start
+./core.sh stop
+./core.sh status
+./core.sh update
+./core.sh console
+```
+
+### 9. Zero-Residue Clean Uninstallation
+If you ever want to completely remove Core AI from your system without leaving any residual files behind:
+```bash
+# Windows
+.\core.bat uninstall
+
+# Linux / macOS
+./core.sh uninstall
+```
+Stops running processes, removes autostart entries, offers to export a backup bundle, and cleanly purges all runtime databases and logs.
 
 ---
 

@@ -255,7 +255,7 @@ def main():
     logger.info(f" -> Smart Mirror HUD:  http://localhost:{port}/mirror")
     logger.info(f" -> Swagger API Docs:  http://localhost:{port}/docs")
     if voice_in and voice_in.is_recording:
-        logger.info(f" 🎙️ Live Voice Loop: ACTIVE (Speak into your microphone!)")
+        logger.info(f" Live Voice Loop: ACTIVE (Speak into your microphone!)")
     
     try:
         uvicorn.run(gateway_app, host=host, port=port, log_level="info")
