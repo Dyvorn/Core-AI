@@ -118,6 +118,10 @@ class DeviceAnchorRequest(BaseModel):
     is_fixed_anchor: bool = False
     nearest_anchor_id: Optional[str] = None
 
+class ModelPreferenceUpdateRequest(BaseModel):
+    role: str
+    model_name: str
+
 
 def create_gateway_app(
     state_manager: StateManager,
@@ -226,6 +230,39 @@ def create_gateway_app(
         if not record:
             raise HTTPException(status_code=404, detail="Pipeline not found")
         return record
+
+    @app.post("/api/v1/pipeline/solve_sync")
+    async def solve_pipeline_sync(request: PipelineSubmitRequest):
+        """Synchronously decompose, execute, and return completed pipeline result."""
+        plan = planner.plan_problem(request.goal, request.context)
+        finished = await pipeline_engine.execute_pipeline(plan)
+        return {
+            "pipeline_id": finished.id,
+            "status": finished.status,
+            "goal": finished.goal,
+            "final_output": finished.final_output,
+            "error_summary": finished.error_summary,
+            "step_count": len(finished.steps),
+            "steps": [s.model_dump() for s in finished.steps]
+        }
+
+    @app.get("/api/v1/models")
+    def get_models_status():
+        """Returns configured AI providers, active model preferences, and connectivity."""
+        if hasattr(planner, "model_router"):
+            return planner.model_router.get_status_summary()
+        return {
+            "active_model": planner.get_active_model() or "offline_heuristic"
+        }
+
+    @app.post("/api/v1/models/preferences")
+    def set_model_preference(req: ModelPreferenceUpdateRequest, x_trust_tier: Optional[str] = Header(default="owner")):
+        if x_trust_tier and x_trust_tier.lower() != "owner":
+            raise HTTPException(status_code=403, detail="Security Protection: Only owner can modify model routing.")
+        if hasattr(planner, "model_router"):
+            updated = planner.model_router.set_model_preference(req.role, req.model_name)
+            return {"status": "success", "models": updated}
+        return {"status": "error", "message": "ModelRouter not initialized on planner."}
 
     @app.get("/api/v1/profile")
     def get_profile(x_trust_tier: Optional[str] = Header(default="owner")):

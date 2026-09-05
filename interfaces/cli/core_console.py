@@ -25,7 +25,9 @@ from brain.proactive import ProactiveDaemon
 from core.gateway import connection_manager
 from engines.voice_out import VoiceOutEngine
 from engines.voice_in import VoiceInEngine
+from brain.model_router import ModelRouter
 from brain.spoken_to import SpokenToReasoning, DiscourseRole
+from core.mesh_client import MeshClient
 from engines.audio_router import SpatialAudioRouter, route_spatial_audio, route_spatial_audio_schema
 from brain.spatial_handoff import SpatialHandoffEngine
 
@@ -65,7 +67,14 @@ def print_help():
     print(f"  {GREEN}zones{RESET}                     - List all dynamically discovered spatial zones")
     print(f"  {GREEN}zone add <id> [name]{RESET}      - Declare a new spatial zone on-the-fly")
     print(f"  {GREEN}devices{RESET}                   - List all connected fixed and roaming devices & trust tiers")
-    print(f"  {GREEN}tools{RESET}                     - Inspect native, dynamic, and remote edge tool catalog")
+    print(f"  {GREEN}models{RESET}                    - Inspect configured AI providers, active models & health")
+    print(f"  {GREEN}model set <role> <model>{RESET}   - Assign model to role (planner, fallback, deep_reasoning)")
+    print(f"  {GREEN}api-key set <provider> <key>{RESET}- Set API key for provider (gemini, openai, anthropic)")
+    print(f"  {GREEN}mesh{RESET}                      - Inspect intercontinental mesh status, role & server reachability")
+    print(f"  {GREEN}mesh role <main|edge>{RESET}     - Switch node role between main_server and edge_node")
+    print(f"  {GREEN}mesh connect <url>{RESET}        - Set central main server URL and test connection")
+    print(f"  {GREEN}mesh export [path]{RESET}        - Export portable state bundle to migrate server")
+    print(f"  {GREEN}mesh import <path>{RESET}        - Import state bundle to restore server on new machine")
     print(f"  {GREEN}hud <title> | <body{RESET}>       - Dispatch a live ambient HUD card to Smart Mirror")
     print(f"  {GREEN}logs [N]{RESET}                  - View recent execution audit logs from SQLite")
     print(f"  {GREEN}proactive{RESET}                 - Run proactive watcher evaluation on demand")
@@ -91,9 +100,9 @@ def setup_kernel():
     registry.register_tool("route_spatial_audio", route_spatial_audio, route_spatial_audio_schema)
     registry.discover_dynamic_tools()
 
-    remote_dispatcher = RemoteToolDispatcher(registry=registry)
-    dyn_gen = DynamicGenerator(registry=registry, state_manager=state)
-    planner = Planner(registry=registry, state_manager=state, dynamic_generator=dyn_gen)
+    model_router = ModelRouter(state_manager=state)
+    planner = Planner(registry=registry, state_manager=state, dynamic_generator=dyn_gen, model_router=model_router)
+    mesh_client = MeshClient(state_manager=state)
     engine = PipelineEngine(registry=registry, state_manager=state, bus=bus)
     proactive = ProactiveDaemon(state_manager=state, planner=planner, pipeline_engine=engine, bus=bus)
     voice_out = VoiceOutEngine(default_voice="auto")
@@ -107,10 +116,10 @@ def setup_kernel():
         voice_out_engine=voice_out
     )
 
-    return state, bus, registry, planner, engine, proactive, voice_out, spoken_to, audio_router, spatial_handoff
+    return state, bus, registry, planner, engine, proactive, voice_out, spoken_to, audio_router, spatial_handoff, model_router, mesh_client
 
 def main():
-    state, bus, registry, planner, engine, proactive, voice_out, spoken_to, audio_router, spatial_handoff = setup_kernel()
+    state, bus, registry, planner, engine, proactive, voice_out, spoken_to, audio_router, spatial_handoff, model_router, mesh_client = setup_kernel()
 
     
     profile = state.get_user_profile()
@@ -354,6 +363,88 @@ def main():
                 asyncio.run(proactive.evaluate_triggers())
                 print(f"{GREEN}[OK] Proactive evaluation cycle complete.{RESET}")
 
+            elif cmd_lower == "models":
+                summary = model_router.get_status_summary()
+                print(f"\n{BRIGHT}--- Configured AI Providers & Models ---{RESET}")
+                for prov, enabled in summary["configured_providers"].items():
+                    col = GREEN if enabled else YELLOW
+                    status_lbl = "Configured / Online" if enabled else "Not Configured / Offline"
+                    print(f"  • {prov:<16} : [{col}{status_lbl}{RESET}]")
+
+                print(f"\n{BRIGHT}--- Active Model Roles & Assignments ---{RESET}")
+                for role, info in summary["roles"].items():
+                    col = GREEN if info["online"] else YELLOW
+                    status_lbl = "ONLINE" if info["online"] else "OFFLINE (Heuristic Fallback)"
+                    print(f"  • {role:<16} : {CYAN}{info['model']:<26}{RESET} [{col}{status_lbl}{RESET}]")
+                print()
+
+            elif cmd_lower.startswith("model set"):
+                parts = user_input.split(maxsplit=3)
+                if len(parts) >= 4:
+                    role, m_name = parts[2], parts[3]
+                    model_router.set_model_preference(role, m_name)
+                    print(f"{GREEN}[✓] Assigned model '{m_name}' to role '{role}'.{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: model set <role> <model_name> (roles: planner, fallback, deep_reasoning, fast_local){RESET}\n")
+
+            elif cmd_lower.startswith("api-key set") or cmd_lower.startswith("key set"):
+                parts = user_input.split(maxsplit=3)
+                if len(parts) >= 4:
+                    provider, key_val = parts[2], parts[3]
+                    env_var = model_router.set_api_key(provider, key_val, persist_to_env=True)
+                    print(f"{GREEN}[✓] Saved API key for '{provider}' to {env_var} and config/.env.{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: api-key set <provider> <api_key> (providers: gemini, openai, anthropic){RESET}\n")
+
+            elif cmd_lower == "mesh":
+                is_online, ping_info = mesh_client.ping_main_server()
+                status_str = f"{GREEN}REACHABLE (Online){RESET}" if is_online else f"{YELLOW}UNREACHABLE ({ping_info.get('error', 'offline')}){RESET}"
+                print(f"\n{BRIGHT}--- Intercontinental Sovereign Mesh Status ---{RESET}")
+                print(f"  Node Role:        {CYAN}{mesh_client.role.upper()}{RESET}")
+                print(f"  Main Server URL:  {mesh_client.main_server_url}")
+                print(f"  Server Status:    {status_str}")
+                print(f"  Offline Buffer:   {len(mesh_client.offline_buffer)} items queued")
+                if mesh_client.role == "edge_node" and not is_online:
+                    print(f"  {YELLOW}↳ Autonomous Local Fallback is ACTIVE (never locked out).{RESET}")
+                print()
+
+            elif cmd_lower.startswith("mesh role"):
+                parts = user_input.split(maxsplit=2)
+                if len(parts) >= 3 and parts[2].lower() in ["main_server", "edge_node", "main", "edge"]:
+                    new_role = "main_server" if "main" in parts[2].lower() else "edge_node"
+                    mesh_client.save_configuration(role=new_role)
+                    print(f"{GREEN}[✓] Node role switched to: {new_role}{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: mesh role <main_server|edge_node>{RESET}\n")
+
+            elif cmd_lower.startswith("mesh connect"):
+                parts = user_input.split(maxsplit=2)
+                if len(parts) >= 3:
+                    new_url = parts[2]
+                    mesh_client.save_configuration(role=mesh_client.role, main_server_url=new_url)
+                    is_online, ping_info = mesh_client.ping_main_server()
+                    if is_online:
+                        print(f"{GREEN}[✓] Connected to Main Server at {new_url}!{RESET}\n")
+                    else:
+                        print(f"{YELLOW}[!] Main Server at {new_url} is currently unreachable ({ping_info.get('error')}). Local fallback ready.{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: mesh connect <http://host:port>{RESET}\n")
+
+            elif cmd_lower.startswith("mesh export"):
+                parts = user_input.split(maxsplit=2)
+                out_path = parts[2] if len(parts) >= 3 else "core_state_bundle.json"
+                mesh_client.export_state_bundle(export_path=out_path)
+                print(f"{GREEN}[✓] System state bundle exported to '{out_path}' for machine migration.{RESET}\n")
+
+            elif cmd_lower.startswith("mesh import"):
+                parts = user_input.split(maxsplit=2)
+                if len(parts) >= 3:
+                    in_path = parts[2]
+                    counts = mesh_client.import_state_bundle(in_path)
+                    print(f"{GREEN}[✓] State bundle restored: {counts}! Machine ready as Main Server.{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: mesh import <bundle_file.json>{RESET}\n")
+
             else:
                 # Treat as problem / goal solving query
                 goal = user_input
@@ -361,17 +452,39 @@ def main():
                     goal = user_input[6:].strip()
 
                 print(f"\n{CYAN}[*] Decomposing goal with Planner:{RESET} '{goal}'")
-                plan = planner.plan_problem(goal, context={"zone": active_zone, "operator": active_name})
                 
-                print(f"{CYAN}[+] Synthesized Pipeline DAG:{RESET} {len(plan.steps)} steps (ID: {plan.id[:8]})")
-                for s in plan.steps:
-                    dep_str = f"(depends on: {', '.join(s.depends_on)})" if s.depends_on else "(independent)"
-                    print(f"    - Step '{s.id}': {s.name} -> tool '{s.tool_name}' {dep_str}")
+                def local_exec(target_goal, ctx):
+                    plan = planner.plan_problem(target_goal, context=ctx)
+                    print(f"{CYAN}[+] Synthesized Pipeline DAG:{RESET} {len(plan.steps)} steps (ID: {plan.id[:8]})")
+                    for s in plan.steps:
+                        dep_str = f"(depends on: {', '.join(s.depends_on)})" if s.depends_on else "(independent)"
+                        print(f"    - Step '{s.id}': {s.name} -> tool '{s.tool_name}' {dep_str}")
 
-                print(f"\n{YELLOW}[*] Executing pipeline concurrently...{RESET}")
-                start_time = time.time()
-                finished_plan = asyncio.run(engine.execute_pipeline(plan))
-                elapsed = time.time() - start_time
+                    print(f"\n{YELLOW}[*] Executing pipeline concurrently...{RESET}")
+                    start_time = time.time()
+                    finished_plan = asyncio.run(engine.execute_pipeline(plan))
+                    elapsed = time.time() - start_time
+                    return finished_plan, elapsed
+
+                def fallback_notice(msg):
+                    print(f"\n{YELLOW}[!] {msg}{RESET}")
+
+                if mesh_client.role == "edge_node":
+                    mesh_res = mesh_client.execute_over_mesh(
+                        goal=goal,
+                        context={"zone": active_zone, "operator": active_name},
+                        local_executor=lambda g, c: local_exec(g, c),
+                        on_fallback_notice=fallback_notice
+                    )
+                    if mesh_res.get("execution_mode") == "remote_main_server":
+                        res_data = mesh_res["result"]
+                        print(f"{GREEN}[✓] Executed centrally on Main Server ({mesh_res['server_url']})!{RESET}")
+                        print(f"{CYAN}Core AI [Remote]:{RESET} {BRIGHT}{res_data.get('final_output') or 'Task complete.'}{RESET}\n")
+                        continue
+                    else:
+                        finished_plan, elapsed = mesh_res["result"]
+                else:
+                    finished_plan, elapsed = local_exec(goal, {"zone": active_zone, "operator": active_name})
 
                 if finished_plan.status == "completed":
                     print(f"\n{GREEN}[✓] Pipeline Succeeded in {elapsed:.2f}s!{RESET}")

@@ -110,12 +110,17 @@ class StateManager:
                 CREATE TABLE IF NOT EXISTS user_profiles (
                     user_id TEXT PRIMARY KEY,
                     preferred_name TEXT,
+                    aliases JSON,
                     pronouns TEXT,
                     preferred_tone TEXT,
                     preferences JSON,
                     updated_at TIMESTAMP
                 )
             ''')
+            try:
+                conn.execute("ALTER TABLE user_profiles ADD COLUMN aliases JSON")
+            except Exception:
+                pass
 
             # 8. Dynamic Spatial Zones (Created on demand as the user adds rooms or spaces)
             conn.execute('''
@@ -371,6 +376,7 @@ class StateManager:
             row = cursor.fetchone()
             if row:
                 data = dict(row)
+                data["aliases"] = json.loads(data["aliases"]) if data.get("aliases") else []
                 data["preferences"] = json.loads(data["preferences"]) if data.get("preferences") else {}
                 if data.get("updated_at") and isinstance(data["updated_at"], str):
                     data["updated_at"] = datetime.fromisoformat(data["updated_at"])
@@ -388,11 +394,12 @@ class StateManager:
             now_iso = datetime.now(timezone.utc).isoformat()
             conn.execute('''
                 INSERT OR REPLACE INTO user_profiles
-                (user_id, preferred_name, pronouns, preferred_tone, preferences, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (user_id, preferred_name, aliases, pronouns, preferred_tone, preferences, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 profile.user_id,
                 profile.preferred_name,
+                json.dumps(profile.aliases),
                 profile.pronouns,
                 profile.preferred_tone,
                 json.dumps(profile.preferences),

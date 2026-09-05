@@ -28,12 +28,15 @@ class Planner:
         model_name: str = "ollama/qwen3.5:2b",
         fallback_model: str = "gemini/gemini-2.5-flash",
         state_manager: Optional[StateManager] = None,
-        dynamic_generator: Optional[DynamicGenerator] = None
+        dynamic_generator: Optional[DynamicGenerator] = None,
+        model_router: Optional[Any] = None
     ):
         self.registry = registry
+        self.state_manager = state_manager or StateManager()
+        from brain.model_router import ModelRouter
+        self.model_router = model_router or ModelRouter(state_manager=self.state_manager)
         self.model_name = model_name
         self.fallback_model = fallback_model
-        self.state_manager = state_manager or StateManager()
         self.dynamic_generator = dynamic_generator or DynamicGenerator(registry=self.registry, state_manager=self.state_manager)
         self.pipeline_logger = get_pipeline_logger()
         self._model_status_cache: Dict[str, bool] = {}
@@ -41,78 +44,34 @@ class Planner:
     def check_model_availability(self, model: str) -> bool:
         """
         Verifies if the model's provider and service are actually available.
-        Performs fast socket/env checks before attempting litellm calls, and caches results.
+        Delegates to ModelRouter for fast pre-checks and cached responses.
         """
-        if model in self._model_status_cache:
-            return self._model_status_cache[model]
+        return self.model_router.check_model_availability(model)
 
-        import os
-        # Fast pre-check for Ollama
-        if "ollama" in model.lower():
-            try:
-                import urllib.request
-                with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=0.3) as resp:
-                    if resp.status != 200:
-                        self._model_status_cache[model] = False
-                        return False
-            except Exception:
-                self._model_status_cache[model] = False
-                return False
-
-        # Fast pre-check for Gemini
-        elif "gemini" in model.lower():
-            if not (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")):
-                self._model_status_cache[model] = False
-                return False
-
-        # Fast pre-check for OpenAI
-        elif "openai" in model.lower():
-            if not os.getenv("OPENAI_API_KEY"):
-                self._model_status_cache[model] = False
-                return False
-
-        try:
-            from litellm import completion
-            response = completion(
-                model=model,
-                messages=[{"role": "user", "content": "ping"}],
-                max_tokens=2,
-                timeout=2.0
-            )
-            is_available = bool(response and response.choices)
-            self._model_status_cache[model] = is_available
-            logger.info(f"Model '{model}' health check: {'ONLINE' if is_available else 'OFFLINE'}")
-            return is_available
-        except Exception as e:
-            logger.warning(f"Model '{model}' unavailable: {e}")
-            self._model_status_cache[model] = False
-            return False
-
-
-    def get_active_model(self) -> Optional[str]:
+    def get_active_model(self, context: Optional[Dict[str, Any]] = None) -> Optional[str]:
         """Returns the primary model if online, then fallback model, or None if fully offline."""
-        if self.check_model_availability(self.model_name):
-            return self.model_name
-        if self.check_model_availability(self.fallback_model):
-            return self.fallback_model
-        return None
+        _, resolved = self.model_router.resolve_model(goal="", context=context, role="planner")
+        return resolved
 
     def plan_problem(self, goal: str, context: Optional[Dict[str, Any]] = None) -> PipelinePlan:
         """
         Main entrypoint: analyzes problem against available tools, identifies missing capabilities,
         synthesizes dynamic tools if necessary, and produces an executable PipelinePlan DAG.
         """
-        logger.info(f"Planning solution for goal: '{goal}'")
+        clean_goal, active_model = self.model_router.resolve_model(goal, context=context, role="planner")
+        target_goal = clean_goal or goal
+
+        logger.info(f"Planning solution for goal: '{target_goal}' (model: '{active_model or 'heuristic'}')")
         self.pipeline_logger.log_event("PLANNING_STARTED", {
-            "goal": goal,
+            "goal": target_goal,
+            "resolved_model": active_model,
             "available_tools": list(self.registry.tools.keys())
         })
 
         catalog = self.registry.get_tool_catalog()
-        active_model = self.get_active_model()
 
         # 1. First, check if goal requires a missing capability and needs dynamic tool creation
-        self._ensure_capabilities_for_goal(goal, catalog)
+        self._ensure_capabilities_for_goal(target_goal, catalog)
 
         # Re-fetch catalog in case dynamic tools were just added
         catalog = self.registry.get_tool_catalog()
@@ -120,7 +79,7 @@ class Planner:
         # 2. Decompose into PipelinePlan using LLM or Heuristic Engine
         if active_model:
             try:
-                plan = self._llm_generate_plan(goal, catalog, active_model, context or {})
+                plan = self._llm_generate_plan(target_goal, catalog, active_model, context or {})
                 if plan and plan.steps:
                     self.pipeline_logger.log_event("PLAN_GENERATED", {
                         "mode": "llm",
@@ -132,7 +91,7 @@ class Planner:
             except Exception as e:
                 logger.warning(f"LLM planning failed ({e}). Falling back to heuristic planning engine.")
 
-        plan = self._heuristic_generate_plan(goal, catalog, context or {})
+        plan = self._heuristic_generate_plan(target_goal, catalog, context or {})
         self.pipeline_logger.log_event("PLAN_GENERATED", {
             "mode": "heuristic_fallback",
             "step_count": len(plan.steps),

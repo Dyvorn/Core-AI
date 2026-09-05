@@ -11,7 +11,7 @@
 ```
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 42/42 TESTS PASSED ]  [ PYTHON: 3.13+ ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 51/51 TESTS PASSED ]  [ PYTHON: 3.13+ ]
 [ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]     [ ETHOS: #ANTISLOP ]
 ```
 
@@ -241,10 +241,11 @@ Core AI enforces three immutable security tiers:
 Core AI/
 +-- brain/                      # Intelligence, Planning, & Spatial Unity
 |   +-- dynamic_generator.py    # Synthesizes, verifies (AST + sandbox), & persists new tools
+|   +-- model_router.py         # Dynamic AI provider & model router with runtime overrides
 |   +-- pipeline_engine.py      # Async DAG engine; concurrent step execution & variable piping
 |   +-- planner.py              # Tool introspection, capability gap detector & DAG architect
 |   +-- proactive.py            # Proactive background watcher & conditional trigger daemon
-|   +-- safety.py               # Human-in-the-loop validation for critical actions
+|   +-- safety.py               # Harm-free unstoppable agency & safety gate
 |   +-- spatial_handoff.py      # Cross-zone spatial handoff & dynamic audio stream migration
 +-- config/                     # Configuration & Environment
 |   +-- nodes.yaml              # Multi-device topology (rooms, outdoor, car, bike, glasses)
@@ -255,9 +256,12 @@ Core AI/
 |   +-- context.py              # Ubiquitous ContextManager (spatial zones, device profiles)
 |   +-- gateway.py              # FastAPI Universal Gateway (REST, WebSockets, OpenAPI)
 |   +-- logging_setup.py        # Multi-sink logger: Console, Rotating File, & JSONL audit
+|   +-- mesh_client.py          # Intercontinental mesh client & autonomous offline fallback
 |   +-- schemas.py              # Pydantic v2 schemas (events, pipelines, dynamic tools, spatial)
 |   +-- state.py                # SQLite WAL-mode state manager (pipelines, audio routes, profiles)
 +-- docs/                       # Project Documentation & Issue Tracking
+|   +-- CUSTOMIZATION_AND_MODELS.md # AI provider setup, model roles, & per-task overrides
+|   +-- INTERCONTINENTAL_MESH.md    # Global mesh architecture, offline fallback, & migration
 |   +-- ROADMAP.md              # Long-term multi-year milestone roadmap (Phases 1-6)
 |   +-- PROBLEMS_AND_DEBT.md    # Dedicated ledger tracking known bugs, edge cases & debt
 |   +-- SESSION_HANDOVER.md     # Engineering handovers, architecture decisions, & session context
@@ -466,7 +470,9 @@ Real-time audio route binding stored in SQLite and managed on the fly:
 | **Dynamic Spatial Audio Router** | Phase 3 | `[COMPLETED]` | `engines/audio_router.py` introspects soundcards dynamically |
 | **Cross-Zone Spatial Handoff** | Phase 3 | `[COMPLETED]` | `brain/spatial_handoff.py` auto-relocates audio and HUDs |
 | **Smart Mirror Kiosk Launcher** | Phase 3 | `[COMPLETED]` | `interfaces/mirror/launcher.py` watchdog crash recovery |
-| **Automated Test Suite** | All | `[COMPLETED]` | **42/42 tests passing 100% green** (`pytest tests`) |
+| **Dynamic Model & Provider Router** | Core | `[COMPLETED]` | `brain/model_router.py` persistent roles & prompt overrides |
+| **Intercontinental Sovereign Mesh** | Core | `[COMPLETED]` | `core/mesh_client.py` offline fallback & machine migration |
+| **Automated Test Suite** | All | `[COMPLETED]` | **51/51 tests passing 100% green** (`pytest tests`) |
 | **Mobile Companion & Nothing OS** | Phase 4 | `[ACTIVE]` | WebSocket client, rear Glyph Matrix LED driver, BLE bridge |
 | **Automotive & Bicycle SBC Unit** | Phase 5 | `[QUEUED]` | CAN-bus / OBD-II integration, bicycle computer bridge |
 | **Smart Glasses AR & Spatial Cam** | Phase 6 | `[QUEUED]` | Micro HUD projection, bone conduction, FOV camera |
