@@ -13,3 +13,5 @@ websockets
 # sqlite-vec (for future vector db usage)
 # kokoro-onnx (can be added depending on tts backend)
 soundfile
+edge-tts
+

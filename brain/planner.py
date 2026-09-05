@@ -182,13 +182,24 @@ class Planner:
     def _heuristic_generate_plan(self, goal: str, catalog: List[Dict[str, Any]], context: Dict[str, Any]) -> PipelinePlan:
         """
         Robust heuristic planner that constructs valid execution pipelines with concurrency.
+        Specially optimized for natural spoken voice commands and system operations.
         """
         goal_lower = goal.lower()
         pipeline_id = str(uuid.uuid4())
         steps: List[PipelineStep] = []
 
+        # Pattern: Time query ("wie spät ist es", "what time is it")
+        if any(k in goal_lower for k in ["wie spät", "uhrzeit", "what time", "current time", "time is it"]):
+            steps.append(PipelineStep(
+                id="get_time_step",
+                name="Fetch Current Time",
+                tool_name="get_time",
+                arguments={},
+                depends_on=[]
+            ))
+
         # Pattern: System diagnostics (Parallel execution of time + system status)
-        if "status" in goal_lower or "system" in goal_lower or "overview" in goal_lower:
+        elif any(k in goal_lower for k in ["status", "system", "overview", "diagnos", "gesundheit", "wie geht"]):
             steps.append(PipelineStep(
                 id="get_time_step",
                 name="Fetch Current Time",
@@ -204,11 +215,12 @@ class Planner:
                 depends_on=[]
             ))
 
-        # Pattern: Math computation
-        elif any(char in goal for char in ["+", "*", "/", "sqrt", "math", "calculate"]):
+        # Pattern: Math computation ("was ist 25 * 4", "berechne 12 + 8")
+        elif any(char in goal for char in ["+", "*", "/", "sqrt", "math", "calculate"]) or any(k in goal_lower for k in ["berechne", "calculate", "wie viel ist", "was ist"]):
             # Extract possible math expression
             expr_match = re.search(r"([0-9\.\s\+\-\*\/\(\)\^]|sqrt|pow|sin|cos)+", goal)
             expr = expr_match.group(0).strip() if expr_match else "1 + 1"
+            expr = expr.strip("?!. ")
             steps.append(PipelineStep(
                 id="calc_step",
                 name="Calculate Math Expression",
@@ -217,8 +229,18 @@ class Planner:
                 depends_on=[]
             ))
 
+        # Pattern: Directory / File listing
+        elif any(k in goal_lower for k in ["dateien", "files", "list dir", "list files", "zeige ordner"]):
+            steps.append(PipelineStep(
+                id="list_dir_step",
+                name="List Workspace Contents",
+                tool_name="list_dir_contents",
+                arguments={"path": "."},
+                depends_on=[]
+            ))
+
         # Pattern: Hashing
-        elif "hash" in goal_lower:
+        elif "hash" in goal_lower or "sha256" in goal_lower or "md5" in goal_lower:
             target_str = goal.split("hash")[-1].strip(" '\"") or "default_text"
             steps.append(PipelineStep(
                 id="hash_step",
@@ -229,9 +251,9 @@ class Planner:
             ))
 
         # Pattern: Home assistant device control
-        elif "turn on" in goal_lower or "schalte" in goal_lower or "light" in goal_lower:
+        elif any(k in goal_lower for k in ["turn on", "turn off", "schalte", "licht", "light", "lampe"]):
             entity = "light.living_room"
-            action = "turn_on" if ("on" in goal_lower or "an" in goal_lower or "ein" in goal_lower) else "turn_off"
+            action = "turn_on" if any(k in goal_lower for k in ["on", "an", "ein"]) else "turn_off"
             steps.append(PipelineStep(
                 id="ha_action_step",
                 name="Home Assistant Service Call",
@@ -241,7 +263,7 @@ class Planner:
             ))
 
         # Pattern: File read / write
-        elif "write file" in goal_lower or "save to" in goal_lower:
+        elif "write file" in goal_lower or "save to" in goal_lower or "speichere" in goal_lower:
             steps.append(PipelineStep(
                 id="write_step",
                 name="Write File Content",
@@ -250,7 +272,7 @@ class Planner:
                 depends_on=[]
             ))
 
-        # Generic default: fallback to get_time or directory listing
+        # Generic default: fallback to get_time
         else:
             steps.append(PipelineStep(
                 id="default_inspect_step",
@@ -350,3 +372,94 @@ Guidelines:
                 step.error = None
 
         return plan
+
+    def formulate_spoken_response(
+        self,
+        plan: PipelinePlan,
+        profile: Optional[Any] = None,
+        language: Optional[str] = None
+    ) -> str:
+        """
+        Formulates a natural, conversational spoken sentence from a finished PipelinePlan.
+        Translates raw tool outputs and status codes into clear human speech.
+        """
+        name = profile.preferred_name if profile and hasattr(profile, "preferred_name") else "Operator"
+        
+        # Determine language
+        goal_text = plan.goal.lower()
+        if not language:
+            is_german = any(c in goal_text for c in ["ä", "ö", "ü", "ß"]) or any(
+                w in goal_text.split() for w in ["wie", "was", "ist", "uhrzeit", "spät", "system", "status", "hallo", "schalte", "licht", "berechne"]
+            )
+            language = "de" if is_german else "en"
+
+        # Failure handling
+        if plan.status != "completed":
+            err = plan.error_summary or "Unbekannter Fehler"
+            if language == "de":
+                return f"Hey {name}, die Aktion konnte leider nicht vollständig ausgeführt werden: {err}"
+            else:
+                return f"Hey {name}, the action could not be completed: {err}"
+
+        # Success handling - inspect step outputs
+        step_outputs = {s.tool_name: s.output for s in plan.steps if s.status == "completed"}
+
+        # 1. Time response
+        if "get_time" in step_outputs and "get_system_status" not in step_outputs:
+            time_val = step_outputs["get_time"]
+            if language == "de":
+                return f"Es ist {time_val} Uhr, {name}."
+            else:
+                return f"It is {time_val}, {name}."
+
+        # 2. System Status & Diagnostics
+        if "get_system_status" in step_outputs:
+            sys_info = step_outputs["get_system_status"]
+            os_name = sys_info.get("os", "System")
+            arch = sys_info.get("architecture", "")
+            py_ver = sys_info.get("python_version", "")
+            time_val = step_outputs.get("get_time", "")
+            time_str = f" um {time_val} Uhr" if time_val else ""
+            if language == "de":
+                return f"Das System läuft stabil auf {os_name} ({arch}) mit Python {py_ver}{time_str}, {name}."
+            else:
+                return f"Core AI is operational on {os_name} {arch} running Python {py_ver}, {name}."
+
+        # 3. Math calculation
+        if "calculate_math" in step_outputs:
+            res_info = step_outputs["calculate_math"]
+            if isinstance(res_info, dict) and res_info.get("status") == "success":
+                expr = res_info.get("expression", "")
+                result = res_info.get("result")
+                if language == "de":
+                    return f"Das Ergebnis von {expr} ist {result}, {name}."
+                else:
+                    return f"The result of {expr} is {result}, {name}."
+
+        # 4. Home Assistant service call
+        if "home_assistant_call" in step_outputs:
+            if language == "de":
+                return f"Befehl ausgeführt, {name}. Das Smart-Home-Gerät wurde aktualisiert."
+            else:
+                return f"Smart home action completed, {name}."
+
+        # 5. File / Dir operations
+        if "list_dir_contents" in step_outputs:
+            contents = step_outputs["list_dir_contents"]
+            count = len(contents) if isinstance(contents, list) else "mehrere"
+            if language == "de":
+                return f"Ich habe das Verzeichnis geprüft. Es enthält {count} Einträge, {name}."
+            else:
+                return f"Directory contains {count} items, {name}."
+
+        # Generic default success
+        final_val = plan.final_output
+        if isinstance(final_val, dict):
+            final_str = json.dumps(final_val)
+        else:
+            final_str = str(final_val) if final_val is not None else "erfolgreich"
+
+        if language == "de":
+            return f"Hey {name}, Aktion abgeschlossen: {final_str}"
+        else:
+            return f"Hey {name}, action completed: {final_str}"
