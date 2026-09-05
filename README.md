@@ -289,15 +289,13 @@ Core AI/
 |   +-- audio_router.py         # Dynamic spatial audio hardware introspection & route binding
 |   +-- voice_in.py             # Silero-VAD + faster-whisper STT audio capture
 |   +-- voice_out.py            # Text-To-Speech engine (Kokoro / Piper / Pyttsx3)
-+-- interfaces/                 # Client Interfaces & Test Harnesses
++-- interfaces/                 # Client Interfaces & Installers
 |   +-- cli/
-|   |   +-- core_console.py     # Interactive rich operator command center shell
-|   |   +-- problem_solver_cli.py # Concurrency, dynamic tools, & failure awareness harness
+|   |   +-- core_console.py     # Command center launcher (delegates to main.py)
 |   |   +-- setup_wizard.py     # Interactive zero-hardcoding operator profile initializer
-|   |   +-- voice_test.py       # Voice pipeline interactive test harness
 |   +-- install/
 |   |   +-- enroll.py           # 1-line zero-friction edge device onboarding client
-|   |   +-- setup_service.py    # Interactive bootstrap & autostart installer (Y/N)
+|   |   +-- setup_service.py    # Interactive bootstrap, desktop launcher & autostart setup
 |   |   +-- uninstall.py        # Clean zero-residue complete uninstaller
 +-- logs/                       # System & Audit Logs
 |   +-- core_ai.log             # Rotating system logs (5MB, 5 backups)

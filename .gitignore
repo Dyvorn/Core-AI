@@ -24,6 +24,9 @@ config/.env
 logs/*.log
 logs/*.txt
 logs/pipelines.jsonl
+*.pid
+.core_ai.pid
+core_state_bundle.json
 
 # IDE and OS files
 .vscode/
