@@ -6,6 +6,7 @@ import logging
 import argparse
 import threading
 import uvicorn
+from typing import Optional
 from dotenv import load_dotenv
 
 from core.logging_setup import setup_logging
