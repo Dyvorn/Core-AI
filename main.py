@@ -986,7 +986,30 @@ def main():
 
     # Background Universal Gateway Server
     host = args.host or os.getenv("CORE_HOST", "0.0.0.0")
-    port = args.port or int(os.getenv("CORE_PORT", 8000))
+    requested_port = args.port or int(os.getenv("CORE_PORT", 8000))
+    port = requested_port
+
+    import socket
+    def is_port_in_use(h: str, p: int) -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind((h, p))
+                return False
+            except OSError:
+                return True
+
+    if is_port_in_use(host, port):
+        found_port = None
+        for candidate in range(port + 1, port + 25):
+            if not is_port_in_use(host, candidate):
+                found_port = candidate
+                break
+        if found_port:
+            logger.warning(f"Port {requested_port} is already in use by another process. Automatically binding Universal Gateway to port {found_port}.")
+            port = found_port
+        else:
+            logger.error(f"Port {requested_port} and all fallback ports are occupied.")
+
     shutdown_event = threading.Event()
 
     config = uvicorn.Config(gateway_app, host=host, port=port, log_level="warning")
