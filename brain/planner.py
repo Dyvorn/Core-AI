@@ -236,9 +236,9 @@ class Planner:
                 depends_on=[]
             ))
 
-        # Pattern: Spatial presence / Relocation / Handoff
-        # (e.g. "I'm in the office rn", "I am in the kitchen", "moved to studio", "ich bin jetzt im büro")
-        elif reloc_match_en := re.search(r"\b(?:i'?m\s+in|i am\s+in|moved to|relocate to|relocated to|now in|currently in)\s+(?:the\s+)?([a-zA-Z0-9_\-]+)", goal_lower):
+        # Pattern: Verbal presence relocation
+        # (e.g. "I'm in the office rn", "I'm at the desk", "I am in the kitchen", "moved to studio", "ich bin jetzt im büro")
+        elif reloc_match_en := re.search(r"\b(?:i'?m\s+(?:in|at)|i am\s+(?:in|at)|moved to|relocate to|relocated to|now (?:in|at)|currently (?:in|at))\s+(?:the\s+)?([a-zA-Z0-9_\-]+)", goal_lower):
             raw_zone = reloc_match_en.group(1).strip().lower()
             raw_zone = re.sub(r"\b(rn|now|right|room|zimmer)\b", "", raw_zone).strip() or raw_zone
             steps.append(PipelineStep(
@@ -248,7 +248,7 @@ class Planner:
                 arguments={"target_zone": raw_zone},
                 depends_on=[]
             ))
-        elif reloc_match_de := re.search(r"\b(?:ich bin|bin|umgezogen|gewechselt)\s+(?:jetzt\s+)?(?:in\s+der|im|in\s+den|in\s+das|ins)\s+(?:der\s+)?([a-zA-Z0-9äöüß_\-]+)", goal_lower):
+        elif reloc_match_de := re.search(r"\b(?:ich bin|bin|jetzt|ab jetzt|umgezogen|gewechselt|standort)\s+(?:jetzt\s+)?(?:in\s+der|im|in\s+den|in\s+das|ins)\s+(?:der\s+)?([a-zA-Z0-9äöüß_\-]+)", goal_lower):
             raw_zone = reloc_match_de.group(1).strip().lower()
             raw_zone = re.sub(r"\b(rn|now|right|room|zimmer)\b", "", raw_zone).strip() or raw_zone
             steps.append(PipelineStep(

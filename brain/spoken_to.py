@@ -250,11 +250,12 @@ class SpokenToReasoning:
                 )
 
         # Pattern 3: Standalone directive command containing explicit tool actions
-        # (e.g., "Wie spät ist es", "Systemstatus anzeigen", "Berechne 25 * 4")
+        # (e.g., "Wie spät ist es", "Systemstatus anzeigen", "Berechne 25 * 4", "I'm in the office rn")
         explicit_action_triggers = [
             "wie spät", "uhrzeit", "systemstatus", "system status", "berechne",
             "what time", "calculate", "system overview",
-            "i'm in", "i am in", "moved to", "relocate to", "ich bin im", "ich bin in der", "bin jetzt im"
+            "i'm in", "i am in", "i'm at", "i am at", "now in", "now at", "moved to", "relocate to",
+            "ich bin im", "ich bin in der", "bin jetzt im", "jetzt im büro", "ab jetzt im"
         ]
         if any(trig in text_lower for trig in explicit_action_triggers):
             return SpokenToDecision(
