@@ -243,6 +243,11 @@ class ModelRouter:
         # 6. Completely offline (no AI backends connected)
         return clean_goal, None
 
+    def get_active_model(self, role: str = "planner") -> Optional[str]:
+        """Returns the currently active and available model name for a given role, or None if offline."""
+        _, resolved = self.resolve_model(goal="", role=role)
+        return resolved
+
     def get_status_summary(self) -> Dict[str, Any]:
         """Provides a complete summary of configured providers, active models, and connectivity."""
         prefs = self.get_model_preferences()
