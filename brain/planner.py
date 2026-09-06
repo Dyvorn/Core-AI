@@ -342,9 +342,13 @@ class Planner:
 
         operator_name = "Operator"
         operator_zone = context.get("zone", "studio")
+        operator_aliases = []
+        operator_tone = "Concise, articulate, sovereign companion"
         try:
             profile = self.state_manager.get_user_profile()
             operator_name = profile.preferred_name
+            operator_aliases = profile.aliases or []
+            operator_tone = profile.preferred_tone or operator_tone
         except Exception:
             pass
 
@@ -362,8 +366,10 @@ class Planner:
         except Exception:
             pass
 
+        aliases_text = f" (Recognized Honorifics/Aliases: {', '.join(operator_aliases)})" if operator_aliases else ""
         system_prompt = f"""You are the Brain and DAG Orchestrator of Core AI, an autonomous sovereign life OS with Jarvis-level situational awareness.
-Operator: {operator_name}
+Operator: {operator_name}{aliases_text}
+Preferred Persona & Tone: {operator_tone}
 Current Spatial Zone: {operator_zone}
 
 Physical & Mesh Topology:

@@ -253,7 +253,48 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
             "required": ["target_zone"]
         }
     })
-    
+
+    def update_operator_profile_tool(
+        preferred_name: Optional[str] = None,
+        add_alias: Optional[str] = None,
+        preferred_tone: Optional[str] = None,
+        primary_zone: Optional[str] = None
+    ):
+        mgr = state or StateManager()
+        prof = mgr.get_user_profile()
+        if preferred_name:
+            prof.preferred_name = preferred_name
+        if add_alias:
+            clean_alias = add_alias.strip()
+            if clean_alias and clean_alias not in prof.aliases:
+                prof.aliases.append(clean_alias)
+        if preferred_tone:
+            prof.preferred_tone = preferred_tone
+        if primary_zone:
+            prof.preferences["primary_space"] = primary_zone
+        mgr.save_user_profile(prof)
+        return {
+            "status": "success",
+            "preferred_name": prof.preferred_name,
+            "aliases": prof.aliases,
+            "preferred_tone": prof.preferred_tone,
+            "primary_zone": prof.preferences.get("primary_space")
+        }
+
+    registry.register_tool("update_operator_profile", update_operator_profile_tool, {
+        "name": "update_operator_profile",
+        "description": "Updates operator profile in SQLite: name, honorific/alias (e.g. 'Sir', 'Boss', 'Captain'), preferred tone, or default primary zone",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "preferred_name": {"type": "string", "description": "New preferred name"},
+                "add_alias": {"type": "string", "description": "New honorific or alias to add, e.g. 'Sir'"},
+                "preferred_tone": {"type": "string", "description": "Preferred interaction tone or style"},
+                "primary_zone": {"type": "string", "description": "Primary spatial zone"}
+            }
+        }
+    })
+
     registry.discover_dynamic_tools()
     return registry
 
@@ -451,6 +492,18 @@ def run_interactive_repl(
                     print(f"{GREEN}[OK] Operator identity updated to: {new_name}{RESET}\n")
                 else:
                     print(f"{RED}[!] Usage: profile set <name> [alias]{RESET}")
+
+            elif cmd_lower.startswith("profile add-alias"):
+                parts = user_input.split(maxsplit=2)
+                if len(parts) >= 3:
+                    alias = parts[2].strip()
+                    p = state.get_user_profile()
+                    if alias not in p.aliases:
+                        p.aliases.append(alias)
+                        state.save_user_profile(p)
+                    print(f"{GREEN}[OK] Added alias/title '{alias}' to operator profile.{RESET}\n")
+                else:
+                    print(f"{RED}[!] Usage: profile add-alias <alias>{RESET}")
 
             elif cmd_lower == "zones":
                 zones = state.list_zones()
