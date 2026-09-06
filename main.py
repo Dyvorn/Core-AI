@@ -22,6 +22,7 @@ from tools.native.system_tools import get_time, time_schema, get_system_status
 from tools.native.home_assistant import HomeAssistantMock, ha_call_schema
 from tools.native.file_tools import read_text_file, read_file_schema, write_text_file, write_file_schema, list_dir_contents, list_dir_schema
 from tools.native.math_tools import calculate_math, calculate_math_schema, summarize_numbers, summarize_numbers_schema
+from tools.native.network_tools import scan_local_network, scan_local_network_schema, inspect_lan_device, inspect_lan_device_schema
 from tools.remote_dispatcher import RemoteToolDispatcher
 from brain.dynamic_generator import DynamicGenerator
 from brain.pipeline_engine import PipelineEngine
@@ -106,7 +107,7 @@ def print_help():
     print(f"  {GREEN}clear{RESET}                     - Clear terminal screen")
     print(f"  {GREEN}exit / quit{RESET}               - Cleanly shut down Core AI and background services\n")
 
-def setup_tools() -> ToolRegistry:
+def setup_tools(state: Optional[StateManager] = None) -> ToolRegistry:
     registry = ToolRegistry(dynamic_dir="tools/dynamic")
     
     # Register Native Tools
@@ -128,6 +129,57 @@ def setup_tools() -> ToolRegistry:
     registry.register_tool("calculate_math", calculate_math, calculate_math_schema)
     registry.register_tool("summarize_numbers", summarize_numbers, summarize_numbers_schema)
     registry.register_tool("route_spatial_audio", route_spatial_audio, route_spatial_audio_schema)
+
+    # Network & Device Topology Introspection Tools
+    registry.register_tool("scan_local_network", scan_local_network, scan_local_network_schema)
+    registry.register_tool("inspect_lan_device", inspect_lan_device, inspect_lan_device_schema)
+
+    def list_registered_devices(zone_filter: Optional[str] = None):
+        mgr = state or StateManager()
+        devs = mgr.list_all_devices()
+        if zone_filter:
+            devs = [d for d in devs if d.current_zone.lower() == zone_filter.lower()]
+        return {
+            "status": "success",
+            "device_count": len(devs),
+            "devices": [
+                {
+                    "device_id": d.device_id,
+                    "device_type": d.device_type,
+                    "current_zone": d.current_zone,
+                    "trust_tier": d.trust_tier,
+                    "status": d.status,
+                    "capabilities": d.capabilities,
+                }
+                for d in devs
+            ]
+        }
+
+    registry.register_tool("list_registered_devices", list_registered_devices, {
+        "name": "list_registered_devices",
+        "description": "Lists all devices, appliances, and smart hardware nodes currently registered in Core AI topology",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "zone_filter": {"type": "string", "description": "Optional zone_id to filter devices by"}
+            }
+        }
+    })
+
+    def list_spatial_zones():
+        mgr = state or StateManager()
+        zones = mgr.list_zones()
+        return {
+            "status": "success",
+            "zone_count": len(zones),
+            "zones": [{"zone_id": z.zone_id, "display_name": z.display_name} for z in zones]
+        }
+
+    registry.register_tool("list_spatial_zones", list_spatial_zones, {
+        "name": "list_spatial_zones",
+        "description": "Lists all physical spatial zones and rooms configured in the environment",
+        "parameters": {"type": "object", "properties": {}}
+    })
     
     registry.discover_dynamic_tools()
     return registry
@@ -384,7 +436,9 @@ def run_interactive_repl(
                 if len(parts) >= 4:
                     provider, key_val = parts[2], parts[3]
                     env_var = model_router.set_api_key(provider, key_val, persist_to_env=True)
-                    print(f"{GREEN}[OK] Saved API key for '{provider}' to {env_var} and config/.env.{RESET}\n")
+                    active_now = planner.get_active_model()
+                    print(f"{GREEN}[OK] Saved API key for '{provider}' to {env_var} and config/.env.{RESET}")
+                    print(f"  {CYAN}↳ Active Reasoning Model:{RESET} {GREEN}{active_now}{RESET}\n")
                 else:
                     print(f"{RED}[!] Usage: api-key set <provider> <api_key> (providers: gemini, openai, anthropic){RESET}\n")
 
@@ -510,6 +564,9 @@ def run_interactive_repl(
 
                 def local_exec(target_goal, ctx):
                     plan = planner.plan_problem(target_goal, context=ctx)
+                    if len(plan.steps) == 0:
+                        return plan, 0.0
+
                     print(f"{CYAN}[+] Synthesized Pipeline DAG:{RESET} {len(plan.steps)} steps (ID: {plan.id[:8]})")
                     for s in plan.steps:
                         dep_str = f"(depends on: {', '.join(s.depends_on)})" if s.depends_on else "(independent)"
@@ -541,10 +598,13 @@ def run_interactive_repl(
                 else:
                     finished_plan, elapsed = local_exec(goal, {"zone": active_zone, "operator": active_name})
 
-                if finished_plan.status == "completed":
-                    print(f"\n{GREEN}[OK] Pipeline Succeeded in {elapsed:.2f}s!{RESET}")
-                else:
-                    print(f"\n{RED}[FAILED] Pipeline Failed in {elapsed:.2f}s!{RESET}")
+                if len(finished_plan.steps) > 0:
+                    if finished_plan.status == "completed":
+                        print(f"\n{GREEN}[OK] Pipeline Succeeded in {elapsed:.2f}s!{RESET}")
+                    else:
+                        print(f"\n{RED}[FAILED] Pipeline Failed in {elapsed:.2f}s!{RESET}")
+                elif finished_plan.context.get("offline_ai_notice"):
+                    print(f"\n{YELLOW}[!] Notice: No AI reasoning model connected.{RESET}")
 
                 spoken = planner.formulate_spoken_response(finished_plan, profile=state.get_user_profile())
                 print(f"\n{CYAN}Core AI:{RESET} {BRIGHT}{spoken}{RESET}\n")
@@ -573,7 +633,7 @@ def main():
     bus = EventBus()
     state = StateManager()
     context = ContextManager()
-    registry = setup_tools()
+    registry = setup_tools(state=state)
     profile = state.get_user_profile()
     operator_name = profile.preferred_name
     primary_zone = profile.preferences.get("primary_space", "studio")

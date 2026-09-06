@@ -64,4 +64,45 @@ def test_planner_greeting_response_not_time(tmp_path):
     assert "Online and ready" in spoken
     assert "It is" not in spoken
 
+def test_planner_open_ended_offline_ai_notice(tmp_path):
+    registry = ToolRegistry(dynamic_dir=str(tmp_path))
+    planner = Planner(registry=registry)
+    plan = planner.plan_problem("what is in my fridge right now?")
+    # No fabricated tools for unhandled open-ended questions
+    assert len(plan.steps) == 0
+    assert plan.context.get("offline_ai_notice") is True
+
+    from core.schemas import UserProfile
+    spoken = planner.formulate_spoken_response(plan, profile=UserProfile(preferred_name="Dyvorn"))
+    assert "Dyvorn" in spoken
+    assert "no AI reasoning model" in spoken or "kein KI-Modell" in spoken
+    assert "api-key set" in spoken
+
+def test_network_tools_registration(tmp_path):
+    from main import setup_tools
+    from core.state import StateManager
+    db_path = str(tmp_path / "test_net.db")
+    state = StateManager(db_path=db_path)
+    registry = setup_tools(state=state)
+
+    assert registry.has_tool("scan_local_network")
+    assert registry.has_tool("inspect_lan_device")
+    assert registry.has_tool("list_registered_devices")
+    assert registry.has_tool("list_spatial_zones")
+
+    # Execute list_registered_devices tool
+    res = registry.execute_tool("list_registered_devices", {})
+    assert res.success is True
+    assert isinstance(res.output, dict)
+    assert res.output["status"] == "success"
+    assert "devices" in res.output
+
+    # Execute scan_local_network tool
+    scan_res = registry.execute_tool("scan_local_network", {"timeout_sec": 0.5})
+    assert scan_res.success is True
+    assert isinstance(scan_res.output, dict)
+    assert scan_res.output["status"] == "success"
+    assert "devices" in scan_res.output
+
+
 

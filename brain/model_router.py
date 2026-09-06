@@ -65,8 +65,21 @@ class ModelRouter:
         # Invalidate status cache
         self._status_cache.clear()
 
+        # Auto-assign active provider to planner if currently on unconfigured Ollama default
+        prefs = self.get_model_preferences()
+        current_planner = prefs.get("planner", "")
+        if not current_planner or (current_planner.startswith("ollama/") and not self.check_model_availability(current_planner)):
+            if provider_clean in ("GEMINI", "GOOGLE"):
+                self.set_model_preference("planner", "gemini/gemini-2.5-flash")
+            elif provider_clean == "OPENAI":
+                self.set_model_preference("planner", "openai/gpt-4o-mini")
+            elif provider_clean == "ANTHROPIC":
+                self.set_model_preference("planner", "anthropic/claude-3-5-sonnet-20241022")
+
         if persist_to_env:
             self._update_env_file(env_var, api_key.strip())
+            if provider_clean in ("GEMINI", "GOOGLE"):
+                self._update_env_file("GOOGLE_API_KEY", api_key.strip())
 
         logger.info(f"Configured API key for provider '{provider_clean}' (saved to {env_var})")
         return env_var
@@ -216,7 +229,18 @@ class ModelRouter:
         if fallback_model and self.check_model_availability(fallback_model):
             return clean_goal, fallback_model
 
-        # 5. Offline heuristic
+        # 5. Dynamic provider discovery: Check if any other provider is configured or Ollama is online
+        candidate_providers = [
+            ("gemini/gemini-2.5-flash", bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))),
+            ("openai/gpt-4o-mini", bool(os.getenv("OPENAI_API_KEY"))),
+            ("anthropic/claude-3-5-sonnet-20241022", bool(os.getenv("ANTHROPIC_API_KEY"))),
+            ("ollama/llama3", self.check_model_availability("ollama/test")),
+        ]
+        for candidate_model, is_configured in candidate_providers:
+            if is_configured and self.check_model_availability(candidate_model):
+                return clean_goal, candidate_model
+
+        # 6. Completely offline (no AI backends connected)
         return clean_goal, None
 
     def get_status_summary(self) -> Dict[str, Any]:

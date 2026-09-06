@@ -80,12 +80,15 @@ class Planner:
         if active_model:
             try:
                 plan = self._llm_generate_plan(target_goal, catalog, active_model, context or {})
-                if plan and plan.steps:
+                if plan and (plan.steps or plan.context.get("direct_response")):
+                    if not plan.steps:
+                        plan.status = "completed"
                     self.pipeline_logger.log_event("PLAN_GENERATED", {
                         "mode": "llm",
                         "model": active_model,
                         "step_count": len(plan.steps),
-                        "steps": [s.model_dump() for s in plan.steps]
+                        "steps": [s.model_dump() for s in plan.steps],
+                        "has_direct_response": bool(plan.context.get("direct_response"))
                     }, pipeline_id=plan.id)
                     return plan
             except Exception as e:
@@ -242,7 +245,7 @@ class Planner:
 
         # Generic default: do not fabricate unrelated tool steps for unrecognized goals
         else:
-            pass
+            context["offline_ai_notice"] = True
 
         return PipelinePlan(
             id=pipeline_id,
@@ -259,35 +262,67 @@ class Planner:
         context: Dict[str, Any]
     ) -> PipelinePlan:
         """
-        Uses LiteLLM to decompose complex tasks into a structured DAG of steps.
+        Uses LiteLLM to decompose complex tasks into a structured DAG of steps,
+        enriched with full contextual awareness of the operator, spatial zones, and device topology.
         """
         from litellm import completion  # type: ignore
-        
-        system_prompt = f"""
-You are the Brain of Core AI, an autonomous system solver.
-Your job is to inspect available tools and generate a structured multi-step execution pipeline (DAG) to solve the user's problem.
+
+        operator_name = "Operator"
+        operator_zone = context.get("zone", "studio")
+        try:
+            profile = self.state_manager.get_user_profile()
+            operator_name = profile.preferred_name
+        except Exception:
+            pass
+
+        zones_summary = []
+        try:
+            zones = self.state_manager.list_zones()
+            zones_summary = [{"id": z.zone_id, "name": z.display_name} for z in zones]
+        except Exception:
+            pass
+
+        devices_summary = []
+        try:
+            devs = self.state_manager.list_all_devices()
+            devices_summary = [{"id": d.device_id, "type": d.device_type, "zone": d.current_zone, "status": d.status} for d in devs]
+        except Exception:
+            pass
+
+        system_prompt = f"""You are the Brain and DAG Orchestrator of Core AI, an autonomous sovereign life OS with Jarvis-level situational awareness.
+Operator: {operator_name}
+Current Spatial Zone: {operator_zone}
+
+Physical & Mesh Topology:
+- Registered Zones: {json.dumps(zones_summary)}
+- Registered Devices & Edge Nodes: {json.dumps(devices_summary)}
 
 Available Tools Catalog:
 {json.dumps(catalog, indent=2)}
 
+Guidelines:
+1. Deep Contextual Reasoning:
+   - If the user asks about an appliance or device state (e.g. 'what is in my fridge?'), first consider if that device is registered in Core AI. If not, use local network discovery tools ('scan_local_network', 'inspect_lan_device') or home assistant tools to find and inspect it.
+2. If solving the goal requires system actions or inspections, output structured DAG 'steps'.
+   - Independent steps MUST have empty `depends_on` so they execute in parallel!
+   - If a step needs output from an earlier step, use `{{{{steps.earlier_step_id.output.fieldName}}}}` in arguments.
+3. If the user asks an open-ended conversational question, knowledge query, or reasoning task that requires NO external tool actions, provide a direct answer in 'direct_response' with an empty 'steps' array.
+
 Output ONLY a JSON object matching this schema:
 {{
   "goal": "{goal}",
+  "direct_response": null,
   "steps": [
     {{
       "id": "unique_step_id",
       "name": "Human-readable description of step",
       "tool_name": "exact_tool_name_from_catalog",
       "arguments": {{ "param1": "val1" }},
-      "depends_on": [] // IDs of steps that MUST finish before this step runs. Independent steps have empty depends_on!
+      "depends_on": []
     }}
   ]
 }}
-
-Guidelines:
-- Independent steps MUST have empty `depends_on` so they run in parallel!
-- If a step needs output from an earlier step, use `{{{{steps.earlier_step_id.output.fieldName}}}}` in arguments.
-- Do NOT output any markdown formatting, preamble, or conversational comments. Output only valid JSON.
+Do NOT output any markdown formatting or commentary outside the JSON.
 """
         response = completion(
             model=model,
@@ -305,6 +340,8 @@ Guidelines:
 
         data = json.loads(content)
         steps = [PipelineStep(**s) for s in data.get("steps", [])]
+        if data.get("direct_response"):
+            context["direct_response"] = data["direct_response"]
         return PipelinePlan(
             goal=goal,
             steps=steps,
@@ -364,6 +401,24 @@ Guidelines:
             else:
                 return f"Hey {name}! Online and ready. What are we working on?"
 
+        # Direct response from LLM (general reasoning / questions)
+        if plan.context.get("direct_response"):
+            return str(plan.context["direct_response"])
+
+        # Offline AI Notice handling (when no model is connected)
+        if plan.context.get("offline_ai_notice"):
+            if language == "de":
+                return (
+                    f"Entschuldige bitte {name}, aktuell ist kein KI-Modell (wie Gemini, OpenAI oder lokales Ollama) verbunden oder online, "
+                    f"um die Frage '{plan.goal}' auszuwerten. Du kannst jederzeit einen API-Schlüssel konfigurieren "
+                    f"(z. B. mit 'api-key set gemini <KEY>') oder eine lokale Ollama-Instanz starten."
+                )
+            else:
+                return (
+                    f"Pardon me {name}, but there is currently no AI reasoning model (such as Gemini, OpenAI, or local Ollama) connected or online "
+                    f"to analyze '{plan.goal}'. You can connect one anytime with 'api-key set gemini <KEY>' or by running a local Ollama instance."
+                )
+
         # Failure handling
         if plan.status != "completed":
             err = plan.error_summary or "Unbekannter Fehler"
@@ -374,6 +429,33 @@ Guidelines:
 
         # Success handling - inspect step outputs
         step_outputs = {s.tool_name: s.output for s in plan.steps if s.status == "completed"}
+
+        # Dynamic LLM Spoken Synthesis: If an active model is available and tools produced outputs,
+        # have the neural model synthesize a natural, conversational spoken summary
+        active_model = self.get_active_model()
+        if active_model and step_outputs:
+            try:
+                from litellm import completion  # type: ignore
+                synth_prompt = (
+                    f"You are Core AI, a helpful, conversational OS speaking to {name}. "
+                    f"The user asked: '{plan.goal}'. "
+                    f"Tool execution results: {json.dumps(step_outputs, default=str)}. "
+                    f"Formulate a concise, natural, spoken response (1 to 2 sentences max) in {language}. "
+                    f"Provide clear, direct insight based on the tool results. Do not include markdown formatting, bullet points, or JSON."
+                )
+                resp = completion(
+                    model=active_model,
+                    messages=[{"role": "system", "content": synth_prompt}],
+                    max_tokens=150,
+                    timeout=6.0
+                )
+                spoken_text = resp.choices[0].message.content.strip()
+                if spoken_text:
+                    return spoken_text
+            except Exception as e:
+                logger.debug(f"LLM speech synthesis fallback to deterministic formatting: {e}")
+
+        # Deterministic formatting fallbacks
 
         # 1. Time response
         if "get_time" in step_outputs and "get_system_status" not in step_outputs:
@@ -407,14 +489,31 @@ Guidelines:
                 else:
                     return f"The result of {expr} is {result}, {name}."
 
-        # 4. Home Assistant service call
+        # 4. Network Discovery & Device Inspection
+        if "scan_local_network" in step_outputs or "inspect_lan_device" in step_outputs:
+            scan_res = step_outputs.get("scan_local_network") or {}
+            insp_res = step_outputs.get("inspect_lan_device") or {}
+            dev_count = scan_res.get("device_count", 0)
+            if insp_res and not insp_res.get("core_installed", False):
+                hint = insp_res.get("device_hint", "Gerät")
+                host = insp_res.get("host", "LAN")
+                if language == "de":
+                    return f"Ich habe ein {hint} auf {host} im Netzwerk gefunden, allerdings ist dort noch kein Core AI Knoten installiert."
+                else:
+                    return f"I found a {hint} at {host} on your local network, but the Core AI edge node is not installed on it yet."
+            if language == "de":
+                return f"Der Netzwerkscan wurde abgeschlossen. Es wurden {dev_count} aktive Geräte im lokalen Netz gefunden, {name}."
+            else:
+                return f"Network scan completed. Found {dev_count} active devices on your local network, {name}."
+
+        # 5. Home Assistant service call
         if "home_assistant_call" in step_outputs:
             if language == "de":
                 return f"Befehl ausgeführt, {name}. Das Smart-Home-Gerät wurde aktualisiert."
             else:
                 return f"Smart home action completed, {name}."
 
-        # 5. File / Dir operations
+        # 6. File / Dir operations
         if "list_dir_contents" in step_outputs:
             contents = step_outputs["list_dir_contents"]
             count = len(contents) if isinstance(contents, list) else "mehrere"

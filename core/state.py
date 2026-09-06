@@ -13,11 +13,19 @@ class StateManager:
     """Manages SQLite state including WAL-mode for high concurrency, pipeline states, and audit logs"""
     
     def __init__(self, db_path: str = "core_ai.db"):
-        self.db_path = db_path
+        if db_path == ":memory:":
+            import uuid
+            self.db_path = f"file:mem_{uuid.uuid4().hex}?mode=memory&cache=shared"
+            self._is_uri = True
+            self._anchor_conn = sqlite3.connect(self.db_path, uri=True, check_same_thread=False)
+        else:
+            self.db_path = db_path
+            self._is_uri = False
+            self._anchor_conn = None
         self._init_db()
 
     def _get_connection(self):
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn = sqlite3.connect(self.db_path, uri=self._is_uri, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         return conn
 
