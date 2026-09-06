@@ -174,8 +174,8 @@ class ModelRouter:
             response = completion(
                 model=model,
                 messages=[{"role": "user", "content": "ping"}],
-                max_tokens=2,
-                timeout=2.0
+                max_tokens=50,
+                timeout=5.0
             )
             available = bool(response and response.choices)
             self._status_cache[model] = available

@@ -517,11 +517,13 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                 resp = completion(
                     model=active_model,
                     messages=[{"role": "system", "content": synth_prompt}],
-                    max_tokens=150,
-                    timeout=6.0
+                    max_tokens=1024,
+                    timeout=12.0
                 )
-                spoken_text = resp.choices[0].message.content.strip()
-                if spoken_text:
+                first_choice = resp.choices[0]
+                spoken_text = first_choice.message.content.strip()
+                # Safeguard: if length limit truncated the thought/response, fall through to deterministic formatting
+                if spoken_text and getattr(first_choice, "finish_reason", "stop") != "length":
                     return spoken_text
             except Exception as e:
                 logger.debug(f"LLM speech synthesis fallback to deterministic formatting: {e}")
