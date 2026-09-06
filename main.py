@@ -181,6 +181,7 @@ def run_interactive_repl(
                 continue
 
             cmd_lower = user_input.lower()
+            clean_cmd = cmd_lower.strip(" .!?")
 
             if cmd_lower in ["exit", "quit"]:
                 print(f"\n{YELLOW}[*] Shutting down Core AI. Goodbye {active_name}!{RESET}")
@@ -465,6 +466,39 @@ def run_interactive_repl(
                 print(f"{YELLOW}[*] Evaluating proactive state triggers...{RESET}")
                 asyncio.run(proactive.evaluate_triggers())
                 print(f"{GREEN}[OK] Proactive evaluation cycle complete.{RESET}")
+
+            # --- Conversational Dialogues, Greetings & Small Talk ---
+            elif clean_cmd in [
+                "hi", "hello", "hey", "hallo", "moin", "servus", "guten tag",
+                "guten morgen", "good morning", "good evening", "guten abend", "yo", "sup",
+                "hey core", "hallo core", "hi core", "hello core", "hey core ai", "hallo core ai"
+            ]:
+                is_de = any(clean_cmd.startswith(w) for w in ["hallo", "moin", "servus", "guten"])
+                reply = f"Hallo {active_name}! Bereit im {active_zone.title()}. Was steht an?" if is_de else f"Hey {active_name}! Online and ready in the {active_zone.title()}. What are we working on?"
+                print(f"\n{CYAN}Core AI:{RESET} {BRIGHT}{reply}{RESET}\n")
+                if voice_out:
+                    voice_out.synthesize_and_play(reply)
+
+            elif clean_cmd in ["how are you", "how are you doing", "wie gehts", "wie geht's", "wie geht es dir", "was geht", "what's up"]:
+                is_de = "wie" in clean_cmd or "was" in clean_cmd
+                reply = f"Alle Systeme laufen optimal, {active_name}. Wie kann ich dir helfen?" if is_de else f"All systems are green, {active_name}. Running smoothly in the {active_zone.title()}. How can I assist you today?"
+                print(f"\n{CYAN}Core AI:{RESET} {BRIGHT}{reply}{RESET}\n")
+                if voice_out:
+                    voice_out.synthesize_and_play(reply)
+
+            elif clean_cmd in ["who are you", "wer bist du", "what is core ai", "was ist core ai"]:
+                is_de = "wer" in clean_cmd or "was" in clean_cmd
+                reply = f"Ich bin Core AI, dein souveräner Life OS Microkernel und autonomer Problemlöser." if is_de else f"I am Core AI, your sovereign life OS microkernel and autonomous problem solver."
+                print(f"\n{CYAN}Core AI:{RESET} {BRIGHT}{reply}{RESET}\n")
+                if voice_out:
+                    voice_out.synthesize_and_play(reply)
+
+            elif clean_cmd in ["thanks", "thank you", "danke", "danke dir", "vielen dank"]:
+                is_de = "danke" in clean_cmd
+                reply = f"Gern geschehen, {active_name}! Sag Bescheid, wenn du noch etwas brauchst." if is_de else f"Anytime, {active_name}! Let me know if you need anything else."
+                print(f"\n{CYAN}Core AI:{RESET} {BRIGHT}{reply}{RESET}\n")
+                if voice_out:
+                    voice_out.synthesize_and_play(reply)
 
             else:
                 # Problem solving goal

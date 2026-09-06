@@ -117,3 +117,23 @@ def test_follow_up_conversational_window(spoken_engine):
     assert dec.discourse_role == DiscourseRole.ADDRESSED
     assert dec.should_respond is True
     assert dec.action_type == "command"
+
+
+def test_direct_greeting_conversational(spoken_engine):
+    """Verify that standalone greetings like 'hi' or vocative calls like 'Hey Core' trigger conversational response."""
+    prof = UserProfile(preferred_name="Dyvorn")
+    
+    # Pure greeting
+    dec_hi = spoken_engine.evaluate("hi", profile=prof)
+    assert dec_hi.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_hi.should_respond is True
+    assert dec_hi.action_type == "chime_in"
+    assert "Dyvorn" in dec_hi.autonomous_response
+
+    # Vocative assistant call without trailing command
+    dec_core = spoken_engine.evaluate("Hey Core", profile=prof)
+    assert dec_core.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_core.should_respond is True
+    assert dec_core.action_type == "chime_in"
+    assert "Dyvorn" in dec_core.autonomous_response
+

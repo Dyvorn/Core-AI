@@ -51,3 +51,17 @@ def test_planner_compound_time_and_system_status(tmp_path):
     assert "get_time" in tool_names
     assert "get_system_status" in tool_names
 
+
+def test_planner_greeting_response_not_time(tmp_path):
+    registry = ToolRegistry(dynamic_dir=str(tmp_path))
+    planner = Planner(registry=registry)
+    plan = planner.plan_problem("hi")
+    # Should not fabricate a get_time step
+    assert len(plan.steps) == 0
+    from core.schemas import UserProfile
+    spoken = planner.formulate_spoken_response(plan, profile=UserProfile(preferred_name="Dyvorn"))
+    assert "Dyvorn" in spoken
+    assert "Online and ready" in spoken
+    assert "It is" not in spoken
+
+

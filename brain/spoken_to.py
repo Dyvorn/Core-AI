@@ -185,13 +185,26 @@ class SpokenToReasoning:
         # e.g., "Hey Core, wie spät ist es?", "Core, schalte das Licht an", "Computer, status"
         # -------------------------------------------------------------
         for name in assistant_names:
-            # Pattern 1: Leading vocative (e.g. "Hey Core, ...", "Core, ...", "Okay Core, ...")
-            vocative_pattern = rf"^(?:hey|hallo|hi|yo|okay|ok|sag mal)?\s*{re.escape(name)}[\s,:\.!?]+(.*)$"
+            # Pattern 1: Leading vocative (e.g. "Hey Core, ...", "Core, ...", "Hey Core")
+            vocative_pattern = rf"^(?:hey|hallo|hi|yo|okay|ok|sag mal)?\s*{re.escape(name)}(?:[\s,:\.!?]+(.*))?$"
             match = re.search(vocative_pattern, text_lower, re.IGNORECASE)
             if match:
-                clean_cmd = match.group(1).strip()
+                clean_cmd = (match.group(1) or "").strip()
                 if not clean_cmd:
-                    clean_cmd = "status"
+                    is_de = any(w in text_lower for w in ["hallo", "sag mal", "guten"])
+                    greeting_reply = (
+                        f"Hallo {operator_name}! Bereit und online. Was steht an?"
+                        if is_de
+                        else f"Online and listening, {operator_name}. What are we working on?"
+                    )
+                    return SpokenToDecision(
+                        discourse_role=DiscourseRole.ADDRESSED,
+                        should_respond=True,
+                        action_type="chime_in",
+                        autonomous_response=greeting_reply,
+                        confidence=0.98,
+                        rationale=f"Direct vocative greeting with assistant name '{name}'."
+                    )
                 return SpokenToDecision(
                     discourse_role=DiscourseRole.ADDRESSED,
                     should_respond=True,
@@ -200,6 +213,28 @@ class SpokenToReasoning:
                     confidence=0.98,
                     rationale=f"Direct vocative address with assistant name '{name}'."
                 )
+
+        # Pattern 1b: Direct greetings & pleasantries
+        clean_text = text_lower.strip(" .!?")
+        direct_greetings = [
+            "hi", "hello", "hey", "hallo", "moin", "servus", "guten tag",
+            "guten morgen", "good morning", "good evening", "guten abend", "yo"
+        ]
+        if clean_text in direct_greetings:
+            is_de = any(clean_text.startswith(w) for w in ["hallo", "moin", "servus", "guten"])
+            greeting_reply = (
+                f"Hallo {operator_name}! Bereit und online. Was steht an?"
+                if is_de
+                else f"Hey {operator_name}! Online and listening. What are we working on?"
+            )
+            return SpokenToDecision(
+                discourse_role=DiscourseRole.ADDRESSED,
+                should_respond=True,
+                action_type="chime_in",
+                autonomous_response=greeting_reply,
+                confidence=0.95,
+                rationale="Direct conversational greeting."
+            )
 
         # Pattern 2: Natural follow-up question if in active window
         if is_in_follow_up_window:

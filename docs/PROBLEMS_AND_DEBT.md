@@ -44,6 +44,12 @@
 - **Root Cause**: Language server evaluated dependencies against system Python rather than `.venv`.
 - **Fix Applied**: Added `pyrightconfig.json` and `.vscode/settings.json` configured for `.venv`, and guarded dynamic completion imports with `# type: ignore`.
 
+### Issue #006: Conversational Greetings Fabricating Unrelated Tool Steps `[RESOLVED]`
+- **Found**: 2026-09-06 during CLI smoke testing.
+- **Symptom**: Typing simple conversational greetings (`hi`, `hello`) triggered a DAG pipeline synthesizing `get_time`, responding `"It is 15:36, Dyvorn."`.
+- **Root Cause**: REPL defaulted any unrecognized input to a problem-solving goal, and the heuristic planner's catch-all branch fabricated a `get_time` step.
+- **Fix Applied**: Added conversational dialogue branches for greetings, small talk, identity, and pleasantries in `main.py` and `brain/spoken_to.py`. Updated `brain/planner.py` to produce zero steps for greetings, and updated `formulate_spoken_response` to reply conversationally and truthfully indicate when tools are absent.
+
 ---
 
 ## 2. Watchlist & Architectural Debt to Address in Future Phases

@@ -92,6 +92,8 @@ class Planner:
                 logger.warning(f"LLM planning failed ({e}). Falling back to heuristic planning engine.")
 
         plan = self._heuristic_generate_plan(target_goal, catalog, context or {})
+        if not plan.steps:
+            plan.status = "completed"
         self.pipeline_logger.log_event("PLAN_GENERATED", {
             "mode": "heuristic_fallback",
             "step_count": len(plan.steps),
@@ -231,15 +233,16 @@ class Planner:
                 depends_on=[]
             ))
 
-        # Generic default: fallback to get_time
+        # Pattern: Conversational greetings / dialogue
+        elif any(goal_lower == g or goal_lower.startswith(f"{g} ") for g in [
+            "hi", "hello", "hey", "hallo", "moin", "servus", "guten tag", "guten morgen", "good morning", "yo"
+        ]):
+            # Conversational greetings require no tool steps
+            pass
+
+        # Generic default: do not fabricate unrelated tool steps for unrecognized goals
         else:
-            steps.append(PipelineStep(
-                id="default_inspect_step",
-                name="Inspect Environment Time",
-                tool_name="get_time",
-                arguments={},
-                depends_on=[]
-            ))
+            pass
 
         return PipelinePlan(
             id=pipeline_id,
@@ -352,6 +355,15 @@ Guidelines:
             )
             language = "de" if is_german else "en"
 
+        # Conversational greetings & pleasantries
+        clean_goal = goal_text.strip(" .!?")
+        greetings = ["hi", "hello", "hey", "hallo", "moin", "servus", "guten tag", "guten morgen", "good morning", "good evening", "guten abend", "yo"]
+        if clean_goal in greetings or any(clean_goal.startswith(f"{g} ") for g in greetings) or any(clean_goal == f"hey {a}" for a in ["core", "core ai", "assistant"]):
+            if language == "de":
+                return f"Hallo {name}! Bereit und online. Was steht an?"
+            else:
+                return f"Hey {name}! Online and ready. What are we working on?"
+
         # Failure handling
         if plan.status != "completed":
             err = plan.error_summary or "Unbekannter Fehler"
@@ -410,6 +422,13 @@ Guidelines:
                 return f"Ich habe das Verzeichnis geprüft. Es enthält {count} Einträge, {name}."
             else:
                 return f"Directory contains {count} items, {name}."
+
+        # Fallback if no specific step outputs were generated (unregistered tool capability)
+        if not step_outputs:
+            if language == "de":
+                return f"Ich habe die Absicht verstanden, {name}, aber aktuell ist dafür noch kein passendes Werkzeug registriert."
+            else:
+                return f"I hear you, {name}, but there is no specific tool registered for '{plan.goal}' yet."
 
         # Generic default success
         final_val = plan.final_output
