@@ -19,7 +19,7 @@ class ModelRouter:
 
     DEFAULT_ROLES = {
         "planner": "ollama/qwen3.5:2b",
-        "fallback": "gemini/gemini-2.5-flash",
+        "fallback": "ollama/qwen3.5:2b",
         "deep_reasoning": "gemini/gemini-2.5-pro",
         "fast_local": "ollama/qwen3.5:2b"
     }
@@ -141,11 +141,23 @@ class ModelRouter:
         if "ollama" in model_lower:
             try:
                 import urllib.request
+                import json
                 api_base = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
-                with urllib.request.urlopen(f"{api_base}/api/tags", timeout=0.3) as resp:
-                    available = resp.status == 200
-                    self._status_cache[model] = available
-                    return available
+                with urllib.request.urlopen(f"{api_base}/api/tags", timeout=1.5) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        installed = [m.get("name", "").lower() for m in data.get("models", [])]
+                        clean_target = model_lower.split("/", 1)[-1]
+                        available = any(
+                            clean_target == inst or
+                            f"{clean_target}:latest" == inst or
+                            inst.startswith(f"{clean_target}:")
+                            for inst in installed
+                        ) if installed and clean_target not in ("ollama", "default") else bool(installed)
+                        self._status_cache[model] = available
+                        return available
+                    self._status_cache[model] = False
+                    return False
             except Exception:
                 self._status_cache[model] = False
                 return False

@@ -227,10 +227,14 @@ Requirements:
 3. Do not use forbidden libraries like subprocess, shutil, or ctypes.
 4. Output ONLY valid Python code enclosed in ```python ... ``` or raw Python code, no conversational filler.
 """
+                gen_timeout = 30.0 if "ollama" in target_model.lower() else 8.0
+                kwargs: Dict[str, Any] = {"timeout": gen_timeout}
+                if "ollama" in target_model.lower():
+                    kwargs["api_base"] = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
                 response = completion(
                     model=target_model,
                     messages=[{"role": "user", "content": prompt}],
-                    timeout=8.0
+                    **kwargs
                 )
                 raw = response.choices[0].message.content
                 if "```python" in raw:

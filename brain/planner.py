@@ -1,3 +1,4 @@
+import os
 import logging
 import json
 import re
@@ -108,7 +109,28 @@ class Planner:
                     }, pipeline_id=plan.id)
                     return plan
             except Exception as e:
-                logger.warning(f"LLM planning failed ({e}). Falling back to heuristic planning engine.")
+                logger.warning(f"Primary model '{active_model}' planning failed ({e}). Checking fallback model...")
+                prefs = self.model_router.get_model_preferences()
+                fallback_candidate = prefs.get("fallback")
+                if not fallback_candidate or fallback_candidate == active_model:
+                    fallback_candidate = prefs.get("fast_local", "ollama/qwen3.5:2b")
+                if fallback_candidate and fallback_candidate != active_model and self.model_router.check_model_availability(fallback_candidate):
+                    try:
+                        logger.info(f"Retrying planning with fallback model: '{fallback_candidate}'")
+                        plan = self._llm_generate_plan(target_goal, catalog, fallback_candidate, context or {})
+                        if plan and (plan.steps or plan.context.get("direct_response")):
+                            if not plan.steps:
+                                plan.status = "completed"
+                            self.pipeline_logger.log_event("PLAN_GENERATED", {
+                                "mode": "llm_fallback",
+                                "model": fallback_candidate,
+                                "step_count": len(plan.steps),
+                                "steps": [s.model_dump() for s in plan.steps],
+                                "has_direct_response": bool(plan.context.get("direct_response"))
+                            }, pipeline_id=plan.id)
+                            return plan
+                    except Exception as fe:
+                        logger.warning(f"Fallback model '{fallback_candidate}' also failed ({fe}). Falling back to heuristic planning engine.")
 
         plan = self._heuristic_generate_plan(target_goal, catalog, context or {})
         if not plan.steps:
@@ -176,8 +198,53 @@ class Planner:
         pipeline_id = str(uuid.uuid4())
         steps: List[PipelineStep] = []
 
+        # Pattern: YouTube & Web Video ("open youtube", "open yt", "watch yt", "watch youtube", "play youtube")
+        if any(k in goal_lower for k in ["youtube", "yt"]):
+            search_q = None
+            if q_match := re.search(r"(?:search|for|find|watch|play)\s+([a-zA-Z0-9_\-\s]+?)(?:\s+(?:on|in)\s+youtube|\s+on\s+yt|$)", goal_lower):
+                raw_q = q_match.group(1).strip()
+                search_q = re.sub(r"\b(youtube|yt|for me|pls|please)\b", "", raw_q, flags=re.IGNORECASE).strip() or None
+            steps.append(PipelineStep(
+                id="open_youtube_step",
+                name=f"Open YouTube{' (' + search_q + ')' if search_q else ''}",
+                tool_name="open_youtube",
+                arguments={"search_query": search_q} if search_q else {},
+                depends_on=[]
+            ))
+
+        # Pattern: Desktop Application Launching ("open discord", "open davinci resolve", "launch spotify", "start calc")
+        elif app_match := re.search(r"\b(?:open|launch|start|starte|öffne|oeffne)\s+([a-zA-Z0-9_\-\.\s]+)", goal_lower):
+            raw_app = app_match.group(1).strip()
+            app_clean = re.sub(r"\b(for me|pls|please|plws|bitte|on my machine|on my pc|app|application)\b", "", raw_app, flags=re.IGNORECASE).strip()
+            if app_clean and app_clean not in ["file", "files", "folder", "ordner", "dateien", "door", "tür", "youtube", "yt"]:
+                steps.append(PipelineStep(
+                    id="launch_app_step",
+                    name=f"Launch Application '{app_clean}'",
+                    tool_name="launch_application",
+                    arguments={"app_name": app_clean},
+                    depends_on=[]
+                ))
+
+        # Pattern: Media & Audio Controls
+        elif any(k in goal_lower for k in ["volume up", "louder", "lauter", "turn up the volume", "turn volume up"]):
+            steps.append(PipelineStep(id="vol_step", name="Increase Volume", tool_name="media_control", arguments={"action": "volume_up"}, depends_on=[]))
+        elif any(k in goal_lower for k in ["volume down", "quieter", "leiser", "turn down the volume", "turn volume down"]):
+            steps.append(PipelineStep(id="vol_step", name="Decrease Volume", tool_name="media_control", arguments={"action": "volume_down"}, depends_on=[]))
+        elif any(k in goal_lower for k in ["mute", "stumm", "unmute"]):
+            steps.append(PipelineStep(id="mute_step", name="Toggle Mute", tool_name="media_control", arguments={"action": "mute"}, depends_on=[]))
+        elif any(k in goal_lower for k in ["pause music", "stop music", "pause playback"]):
+            steps.append(PipelineStep(id="pause_step", name="Pause Playback", tool_name="media_control", arguments={"action": "pause"}, depends_on=[]))
+        elif any(k in goal_lower for k in ["play music", "resume music", "play song"]):
+            steps.append(PipelineStep(id="play_step", name="Resume Playback", tool_name="media_control", arguments={"action": "play"}, depends_on=[]))
+
+        # Pattern: Screenshots & Workstation Lock
+        elif any(k in goal_lower for k in ["screenshot", "screen capture", "bildschirmfoto"]):
+            steps.append(PipelineStep(id="screen_step", name="Capture Screenshot", tool_name="take_screenshot", arguments={}, depends_on=[]))
+        elif any(k in goal_lower for k in ["lock workstation", "lock screen", "lock pc", "bildschirm sperren"]):
+            steps.append(PipelineStep(id="lock_step", name="Lock Workstation", tool_name="lock_workstation", arguments={}, depends_on=[]))
+
         # Pattern: System diagnostics (Parallel execution of time + system status)
-        if any(k in goal_lower for k in ["status", "system", "overview", "diagnos", "gesundheit", "wie geht"]):
+        elif any(k in goal_lower for k in ["status", "system", "overview", "diagnos", "gesundheit", "wie geht"]):
             steps.append(PipelineStep(
                 id="get_time_step",
                 name="Fetch Current Time",
@@ -366,6 +433,12 @@ class Planner:
         except Exception:
             pass
 
+        if "ollama" in model.lower():
+            compact_catalog = [{"name": t["name"], "desc": t.get("description", "")[:100]} for t in catalog]
+            catalog_repr = json.dumps(compact_catalog)
+        else:
+            catalog_repr = json.dumps(catalog, indent=2)
+
         aliases_text = f" (Recognized Honorifics/Aliases: {', '.join(operator_aliases)})" if operator_aliases else ""
         system_prompt = f"""You are the Brain and DAG Orchestrator of Core AI, an autonomous sovereign life OS with Jarvis-level situational awareness.
 Operator: {operator_name}{aliases_text}
@@ -377,7 +450,7 @@ Physical & Mesh Topology:
 - Registered Devices & Edge Nodes: {json.dumps(devices_summary)}
 
 Available Tools Catalog:
-{json.dumps(catalog, indent=2)}
+{catalog_repr}
 
 Guidelines:
 1. Deep Contextual Reasoning:
@@ -419,13 +492,17 @@ Output ONLY a JSON object matching this schema:
 }}
 Do NOT output any markdown formatting or commentary outside the JSON.
 """
+        call_timeout = 60.0 if "ollama" in model.lower() else 20.0
+        kwargs: Dict[str, Any] = {"timeout": call_timeout, "num_retries": 0}
+        if "ollama" in model.lower():
+            kwargs["api_base"] = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
         response = completion(
             model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": goal}
             ],
-            timeout=15.0
+            **kwargs
         )
         content = response.choices[0].message.content.strip()
         if "```json" in content:
