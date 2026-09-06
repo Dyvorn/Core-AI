@@ -619,18 +619,18 @@ def run_interactive_repl(
                 print(f"  [+] Model Router (Active: {active_mod})   [{GREEN if has_model else YELLOW}{'ONLINE' if has_model else 'OFFLINE'}{RESET}]")
 
                 # 4. EventBus Inter-Node Transport
-                bus_type = "Redis Distributed" if bus.is_connected else "In-Memory Bus"
+                bus_type = "Redis Distributed" if getattr(bus, "is_connected", False) else "In-Memory Bus"
                 print(f"  [+] EventBus Inter-Node Transport ({bus_type})    [{GREEN}OK{RESET}]")
 
                 # 5. Spatial Audio Matrix & Zone Binding
-                routes = audio_router.list_routes()
+                routes = state.list_all_audio_routes()
                 print(f"  [+] Spatial Audio Matrix ({len(routes)} configured zone routes)       [{GREEN}OK{RESET}]")
 
                 # 6. Safety Gate
                 print(f"  [+] Safety Gate (Catastrophic Protection & Anti-Slop)      [{GREEN}ACTIVE{RESET}]")
 
                 # 7. Gateway Server
-                print(f"  [+] Universal Gateway (FastAPI & WebSocket Mesh :8000)     [{GREEN}ONLINE{RESET}]")
+                print(f"  [+] Universal Gateway (FastAPI & WebSocket Mesh :{port})     [{GREEN}ONLINE{RESET}]")
                 print(f"{CYAN}-----------------------------------------------------------------------{RESET}")
                 print(f"  {BRIGHT}Harness Status:{RESET} {GREEN}ALL REASONING & EXECUTION SUBSYSTEMS GREEN{RESET}\n")
 

@@ -81,6 +81,11 @@ class EventBus:
             self.use_fallback = True
             logger.warning(f"Redis not reachable at {redis_url} ({e}). Falling back to internal InMemoryBus.")
 
+    @property
+    def is_connected(self) -> bool:
+        """Returns True if connected to Redis, False if operating on internal in-memory fallback."""
+        return not self.use_fallback and self.redis_client is not None
+
     def publish(self, channel: str, event: BaseEvent):
         """Publish an event to a channel"""
         try:

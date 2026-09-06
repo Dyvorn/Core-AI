@@ -18,6 +18,15 @@ class ToolRegistry:
         self.schemas: Dict[str, dict] = {}
         self.metadata: Dict[str, dict] = {}
 
+    @property
+    def dynamic_tools(self) -> Dict[str, Callable]:
+        """Returns all dynamically synthesized tools currently registered."""
+        return {
+            name: func
+            for name, func in self.tools.items()
+            if self.metadata.get(name, {}).get("is_dynamic", False)
+        }
+
     def register_tool(
         self, 
         name: str, 
