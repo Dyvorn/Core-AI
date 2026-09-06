@@ -11,7 +11,7 @@
 ```
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 68/68 TESTS PASSED ]  [ PYTHON: 3.13+ ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 74/74 TESTS PASSED ]  [ PYTHON: 3.13+ ]
 [ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]     [ ETHOS: #ANTISLOP ]
 ```
 
@@ -265,6 +265,18 @@ Core AI enforces three immutable security tiers:
      - `lookup_knowledge`: Factual encyclopedic summaries via Wikipedia (EN/DE).
      - `scan_local_network` & `inspect_lan_device`: Local hardware discovery and edge node inspection.
   7. **Harness Diagnostic Command (`harness` / `eval`)**: Live multi-subsystem diagnostic in the Core Terminal evaluating State Manager, Tool Registry, Model Router, EventBus, Audio Matrix, Safety Gate, and Universal Gateway in one command.
+
+### 8. Sovereign Desktop & Host OS Automation (Zero-Refusal Agency)
+- **File References**: [tools/native/web_tools.py](tools/native/web_tools.py), [tools/native/desktop_tools.py](tools/native/desktop_tools.py), [tools/native/media_tools.py](tools/native/media_tools.py), [tools/native/process_tools.py](tools/native/process_tools.py), [tools/native/shell_tools.py](tools/native/shell_tools.py), [brain/dynamic_generator.py](brain/dynamic_generator.py)
+- Fully empowers Core AI as an autonomous, proactive workstation companion on the host machine without relying on external bloatware:
+  1. **Zero-Refusal Workplace Rule**: Core AI rejects canned corporate disclaimers (*"I can't open applications on your machine"*). It possesses native tools to execute host actions directly.
+  2. **Browser & Video Navigation**: `open_youtube` (searches or plays topics/videos), `open_url` (any web address), and `search_web_query` (DuckDuckGo, Google, Bing).
+  3. **Desktop Application Launching**: `launch_application` runs applications (e.g. `youtube`, `spotify`, `vscode`, `chrome`, `firefox`, `calc`, `notepad`, `terminal`, `explorer`) in non-blocking detached processes across Windows, Linux, and macOS.
+  4. **Hardware Media & Audio Keys**: `media_control` emulates hardware multimedia keyboard keys (`play_pause`, `next`, `previous`, `volume_up`, `volume_down`, `mute`) using standard OS APIs.
+  5. **Display & Clipboard Perception**: `take_screenshot` captures the active display to timestamped PNG files with zero pip dependencies (using PowerShell .NET Graphics on Windows); `get_clipboard_text` and `set_clipboard_text` allow bidirectional clipboard interaction.
+  6. **Process & Resource Inspection**: `list_running_processes`, `get_hardware_metrics` (live CPU %, RAM total/used/free, disk capacity), `lock_workstation`, and `kill_process` (strictly protected by SafetyGate against terminating vital OS processes or Core AI itself).
+  7. **Audited Shell Execution**: `run_shell_command` runs terminal commands safe-listed through `SafetyGate`.
+  8. **Autonomous Tool Self-Generation**: If a specialized calculation, data transformer, or parser is missing from the catalog, Core AI's planner synthesizes the tool code on the fly via `DynamicGenerator`, validates its AST against forbidden imports, executes it in a sandboxed scope, and persists it to `tools/dynamic/` for instant execution.
 
 ---
 

@@ -25,6 +25,22 @@ from tools.native.math_tools import calculate_math, calculate_math_schema, summa
 from tools.native.network_tools import scan_local_network, scan_local_network_schema, inspect_lan_device, inspect_lan_device_schema
 from tools.native.weather_tools import get_weather, weather_schema
 from tools.native.knowledge_tools import lookup_knowledge, knowledge_schema
+from tools.native.web_tools import open_url, open_url_schema, search_web_query, search_web_query_schema, open_youtube, open_youtube_schema
+from tools.native.desktop_tools import (
+    launch_application, launch_application_schema,
+    open_path_in_explorer, open_path_in_explorer_schema,
+    take_screenshot, take_screenshot_schema,
+    get_clipboard_text, get_clipboard_text_schema,
+    set_clipboard_text, set_clipboard_text_schema
+)
+from tools.native.media_tools import media_control, media_control_schema
+from tools.native.process_tools import (
+    list_running_processes, list_running_processes_schema,
+    kill_process, kill_process_schema,
+    get_hardware_metrics, get_hardware_metrics_schema,
+    lock_workstation, lock_workstation_schema
+)
+from tools.native.shell_tools import run_shell_command, run_shell_command_schema
 from tools.remote_dispatcher import RemoteToolDispatcher
 from brain.dynamic_generator import DynamicGenerator
 from brain.pipeline_engine import PipelineEngine
@@ -178,6 +194,22 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
     # Real-Time Weather and Encyclopedic Knowledge Tools
     registry.register_tool("get_weather", get_weather, weather_schema)
     registry.register_tool("lookup_knowledge", lookup_knowledge, knowledge_schema)
+
+    # Sovereign Desktop & OS Automation Tools
+    registry.register_tool("open_url", open_url, open_url_schema)
+    registry.register_tool("search_web_query", search_web_query, search_web_query_schema)
+    registry.register_tool("open_youtube", open_youtube, open_youtube_schema)
+    registry.register_tool("launch_application", launch_application, launch_application_schema)
+    registry.register_tool("open_path_in_explorer", open_path_in_explorer, open_path_in_explorer_schema)
+    registry.register_tool("take_screenshot", take_screenshot, take_screenshot_schema)
+    registry.register_tool("get_clipboard_text", get_clipboard_text, get_clipboard_text_schema)
+    registry.register_tool("set_clipboard_text", set_clipboard_text, set_clipboard_text_schema)
+    registry.register_tool("media_control", media_control, media_control_schema)
+    registry.register_tool("list_running_processes", list_running_processes, list_running_processes_schema)
+    registry.register_tool("kill_process", kill_process, kill_process_schema)
+    registry.register_tool("get_hardware_metrics", get_hardware_metrics, get_hardware_metrics_schema)
+    registry.register_tool("lock_workstation", lock_workstation, lock_workstation_schema)
+    registry.register_tool("run_shell_command", run_shell_command, run_shell_command_schema)
 
     def list_registered_devices(zone_filter: Optional[str] = None):
         mgr = state or StateManager()

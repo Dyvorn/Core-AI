@@ -387,8 +387,21 @@ Guidelines:
    - If a step needs output from an earlier step, use `{{{{steps.earlier_step_id.output.fieldName}}}}` in arguments.
 3. For live weather, temperatures, encyclopedic knowledge, calculations, or system status:
    - Always synthesize appropriate DAG steps using registered tools ('get_weather', 'lookup_knowledge', 'get_time', 'calculate_math', 'get_system_status') to retrieve authoritative facts.
-4. For general conversational questions, advice, explanations, reasoning, or creative dialogue where NO external tool is required:
-   - Provide an insightful, charismatic, and concise answer directly in 'direct_response' with an empty 'steps' array. Act like Jarvis: be competent, articulate, and never refuse to answer or output canned disclaimers if you possess the intelligence to answer.
+4. Sovereign Desktop, Web & Media Automation:
+   - You have direct native agency on the host workstation:
+     * To open YouTube or watch videos: synthesize a step with 'open_youtube' (e.g. {{"search_query": "lofi beats"}} or empty for homepage).
+     * To open websites or search: use 'open_url' or 'search_web_query'.
+     * To launch apps (Spotify, VS Code, Calc, Notepad, Chrome, Terminal, Explorer, Settings): use 'launch_application'.
+     * To control music/audio: use 'media_control' (play_pause, next, previous, volume_up, volume_down, mute).
+     * To capture display: use 'take_screenshot'.
+     * To read or copy clipboard: use 'get_clipboard_text' or 'set_clipboard_text'.
+     * To view running apps or hardware: use 'list_running_processes' or 'get_hardware_metrics'.
+     * To run safe terminal commands: use 'run_shell_command'.
+   - NEVER state "I cannot open applications on your machine" or offer corporate refusal disclaimers. You ARE the sovereign life OS and have native tools to perform these actions immediately.
+5. Autonomous Tool Creation:
+   - If a specific computation, data parsing, or specialized algorithm is missing from the catalog, you can still plan a step with that tool_name; Core AI will autonomously write the Python code, verify it in the sandbox, persist it, and execute it on the fly.
+6. For general conversational questions, advice, explanations, reasoning, or creative dialogue where NO external tool is required:
+   - Provide an insightful, charismatic, and concise answer directly in 'direct_response' with an empty 'steps' array. Act like Jarvis: be competent, articulate, and sovereign.
 
 Output ONLY a JSON object matching this schema:
 {{
@@ -398,7 +411,7 @@ Output ONLY a JSON object matching this schema:
     {{
       "id": "unique_step_id",
       "name": "Human-readable description of step",
-      "tool_name": "exact_tool_name_from_catalog",
+      "tool_name": "exact_tool_name_from_catalog_or_new_tool",
       "arguments": {{ "param1": "val1" }},
       "depends_on": []
     }}
@@ -421,7 +434,33 @@ Do NOT output any markdown formatting or commentary outside the JSON.
             content = content.split("```")[1].split("```")[0].strip()
 
         data = json.loads(content)
-        steps = [PipelineStep(**s) for s in data.get("steps", [])]
+        raw_steps = data.get("steps", [])
+        steps = []
+        for s in raw_steps:
+            t_name = s.get("tool_name")
+            # If the tool is missing from the registry, synthesize it dynamically on the fly!
+            if t_name and not self.registry.has_tool(t_name):
+                logger.info(f"Planned step requires missing tool '{t_name}'. Synthesizing tool autonomously on the fly...")
+                desc = s.get("name", f"Auto-synthesized dynamic tool for {t_name}")
+                sample_args = s.get("arguments", {})
+                param_schema = {
+                    "type": "object",
+                    "properties": {k: {"type": "string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "object"} for k, v in sample_args.items()},
+                    "required": list(sample_args.keys())
+                }
+                success, path, err = self.dynamic_generator.synthesize_tool(
+                    tool_name=t_name,
+                    description=desc,
+                    parameters_schema=param_schema,
+                    sample_args=sample_args
+                )
+                if success:
+                    logger.info(f"Successfully synthesized missing tool '{t_name}' at {path}")
+                else:
+                    logger.warning(f"Autonomous tool synthesis for '{t_name}' failed: {err}")
+
+            steps.append(PipelineStep(**s))
+
         if data.get("direct_response"):
             context["direct_response"] = data["direct_response"]
         return PipelinePlan(
@@ -654,6 +693,62 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                     return f"Regarding {topic}: {concise_summary}"
             elif isinstance(k_res, dict) and k_res.get("message"):
                 return str(k_res["message"])
+
+        # 10. YouTube & Web Navigation
+        if "open_youtube" in step_outputs:
+            yt_res = step_outputs["open_youtube"]
+            msg = yt_res.get("message", "Opening YouTube") if isinstance(yt_res, dict) else "Opening YouTube"
+            return f"Alles klar {name}, ich habe YouTube im Browser geöffnet." if language == "de" else f"On it {name}, {msg}."
+
+        if "open_url" in step_outputs or "search_web_query" in step_outputs:
+            url_res = step_outputs.get("open_url") or step_outputs.get("search_web_query") or {}
+            msg = url_res.get("message") if isinstance(url_res, dict) else None
+            if msg:
+                return str(msg)
+            return f"Ich habe die Webseite im Browser aufgerufen, {name}." if language == "de" else f"Opening that in your browser now, {name}."
+
+        # 11. Desktop Applications & Explorer
+        if "launch_application" in step_outputs:
+            app_res = step_outputs["launch_application"]
+            app_name = app_res.get("app_name", "die Anwendung") if isinstance(app_res, dict) else "the application"
+            return f"Ich habe {app_name} auf deinem Computer gestartet, {name}." if language == "de" else f"Launching {app_name} on your workstation now, {name}."
+
+        if "open_path_in_explorer" in step_outputs:
+            return f"Ich habe den Ordner im Explorer geöffnet, {name}." if language == "de" else f"Opened that in your file explorer, {name}."
+
+        # 12. Media Controls
+        if "media_control" in step_outputs:
+            m_res = step_outputs["media_control"]
+            action = m_res.get("action", "playback") if isinstance(m_res, dict) else "playback"
+            return f"Mediensteuerung '{action}' ausgeführt, {name}." if language == "de" else f"Media control '{action}' executed, {name}."
+
+        # 13. Screenshots & Clipboard
+        if "take_screenshot" in step_outputs:
+            s_res = step_outputs["take_screenshot"]
+            fp = s_res.get("file_path", "dem Screenshot-Ordner") if isinstance(s_res, dict) else "screenshots"
+            return f"Screenshot erfolgreich aufgenommen und gespeichert unter {fp}, {name}." if language == "de" else f"Screenshot captured and saved to {fp}, {name}."
+
+        # 14. Shell Execution
+        if "run_shell_command" in step_outputs:
+            sh_res = step_outputs["run_shell_command"]
+            if isinstance(sh_res, dict):
+                if sh_res.get("status") == "rejected":
+                    return f"Aktion abgelehnt: {sh_res.get('reason')}" if language == "de" else f"Action rejected: {sh_res.get('reason')}"
+                elif sh_res.get("status") == "success":
+                    out_text = (sh_res.get("stdout") or "Erfolgreich ausgeführt").split("\n")[0][:120]
+                    return f"Befehl ausgeführt, {name}: {out_text}" if language == "de" else f"Command completed, {name}: {out_text}"
+
+        # 15. Hardware Metrics
+        if "get_hardware_metrics" in step_outputs:
+            hw_res = step_outputs["get_hardware_metrics"]
+            if isinstance(hw_res, dict) and "metrics" in hw_res:
+                m = hw_res["metrics"]
+                cpu = m.get("cpu_percent")
+                cpu_str = f"CPU-Last {cpu}%" if cpu is not None else ""
+                ram = m.get("memory", {})
+                ram_str = f"RAM: {ram.get('used_gb', '?')}GB von {ram.get('total_gb', '?')}GB" if ram else ""
+                info = ", ".join(filter(None, [cpu_str, ram_str]))
+                return f"Hardware-Status ({name}): {info}" if language == "de" else f"System hardware metrics for {name}: {info}"
 
         # Fallback if no specific step outputs were generated (unregistered tool capability)
         if not step_outputs:
