@@ -56,6 +56,9 @@ def test_set_api_key(monkeypatch):
     assert env_var == "GEMINI_API_KEY"
     assert os.getenv("GEMINI_API_KEY") == "test_key_12345"
 
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+
 def test_planner_model_override_integration(tmp_path):
     db_path = str(tmp_path / "test_planner.db")
     state = StateManager(db_path=db_path)

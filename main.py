@@ -6,7 +6,7 @@ import logging
 import argparse
 import threading
 import uvicorn
-from typing import Optional
+from typing import Optional, Any, Dict, List
 from dotenv import load_dotenv
 
 # Ensure project root is on sys.path
@@ -107,7 +107,45 @@ def print_help():
     print(f"  {GREEN}clear{RESET}                     - Clear terminal screen")
     print(f"  {GREEN}exit / quit{RESET}               - Cleanly shut down Core AI and background services\n")
 
-def setup_tools(state: Optional[StateManager] = None) -> ToolRegistry:
+class OperatorRelocator:
+    """Manages operator physical presence relocation, updates profile state, and coordinates audio/HUD handoff."""
+    def __init__(self, state_manager: Optional[StateManager] = None, spatial_handoff: Optional[Any] = None):
+        self.state_manager = state_manager
+        self.spatial_handoff = spatial_handoff
+
+    def relocate(self, target_zone: str) -> dict:
+        zone_clean = target_zone.strip().lower()
+        mgr = self.state_manager or StateManager()
+        z_rec = mgr.ensure_zone_exists(zone_clean)
+        try:
+            prof = mgr.get_user_profile()
+            prof.preferences["primary_space"] = zone_clean
+            mgr.save_user_profile(prof)
+        except Exception:
+            pass
+
+        audio_routed = False
+        if self.spatial_handoff:
+            try:
+                import asyncio
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(self.spatial_handoff.execute_handoff(to_zone=zone_clean, reason="verbal_presence"))
+                except RuntimeError:
+                    asyncio.run(self.spatial_handoff.execute_handoff(to_zone=zone_clean, reason="verbal_presence"))
+                audio_routed = True
+            except Exception as e:
+                logger.warning(f"Spatial handoff notice: {e}")
+
+        return {
+            "status": "success",
+            "zone": zone_clean,
+            "display_name": z_rec.display_name,
+            "audio_routed": audio_routed,
+            "message": f"Relocated operator to {z_rec.display_name}"
+        }
+
+def setup_tools(state: Optional[StateManager] = None, relocator: Optional[OperatorRelocator] = None) -> ToolRegistry:
     registry = ToolRegistry(dynamic_dir="tools/dynamic")
     
     # Register Native Tools
@@ -179,6 +217,34 @@ def setup_tools(state: Optional[StateManager] = None) -> ToolRegistry:
         "name": "list_spatial_zones",
         "description": "Lists all physical spatial zones and rooms configured in the environment",
         "parameters": {"type": "object", "properties": {}}
+    })
+
+    def relocate_operator_tool(target_zone: str):
+        if relocator:
+            return relocator.relocate(target_zone)
+        zone_clean = target_zone.strip().lower()
+        mgr = state or StateManager()
+        z_rec = mgr.ensure_zone_exists(zone_clean)
+        return {
+            "status": "success",
+            "zone": zone_clean,
+            "display_name": z_rec.display_name,
+            "message": f"Relocated operator to {z_rec.display_name}"
+        }
+
+    registry.register_tool("relocate_operator", relocate_operator_tool, {
+        "name": "relocate_operator",
+        "description": "Relocates the operator's physical presence to a new spatial zone (e.g. 'office', 'kitchen', 'studio', 'living_room') and re-routes audio & display contexts",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "target_zone": {
+                    "type": "string",
+                    "description": "The destination room/zone ID (e.g. 'office', 'kitchen', 'studio', 'bedroom')"
+                }
+            },
+            "required": ["target_zone"]
+        }
     })
     
     registry.discover_dynamic_tools()
@@ -320,6 +386,11 @@ def run_interactive_repl(
                             target_cmd = dec.clean_command or text
                             plan = planner.plan_problem(target_cmd, context={"zone": active_zone, "operator": active_name})
                             finished = asyncio.run(engine.execute_pipeline(plan))
+                            for s in finished.steps:
+                                if s.tool_name == "relocate_operator" and s.status == "completed" and isinstance(s.output, dict):
+                                    new_z = s.output.get("zone")
+                                    if new_z:
+                                        active_zone = new_z
                             spoken = planner.formulate_spoken_response(finished, profile=prof)
                             print(f"{CYAN}Core AI:{RESET} {spoken}\n")
                             if voice_out:
@@ -601,6 +672,11 @@ def run_interactive_repl(
                 if len(finished_plan.steps) > 0:
                     if finished_plan.status == "completed":
                         print(f"\n{GREEN}[OK] Pipeline Succeeded in {elapsed:.2f}s!{RESET}")
+                        for s in finished_plan.steps:
+                            if s.tool_name == "relocate_operator" and s.status == "completed" and isinstance(s.output, dict):
+                                new_z = s.output.get("zone")
+                                if new_z:
+                                    active_zone = new_z
                     else:
                         print(f"\n{RED}[FAILED] Pipeline Failed in {elapsed:.2f}s!{RESET}")
                 elif finished_plan.context.get("offline_ai_notice"):
@@ -633,7 +709,8 @@ def main():
     bus = EventBus()
     state = StateManager()
     context = ContextManager()
-    registry = setup_tools(state=state)
+    relocator = OperatorRelocator(state_manager=state)
+    registry = setup_tools(state=state, relocator=relocator)
     profile = state.get_user_profile()
     operator_name = profile.preferred_name
     primary_zone = profile.preferences.get("primary_space", "studio")
@@ -677,6 +754,7 @@ def main():
         audio_router=audio_router,
         voice_out_engine=voice_out
     )
+    relocator.spatial_handoff = spatial_handoff
 
     # 7. Universal Gateway App
     gateway_app = create_gateway_app(

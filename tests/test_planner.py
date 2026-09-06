@@ -104,5 +104,38 @@ def test_network_tools_registration(tmp_path):
     assert scan_res.output["status"] == "success"
     assert "devices" in scan_res.output
 
+def test_planner_spatial_relocation(tmp_path):
+    from main import setup_tools
+    from core.state import StateManager
+    from core.schemas import UserProfile
+    db_path = str(tmp_path / "test_reloc.db")
+    state = StateManager(db_path=db_path)
+    registry = setup_tools(state=state)
+    planner = Planner(registry=registry, state_manager=state)
+
+    # 1. English statement: "I'm in the office rn"
+    plan_en = planner.plan_problem("I'm in the office rn")
+    assert len(plan_en.steps) == 1
+    assert plan_en.steps[0].tool_name == "relocate_operator"
+    assert plan_en.steps[0].arguments["target_zone"] == "office"
+
+    # Execute tool directly to simulate pipeline completion
+    res = registry.execute_tool("relocate_operator", plan_en.steps[0].arguments)
+    assert res.success is True
+    plan_en.steps[0].status = "completed"
+    plan_en.steps[0].output = res.output
+    plan_en.status = "completed"
+
+    spoken = planner.formulate_spoken_response(plan_en, profile=UserProfile(preferred_name="Dyvorn"))
+    assert "Dyvorn" in spoken
+    assert "Office" in spoken
+
+    # 2. German statement: "ich bin jetzt im büro"
+    plan_de = planner.plan_problem("ich bin jetzt im büro")
+    assert len(plan_de.steps) == 1
+    assert plan_de.steps[0].tool_name == "relocate_operator"
+    assert plan_de.steps[0].arguments["target_zone"] == "büro"
+
+
 
 

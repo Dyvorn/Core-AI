@@ -253,7 +253,8 @@ class SpokenToReasoning:
         # (e.g., "Wie spät ist es", "Systemstatus anzeigen", "Berechne 25 * 4")
         explicit_action_triggers = [
             "wie spät", "uhrzeit", "systemstatus", "system status", "berechne",
-            "what time", "calculate", "system overview"
+            "what time", "calculate", "system overview",
+            "i'm in", "i am in", "moved to", "relocate to", "ich bin im", "ich bin in der", "bin jetzt im"
         ]
         if any(trig in text_lower for trig in explicit_action_triggers):
             return SpokenToDecision(
@@ -262,7 +263,7 @@ class SpokenToReasoning:
                 action_type="command",
                 clean_command=text,
                 confidence=0.88,
-                rationale="Direct tool query with explicit invocation keywords."
+                rationale="Direct tool query or presence update with explicit invocation keywords."
             )
 
         # -------------------------------------------------------------
