@@ -1,0 +1,18 @@
+{
+  "include": [
+    "brain",
+    "core",
+    "engines",
+    "interfaces",
+    "tools",
+    "tests",
+    "main.py"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    ".venv"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "reportMissingImports": "warning"
+}

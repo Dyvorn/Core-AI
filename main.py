@@ -315,7 +315,7 @@ def run_interactive_repl(
                 if len(parts) >= 3:
                     new_name = parts[2]
                     alias = parts[3] if len(parts) > 3 else None
-                    state.set_user_preferred_name(new_name, alias=alias)
+                    state.set_user_preferred_name(new_name, aliases=[alias] if alias else None)
                     active_name = new_name
                     print(f"{GREEN}[OK] Operator identity updated to: {new_name}{RESET}\n")
                 else:

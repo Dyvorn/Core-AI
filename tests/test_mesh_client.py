@@ -102,3 +102,24 @@ def test_mesh_state_bundle_export_and_import(tmp_path):
     assert prof_b.preferred_name == "Dyvorn"
     assert "Vyrn" in prof_b.aliases
     assert state_b.get_audio_route("sanctuary").output_device_name == "HiFi Monitors"
+
+
+def test_state_manager_set_user_preferred_name(tmp_path):
+    db_path = str(tmp_path / "test_user.db")
+    state = StateManager(db_path=db_path)
+
+    # Test with aliases list
+    p1 = state.set_user_preferred_name("Alice", aliases=["Ali", "A"])
+    assert p1.preferred_name == "Alice"
+    assert p1.aliases == ["Ali", "A"]
+
+    # Test with alias keyword argument
+    p2 = state.set_user_preferred_name("Bob", alias="Bobby")
+    assert p2.preferred_name == "Bob"
+    assert p2.aliases == ["Bobby"]
+
+    # Verify persistent reload
+    reloaded = state.get_user_profile("primary_user")
+    assert reloaded.preferred_name == "Bob"
+    assert reloaded.aliases == ["Bobby"]
+

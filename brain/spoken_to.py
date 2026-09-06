@@ -272,7 +272,7 @@ class SpokenToReasoning:
         """
         Uses LiteLLM to dynamically classify discourse role and pragmatic intent.
         """
-        from litellm import completion
+        from litellm import completion  # type: ignore
 
         operator_name = profile.preferred_name or "Operator"
         prompt = f"""

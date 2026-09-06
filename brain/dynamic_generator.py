@@ -204,7 +204,7 @@ class DynamicGenerator:
 
         if is_model_available:
             try:
-                from litellm import completion
+                from litellm import completion  # type: ignore
                 prompt = f"""
 Write a complete Python module for a standalone tool named '{tool_name}'.
 Description: {description}

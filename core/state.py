@@ -410,11 +410,20 @@ class StateManager:
         finally:
             conn.close()
 
-    def set_user_preferred_name(self, preferred_name: str, aliases: Optional[List[str]] = None, user_id: str = "primary_user") -> UserProfile:
+    def set_user_preferred_name(
+        self,
+        preferred_name: str,
+        aliases: Optional[List[str]] = None,
+        user_id: str = "primary_user",
+        alias: Optional[str] = None
+    ) -> UserProfile:
+        """Sets the operator's preferred name and optional aliases/alias."""
         profile = self.get_user_profile(user_id)
         profile.preferred_name = preferred_name
         if aliases is not None:
             profile.aliases = aliases
+        elif alias is not None:
+            profile.aliases = [alias]
         profile.updated_at = datetime.now(timezone.utc)
         self.save_user_profile(profile)
         return profile

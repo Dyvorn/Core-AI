@@ -258,7 +258,7 @@ class Planner:
         """
         Uses LiteLLM to decompose complex tasks into a structured DAG of steps.
         """
-        from litellm import completion
+        from litellm import completion  # type: ignore
         
         system_prompt = f"""
 You are the Brain of Core AI, an autonomous system solver.

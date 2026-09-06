@@ -157,7 +157,7 @@ class ModelRouter:
 
         # Generic / Unknown model: check via litellm if installed
         try:
-            from litellm import completion
+            from litellm import completion  # type: ignore
             response = completion(
                 model=model,
                 messages=[{"role": "user", "content": "ping"}],

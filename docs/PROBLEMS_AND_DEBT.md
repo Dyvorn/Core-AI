@@ -32,6 +32,18 @@
 - **Root Cause**: Direct API calls to unreachable endpoints trigger internal retries.
 - **Fix Applied**: Built fast socket/HTTP ping in `Planner.check_model_availability` (0.3s timeout on `http://localhost:11434/api/tags`) and environment variable pre-checks for API keys before invoking LiteLLM.
 
+### Issue #004: StateManager `set_user_preferred_name` Keyword Discrepancy `[RESOLVED]`
+- **Found**: 2026-09-06 during CLI identity update check.
+- **Symptom**: `Unexpected keyword argument 'alias' in function core.state.StateManager.set_user_preferred_name`.
+- **Root Cause**: `main.py` CLI invoked `set_user_preferred_name(new_name, alias=alias)` whereas method signature expected `aliases`.
+- **Fix Applied**: Updated `main.py` to pass `aliases=[alias] if alias else None`, extended `StateManager.set_user_preferred_name` to support both `aliases` (list) and `alias` (str), and added unit tests.
+
+### Issue #005: IDE Pyright Virtual Environment Resolution `[RESOLVED]`
+- **Found**: 2026-09-06 in IDE problem diagnostics.
+- **Symptom**: `Cannot find module litellm` across multiple modules.
+- **Root Cause**: Language server evaluated dependencies against system Python rather than `.venv`.
+- **Fix Applied**: Added `pyrightconfig.json` and `.vscode/settings.json` configured for `.venv`, and guarded dynamic completion imports with `# type: ignore`.
+
 ---
 
 ## 2. Watchlist & Architectural Debt to Address in Future Phases
