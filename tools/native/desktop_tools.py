@@ -1,5 +1,8 @@
 import os
+import re
 import sys
+import time
+import shutil
 import platform
 import subprocess
 import logging
@@ -8,107 +11,229 @@ from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger("CoreAI.DesktopTools")
 
+
+class AppResolver:
+    """
+    Universal Desktop Application Discovery & Fuzzy Matcher:
+    - Scans Windows Start Menu, Desktops, and App Paths (.lnk shortcuts & executables).
+    - Scans macOS /Applications (.app) and Linux /usr/share/applications (.desktop).
+    - Employs ranked token & substring matching to resolve conversational names
+      (e.g. 'davinci', 'davinci resolve', 'obs', 'discord', 'blender', 'spotify').
+    """
+
+    def __init__(self):
+        self._cache: Dict[str, str] = {}
+        self._last_scan_time: float = 0
+        self._scan_ttl: float = 300.0  # 5 minutes cache
+
+    def scan_installed_apps(self, force: bool = False) -> Dict[str, str]:
+        now = time.time()
+        if self._cache and not force and (now - self._last_scan_time) < self._scan_ttl:
+            return self._cache
+
+        system = platform.system()
+        apps: Dict[str, str] = {}
+
+        if system == "Windows":
+            # 1. Start Menu Shortcuts & Desktops
+            scan_dirs = [
+                r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
+                os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs"),
+                os.path.expandvars(r"%USERPROFILE%\Desktop"),
+                r"C:\Users\Public\Desktop"
+            ]
+            for s_dir in scan_dirs:
+                if os.path.exists(s_dir):
+                    for root, _, files in os.walk(s_dir):
+                        for f in files:
+                            if f.lower().endswith(".lnk"):
+                                base = os.path.splitext(f)[0].lower().strip()
+                                apps[base] = os.path.join(root, f)
+
+            # 2. Registry App Paths
+            try:
+                import winreg
+                for hkey in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+                    try:
+                        with winreg.OpenKey(hkey, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths") as key:
+                            num_subkeys, _, _ = winreg.QueryInfoKey(key)
+                            for i in range(num_subkeys):
+                                try:
+                                    subkey_name = winreg.EnumKey(key, i)
+                                    with winreg.OpenKey(key, subkey_name) as subkey:
+                                        val, _ = winreg.QueryValueEx(subkey, "")
+                                        if val and os.path.exists(val):
+                                            base = os.path.splitext(subkey_name)[0].lower()
+                                            if base not in apps:
+                                                apps[base] = val
+                                except Exception:
+                                    continue
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        elif system == "Darwin":
+            for d in ["/Applications", os.path.expanduser("~/Applications")]:
+                if os.path.exists(d):
+                    for item in os.listdir(d):
+                        if item.endswith(".app"):
+                            base = os.path.splitext(item)[0].lower()
+                            apps[base] = os.path.join(d, item)
+
+        else:  # Linux
+            for d in ["/usr/share/applications", os.path.expanduser("~/.local/share/applications")]:
+                if os.path.exists(d):
+                    for f in os.listdir(d):
+                        if f.endswith(".desktop"):
+                            base = os.path.splitext(f)[0].lower()
+                            apps[base] = os.path.join(d, f)
+
+        self._cache = apps
+        self._last_scan_time = now
+        logger.info(f"Indexed {len(apps)} installed desktop applications.")
+        return apps
+
+    def find_app(self, query: str) -> Optional[str]:
+        q = query.lower().strip()
+        apps = self.scan_installed_apps()
+
+        if q in apps:
+            return apps[q]
+
+        candidates = []
+        q_words = set(re.findall(r'\w+', q))
+
+        for name, path in apps.items():
+            name_words = set(re.findall(r'\w+', name))
+            if name == q:
+                candidates.append((100, -len(name), path))
+            elif name.startswith(q):
+                candidates.append((85, -len(name), path))
+            elif q_words and q_words.issubset(name_words):
+                score = 80 if len(q_words) == len(name_words) else 70
+                candidates.append((score, -len(name), path))
+            elif q in name:
+                candidates.append((60, -len(name), path))
+            elif name in q:
+                candidates.append((50, len(name), path))
+            elif q_words and (q_words & name_words):
+                overlap = len(q_words & name_words)
+                candidates.append((30 + overlap * 5, -len(name), path))
+
+        if candidates:
+            candidates.sort(reverse=True)
+            return candidates[0][2]
+
+        return None
+
+
+_app_resolver = AppResolver()
+
+
 def launch_application(app_name: str, args: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Launches a desktop application on the host machine.
-    Resolves common aliases across Windows, Linux, and macOS.
-    Executes in detached mode so Core AI never blocks or hangs.
+    Dynamically discovers installed programs (.lnk, .exe, .desktop, .app) via AppResolver.
+    Resolves common aliases and handles arbitrary application names.
     """
     name_clean = app_name.lower().strip()
     system = platform.system()
     extra_args = args or []
 
-    # Common cross-platform application aliases
-    app_map_windows = {
-        "youtube": ["cmd.exe", "/c", "start", "https://youtube.com"],
-        "spotify": ["cmd.exe", "/c", "start", "spotify:"],
-        "vscode": ["code"],
-        "code": ["code"],
-        "browser": ["cmd.exe", "/c", "start", "https://google.com"],
-        "chrome": ["chrome"],
-        "firefox": ["firefox"],
-        "edge": ["msedge"],
-        "calculator": ["calc.exe"],
-        "calc": ["calc.exe"],
-        "notepad": ["notepad.exe"],
-        "terminal": ["wt.exe"],
-        "powershell": ["powershell.exe"],
-        "cmd": ["cmd.exe"],
-        "explorer": ["explorer.exe"],
-        "taskmgr": ["taskmgr.exe"],
-        "task manager": ["taskmgr.exe"],
-        "settings": ["cmd.exe", "/c", "start", "ms-settings:"]
+    # 1. Built-in Special Aliases & URI Schemes
+    special_schemes = {
+        "youtube": lambda: subprocess.Popen(["cmd.exe", "/c", "start", "https://youtube.com"] if system == "Windows" else ["xdg-open", "https://youtube.com"]),
+        "spotify": lambda: os.startfile("spotify:") if system == "Windows" else subprocess.Popen(["spotify"]),
+        "calculator": lambda: subprocess.Popen(["calc.exe"] if system == "Windows" else ["gnome-calculator"]),
+        "calc": lambda: subprocess.Popen(["calc.exe"] if system == "Windows" else ["gnome-calculator"]),
+        "notepad": lambda: subprocess.Popen(["notepad.exe"] if system == "Windows" else ["gedit"]),
+        "terminal": lambda: subprocess.Popen(["wt.exe"] if system == "Windows" else ["x-terminal-emulator"]),
+        "powershell": lambda: subprocess.Popen(["powershell.exe"]),
+        "cmd": lambda: subprocess.Popen(["cmd.exe"]),
+        "explorer": lambda: subprocess.Popen(["explorer.exe"] if system == "Windows" else ["xdg-open", "."]),
+        "settings": lambda: os.startfile("ms-settings:") if system == "Windows" else None,
+        "taskmgr": lambda: subprocess.Popen(["taskmgr.exe"]),
+        "task manager": lambda: subprocess.Popen(["taskmgr.exe"]),
     }
 
-    app_map_linux = {
-        "youtube": ["xdg-open", "https://youtube.com"],
-        "spotify": ["spotify"],
-        "vscode": ["code"],
-        "code": ["code"],
-        "browser": ["x-www-browser"],
-        "chrome": ["google-chrome"],
-        "firefox": ["firefox"],
-        "terminal": ["x-terminal-emulator"],
-        "calculator": ["gnome-calculator"],
-        "calc": ["gnome-calculator"],
-        "notepad": ["gedit"],
-        "explorer": ["xdg-open", "."]
-    }
-
-    app_map_darwin = {
-        "youtube": ["open", "https://youtube.com"],
-        "spotify": ["open", "-a", "Spotify"],
-        "vscode": ["code"],
-        "code": ["code"],
-        "browser": ["open", "https://google.com"],
-        "chrome": ["open", "-a", "Google Chrome"],
-        "firefox": ["open", "-a", "Firefox"],
-        "terminal": ["open", "-a", "Terminal"],
-        "calculator": ["open", "-a", "Calculator"],
-        "notepad": ["open", "-a", "TextEdit"],
-        "explorer": ["open", "."]
-    }
-
-    if system == "Windows":
-        cmd_list = app_map_windows.get(name_clean, [name_clean])
-    elif system == "Darwin":
-        cmd_list = app_map_darwin.get(name_clean, ["open", "-a", name_clean])
-    else:
-        cmd_list = app_map_linux.get(name_clean, [name_clean])
-
-    full_cmd = list(cmd_list) + extra_args
-
-    try:
-        # Launch detached/non-blocking
-        if system == "Windows":
-            creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-            subprocess.Popen(full_cmd, shell=False, creationflags=creationflags)
-        else:
-            subprocess.Popen(full_cmd, shell=False, start_new_session=True)
-
-        logger.info(f"Launched application '{app_name}' with command: {full_cmd}")
-        return {
-            "status": "success",
-            "app_name": app_name,
-            "resolved_command": " ".join(full_cmd),
-            "message": f"Successfully launched {app_name} on your workstation"
-        }
-    except Exception as e:
-        # Fallback to shell start
+    if name_clean in special_schemes:
         try:
-            subprocess.Popen(f"start {app_name}" if system == "Windows" else f"xdg-open {app_name}", shell=True)
+            special_schemes[name_clean]()
             return {
                 "status": "success",
                 "app_name": app_name,
-                "message": f"Invoked launch for '{app_name}' via OS shell launcher"
+                "message": f"Successfully launched {app_name} on your workstation"
             }
-        except Exception as e2:
-            logger.error(f"Failed to launch application '{app_name}': {e2}")
+        except Exception as e:
+            logger.debug(f"Special alias launch failed for '{name_clean}': {e}. Falling through to AppResolver.")
+
+    # 2. Universal Installed Application Search (Fuzzy Matcher)
+    resolved_path = _app_resolver.find_app(name_clean)
+    if resolved_path:
+        try:
+            if system == "Windows":
+                # If it's a shortcut (.lnk), invoke via os.startfile (native Windows shell execution)
+                if resolved_path.lower().endswith(".lnk"):
+                    os.startfile(resolved_path)
+                else:
+                    creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                    subprocess.Popen([resolved_path] + extra_args, creationflags=creationflags)
+            elif system == "Darwin":
+                subprocess.Popen(["open", resolved_path] + extra_args)
+            else:
+                subprocess.Popen(["xdg-open", resolved_path] + extra_args)
+
+            logger.info(f"Launched application '{app_name}' via resolved shortcut: {resolved_path}")
             return {
-                "status": "error",
+                "status": "success",
                 "app_name": app_name,
-                "error": str(e2)
+                "resolved_path": resolved_path,
+                "message": f"Successfully launched {app_name} ({os.path.basename(resolved_path)})"
             }
+        except Exception as e:
+            logger.warning(f"Error launching resolved path '{resolved_path}': {e}")
+
+    # 3. System PATH Search (shutil.which)
+    in_path = shutil.which(name_clean) or (shutil.which(f"{name_clean}.exe") if system == "Windows" else None)
+    if in_path:
+        try:
+            if system == "Windows":
+                creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                subprocess.Popen([in_path] + extra_args, creationflags=creationflags)
+            else:
+                subprocess.Popen([in_path] + extra_args, start_new_session=True)
+            return {
+                "status": "success",
+                "app_name": app_name,
+                "resolved_path": in_path,
+                "message": f"Successfully launched {app_name} from system PATH"
+            }
+        except Exception as e:
+            logger.warning(f"Error launching from PATH '{in_path}': {e}")
+
+    # 4. Safe OS Shell Fallback
+    try:
+        if system == "Windows":
+            # Note the empty title string "" so start doesn't treat target as window title
+            subprocess.Popen(f'cmd.exe /c start "" "{name_clean}"', shell=True)
+        elif system == "Darwin":
+            subprocess.Popen(["open", "-a", name_clean])
+        else:
+            subprocess.Popen(["xdg-open", name_clean])
+
+        return {
+            "status": "success",
+            "app_name": app_name,
+            "message": f"Dispatched launch for '{app_name}' to OS shell"
+        }
+    except Exception as e:
+        logger.error(f"Failed to launch application '{app_name}': {e}")
+        return {
+            "status": "error",
+            "app_name": app_name,
+            "error": f"Could not find or launch application '{app_name}': {e}"
+        }
 
 def open_path_in_explorer(path: str) -> Dict[str, Any]:
     """
