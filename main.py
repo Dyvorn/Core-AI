@@ -325,14 +325,15 @@ def run_interactive_repl(
                 zones = state.list_zones()
                 print(f"\n{BRIGHT}--- Dynamically Discovered Spatial Zones ({len(zones)}) ---{RESET}")
                 for z in zones:
-                    print(f"  - {YELLOW}{z['zone_id']:<16}{RESET} Display: {z['display_name']} (Discovered: {z['created_at'][:19]})")
+                    created_str = z.created_at.isoformat()[:19] if hasattr(z.created_at, "isoformat") else str(z.created_at)[:19]
+                    print(f"  - {YELLOW}{z.zone_id:<16}{RESET} Display: {z.display_name} (Discovered: {created_str})")
                 print()
 
             elif cmd_lower.startswith("zone add"):
                 parts = user_input.split(maxsplit=3)
                 if len(parts) >= 3:
                     zid = parts[2]
-                    zname = parts[3] if len(parts) > 3 else zid.title()
+                    zname = parts[3].strip("\"'") if len(parts) > 3 else zid.title()
                     state.ensure_zone_exists(zid, display_name=zname)
                     print(f"{GREEN}[OK] Spatial zone '{zid}' registered.{RESET}")
                 else:
@@ -342,8 +343,8 @@ def run_interactive_repl(
                 devs = state.list_all_devices()
                 print(f"\n{BRIGHT}--- Connected Devices & Trust Topology ({len(devs)}) ---{RESET}")
                 for d in devs:
-                    anchor = "Fixed Anchor" if d["is_fixed_anchor"] else "Roaming"
-                    print(f"  - {CYAN}{d['device_id']:<16}{RESET} Type: {d['device_type']:<12} Zone: {d['current_zone']:<14} Tier: {GREEN}{d['trust_tier']:<8}{RESET} ({anchor})")
+                    anchor = "Fixed Anchor" if d.is_fixed_anchor else "Roaming"
+                    print(f"  - {CYAN}{d.device_id:<16}{RESET} Type: {d.device_type:<12} Zone: {d.current_zone:<14} Tier: {GREEN}{d.trust_tier:<8}{RESET} ({anchor})")
                 print()
 
             elif cmd_lower == "tools":

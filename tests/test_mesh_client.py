@@ -123,3 +123,20 @@ def test_state_manager_set_user_preferred_name(tmp_path):
     assert reloaded.preferred_name == "Bob"
     assert reloaded.aliases == ["Bobby"]
 
+
+def test_record_subscriptability_and_zones(tmp_path):
+    db_path = str(tmp_path / "test_zones.db")
+    state = StateManager(db_path=db_path)
+
+    zone = state.ensure_zone_exists("lab", display_name="Advanced Lab")
+    assert zone["zone_id"] == "lab"
+    assert zone["display_name"] == "Advanced Lab"
+
+    prof = state.get_user_profile()
+    assert prof["user_id"] == "primary_user"
+
+    zones = state.list_zones()
+    assert len(zones) >= 1
+    assert zones[0]["zone_id"] == "lab"
+
+

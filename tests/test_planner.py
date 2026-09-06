@@ -40,3 +40,14 @@ def test_planner_model_availability_check(tmp_path):
     # Health check should return False without crashing
     is_avail = planner.check_model_availability("non_existent/model:offline")
     assert is_avail is False
+
+
+def test_planner_compound_time_and_system_status(tmp_path):
+    registry = ToolRegistry(dynamic_dir=str(tmp_path))
+    planner = Planner(registry=registry)
+    plan = planner.plan_problem("what time is it and check system status")
+    assert len(plan.steps) == 2
+    tool_names = [s.tool_name for s in plan.steps]
+    assert "get_time" in tool_names
+    assert "get_system_status" in tool_names
+

@@ -147,18 +147,8 @@ class Planner:
         pipeline_id = str(uuid.uuid4())
         steps: List[PipelineStep] = []
 
-        # Pattern: Time query ("wie spät ist es", "what time is it")
-        if any(k in goal_lower for k in ["wie spät", "uhrzeit", "what time", "current time", "time is it"]):
-            steps.append(PipelineStep(
-                id="get_time_step",
-                name="Fetch Current Time",
-                tool_name="get_time",
-                arguments={},
-                depends_on=[]
-            ))
-
         # Pattern: System diagnostics (Parallel execution of time + system status)
-        elif any(k in goal_lower for k in ["status", "system", "overview", "diagnos", "gesundheit", "wie geht"]):
+        if any(k in goal_lower for k in ["status", "system", "overview", "diagnos", "gesundheit", "wie geht"]):
             steps.append(PipelineStep(
                 id="get_time_step",
                 name="Fetch Current Time",
@@ -170,6 +160,16 @@ class Planner:
                 id="get_status_step",
                 name="Fetch System Status",
                 tool_name="get_system_status",
+                arguments={},
+                depends_on=[]
+            ))
+
+        # Pattern: Pure Time query ("wie spät ist es", "what time is it")
+        elif any(k in goal_lower for k in ["wie spät", "uhrzeit", "what time", "current time", "time is it"]):
+            steps.append(PipelineStep(
+                id="get_time_step",
+                name="Fetch Current Time",
+                tool_name="get_time",
                 arguments={},
                 depends_on=[]
             ))

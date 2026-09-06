@@ -171,6 +171,9 @@ class ZoneRecord(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item)
+
 
 class UserProfile(BaseModel):
     """Personal identity memory: who the user is, nicknames, preferences, and persona settings."""
@@ -182,7 +185,8 @@ class UserProfile(BaseModel):
     preferences: Dict[str, Any] = Field(default_factory=dict)
     updated_at: datetime = Field(default_factory=utc_now)
 
-
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item)
 
 
 class DeviceTopologyRecord(BaseModel):
@@ -197,6 +201,9 @@ class DeviceTopologyRecord(BaseModel):
     trust_tier: str = "owner"  # 'owner', 'ambient', 'guest'
     last_seen: datetime = Field(default_factory=utc_now)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item)
 
 
 class EdgeNodeRegistration(BaseModel):
