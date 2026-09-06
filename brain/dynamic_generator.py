@@ -38,12 +38,14 @@ class DynamicGenerator:
         registry: ToolRegistry,
         state_manager: Optional[StateManager] = None,
         dynamic_dir: str = "tools/dynamic",
-        model_name: str = "ollama/qwen3.5:2b"
+        model_name: str = "ollama/qwen3.5:2b",
+        model_router: Optional[Any] = None
     ):
         self.registry = registry
         self.state_manager = state_manager or StateManager()
         self.dynamic_dir = dynamic_dir
         self.model_name = model_name
+        self.model_router = model_router
         self.pipeline_logger = get_pipeline_logger()
         os.makedirs(self.dynamic_dir, exist_ok=True)
 
@@ -188,19 +190,27 @@ class DynamicGenerator:
         Attempts LLM code generation first. If LLM is unreachable or fails,
         falls back to deterministic code synthesis template.
         """
+        target_model = self.model_name
+        if self.model_router and hasattr(self.model_router, "get_active_model"):
+            active = self.model_router.get_active_model()
+            if active:
+                target_model = active
+
         # Check if model is available before attempting litellm
         is_model_available = False
-        if "ollama" in self.model_name.lower():
+        if "ollama" in target_model.lower():
             try:
                 import urllib.request
                 with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=0.5) as resp:
                     is_model_available = (resp.status == 200)
             except Exception:
                 is_model_available = False
-        elif "gemini" in self.model_name.lower():
+        elif "gemini" in target_model.lower():
             is_model_available = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
-        elif "openai" in self.model_name.lower():
+        elif "openai" in target_model.lower():
             is_model_available = bool(os.getenv("OPENAI_API_KEY"))
+        elif "anthropic" in target_model.lower():
+            is_model_available = bool(os.getenv("ANTHROPIC_API_KEY"))
 
         if is_model_available:
             try:
@@ -218,9 +228,9 @@ Requirements:
 4. Output ONLY valid Python code enclosed in ```python ... ``` or raw Python code, no conversational filler.
 """
                 response = completion(
-                    model=self.model_name,
+                    model=target_model,
                     messages=[{"role": "user", "content": prompt}],
-                    timeout=5.0
+                    timeout=8.0
                 )
                 raw = response.choices[0].message.content
                 if "```python" in raw:

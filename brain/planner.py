@@ -148,7 +148,15 @@ class Planner:
         Robust heuristic planner that constructs valid execution pipelines with concurrency.
         Specially optimized for natural spoken voice commands and system operations.
         """
-        goal_lower = goal.lower()
+        raw_goal_clean = goal.lower().strip(" .!?")
+        # Strip conversational greeting prefixes if followed by actual commands/questions
+        # e.g. "hi whats the temp in Halle" -> "whats the temp in Halle"
+        core_goal = re.sub(
+            r"^(?:hi|hello|hey|hallo|moin|servus|guten tag|guten morgen|good morning|yo)\b[,\s]*",
+            "",
+            raw_goal_clean
+        ).strip()
+        goal_lower = core_goal if core_goal else raw_goal_clean
         pipeline_id = str(uuid.uuid4())
         steps: List[PipelineStep] = []
 
@@ -178,6 +186,32 @@ class Planner:
                 arguments={},
                 depends_on=[]
             ))
+
+        # Pattern: Weather and Temperature ("whats the temp in Halle", "wie ist das wetter in Berlin")
+        elif any(k in goal_lower for k in ["temp", "temperatur", "weather", "wetter", "grad", "degrees"]):
+            loc_match = re.search(r"(?:in|for|für|im)\s+([a-zA-Z0-9äöüß\s\(\)\-\.]+)", goal, re.IGNORECASE)
+            loc = loc_match.group(1).strip(" .!?") if loc_match else "Berlin"
+            loc = re.sub(r"\b(today|rn|now|right now|heute|aktuell|gerade)\b", "", loc, flags=re.IGNORECASE).strip() or loc
+            steps.append(PipelineStep(
+                id="weather_step",
+                name=f"Fetch Weather for {loc.title()}",
+                tool_name="get_weather",
+                arguments={"location": loc},
+                depends_on=[]
+            ))
+
+        # Pattern: Encyclopedic knowledge / research queries ("who is Albert Einstein", "wer war Mozart", "tell me about Berlin")
+        elif any(goal_lower.startswith(k) for k in ["who is", "who was", "wer ist", "wer war", "tell me about", "erzähl mir von", "erzaehl mir von", "wiki "]) and not any(c in goal for c in ["+", "-", "*", "/"]):
+            clean_q = re.sub(r"^(?:who is|who was|wer ist|wer war|tell me about|erzähl mir von|erzaehl mir von|wiki)\s+", "", goal, flags=re.IGNORECASE).strip(" .!?")
+            if clean_q and len(clean_q) > 2:
+                lang = "de" if any(k in goal_lower for k in ["wer", "erzähl", "erzaehl"]) else "en"
+                steps.append(PipelineStep(
+                    id="knowledge_step",
+                    name=f"Lookup Knowledge on '{clean_q}'",
+                    tool_name="lookup_knowledge",
+                    arguments={"query": clean_q, "language": lang},
+                    depends_on=[]
+                ))
 
         # Pattern: Math computation ("was ist 25 * 4", "berechne 12 + 8")
         elif any(char in goal for char in ["+", "*", "/", "sqrt", "math", "calculate"]) or any(k in goal_lower for k in ["berechne", "calculate", "wie viel ist", "was ist"]):
@@ -259,10 +293,10 @@ class Planner:
                 depends_on=[]
             ))
 
-        # Pattern: Conversational greetings / dialogue
-        elif any(goal_lower == g or goal_lower.startswith(f"{g} ") for g in [
+        # Pattern: Pure conversational greetings (no command or question attached)
+        elif raw_goal_clean in [
             "hi", "hello", "hey", "hallo", "moin", "servus", "guten tag", "guten morgen", "good morning", "yo"
-        ]):
+        ] or raw_goal_clean in [f"hey {a}" for a in ["core", "core ai", "assistant"]] or raw_goal_clean in [f"hallo {a}" for a in ["core", "core ai", "assistant"]]:
             # Conversational greetings require no tool steps
             pass
 
@@ -326,10 +360,13 @@ Available Tools Catalog:
 Guidelines:
 1. Deep Contextual Reasoning:
    - If the user asks about an appliance or device state (e.g. 'what is in my fridge?'), first consider if that device is registered in Core AI. If not, use local network discovery tools ('scan_local_network', 'inspect_lan_device') or home assistant tools to find and inspect it.
-2. If solving the goal requires system actions or inspections, output structured DAG 'steps'.
+2. If solving the goal requires system actions, environment sensing, or external lookups, output structured DAG 'steps'.
    - Independent steps MUST have empty `depends_on` so they execute in parallel!
    - If a step needs output from an earlier step, use `{{{{steps.earlier_step_id.output.fieldName}}}}` in arguments.
-3. If the user asks an open-ended conversational question, knowledge query, or reasoning task that requires NO external tool actions, provide a direct answer in 'direct_response' with an empty 'steps' array.
+3. For live weather, temperatures, encyclopedic knowledge, calculations, or system status:
+   - Always synthesize appropriate DAG steps using registered tools ('get_weather', 'lookup_knowledge', 'get_time', 'calculate_math', 'get_system_status') to retrieve authoritative facts.
+4. For general conversational questions, advice, explanations, reasoning, or creative dialogue where NO external tool is required:
+   - Provide an insightful, charismatic, and concise answer directly in 'direct_response' with an empty 'steps' array. Act like Jarvis: be competent, articulate, and never refuse to answer or output canned disclaimers if you possess the intelligence to answer.
 
 Output ONLY a JSON object matching this schema:
 {{
@@ -415,18 +452,29 @@ Do NOT output any markdown formatting or commentary outside the JSON.
             )
             language = "de" if is_german else "en"
 
-        # Conversational greetings & pleasantries
+        # 1. Direct response from LLM (general reasoning / questions / knowledge answers)
+        # Always prioritize the model's formulated answer if present!
+        if plan.context.get("direct_response"):
+            return str(plan.context["direct_response"])
+
+        # 2. Conversational greetings & pleasantries (ONLY when no direct answer and no steps)
         clean_goal = goal_text.strip(" .!?")
-        greetings = ["hi", "hello", "hey", "hallo", "moin", "servus", "guten tag", "guten morgen", "good morning", "good evening", "guten abend", "yo"]
-        if clean_goal in greetings or any(clean_goal.startswith(f"{g} ") for g in greetings) or any(clean_goal == f"hey {a}" for a in ["core", "core ai", "assistant"]):
+        greetings = [
+            "hi", "hello", "hey", "hallo", "moin", "servus", "guten tag",
+            "guten morgen", "good morning", "good evening", "guten abend", "yo", "sup"
+        ]
+        is_pure_greeting = (
+            clean_goal in greetings or
+            clean_goal in [f"hey {a}" for a in ["core", "core ai", "assistant"]] or
+            clean_goal in [f"hallo {a}" for a in ["core", "core ai", "assistant"]] or
+            clean_goal in [f"hi {a}" for a in ["core", "core ai", "assistant"]] or
+            clean_goal in [f"hello {a}" for a in ["core", "core ai", "assistant"]]
+        )
+        if is_pure_greeting and not plan.steps:
             if language == "de":
                 return f"Hallo {name}! Bereit und online. Was steht an?"
             else:
                 return f"Hey {name}! Online and ready. What are we working on?"
-
-        # Direct response from LLM (general reasoning / questions)
-        if plan.context.get("direct_response"):
-            return str(plan.context["direct_response"])
 
         # Offline AI Notice handling (when no model is connected)
         if plan.context.get("offline_ai_notice"):
@@ -553,6 +601,35 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                 return f"Alles klar {name}, Standort auf {target_name} aktualisiert. Audio und Anzeigen wurden umgestellt."
             else:
                 return f"Understood {name}. Updated your location to the {target_name}. Audio and display context re-routed."
+
+        # 8. Real-Time Weather & Temperature
+        if "get_weather" in step_outputs:
+            w_res = step_outputs["get_weather"]
+            if isinstance(w_res, dict) and w_res.get("status") == "success":
+                loc = w_res.get("resolved_location") or w_res.get("query_location")
+                temp_c = w_res.get("temperature_c")
+                cond = w_res.get("condition", "Clear")
+                if language == "de":
+                    return f"In {loc} sind es aktuell {temp_c} °C bei {cond.lower()}, {name}."
+                else:
+                    return f"In {loc}, it is currently {temp_c}°C with {cond.lower()}, {name}."
+            elif isinstance(w_res, dict) and w_res.get("message"):
+                return f"Weather update: {w_res['message']}"
+
+        # 9. Encyclopedic Knowledge & Research
+        if "lookup_knowledge" in step_outputs:
+            k_res = step_outputs["lookup_knowledge"]
+            if isinstance(k_res, dict) and k_res.get("status") == "success":
+                topic = k_res.get("topic", "")
+                summary = k_res.get("summary", "")
+                sentences = re.split(r"(?<=[.!?])\s+", summary)
+                concise_summary = " ".join(sentences[:2]) if len(sentences) > 1 else summary
+                if language == "de":
+                    return f"Zu {topic}: {concise_summary}"
+                else:
+                    return f"Regarding {topic}: {concise_summary}"
+            elif isinstance(k_res, dict) and k_res.get("message"):
+                return str(k_res["message"])
 
         # Fallback if no specific step outputs were generated (unregistered tool capability)
         if not step_outputs:

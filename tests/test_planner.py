@@ -136,6 +136,63 @@ def test_planner_spatial_relocation(tmp_path):
     assert plan_de.steps[0].tool_name == "relocate_operator"
     assert plan_de.steps[0].arguments["target_zone"] == "büro"
 
+def test_weather_and_knowledge_tools(tmp_path):
+    from main import setup_tools
+    from core.state import StateManager
+    from core.schemas import UserProfile, PipelinePlan, PipelineStep
+    db_path = str(tmp_path / "test_weather.db")
+    state = StateManager(db_path=db_path)
+    registry = setup_tools(state=state)
+    planner = Planner(registry=registry, state_manager=state)
+
+    # 1. Weather tool execution
+    w_res = registry.execute_tool("get_weather", {"location": "Halle (Saale)"})
+    assert w_res.success is True
+    assert isinstance(w_res.output, dict)
+    assert w_res.output["status"] == "success"
+    assert "temperature_c" in w_res.output
+
+    # 2. Weather spoken formulation
+    plan_w = PipelinePlan(
+        goal="whats the temp in Halle (Saale)",
+        steps=[PipelineStep(
+            id="w1", name="Weather", tool_name="get_weather",
+            arguments={"location": "Halle (Saale)"}, status="completed",
+            output=w_res.output
+        )],
+        status="completed"
+    )
+    spoken_w = planner.formulate_spoken_response(plan_w, profile=UserProfile(preferred_name="Dyvorn"))
+    assert "Halle" in spoken_w
+    assert "°C" in spoken_w or "degrees" in spoken_w
+
+    # 3. Knowledge tool execution
+    k_res = registry.execute_tool("lookup_knowledge", {"query": "Albert Einstein", "language": "en"})
+    assert k_res.success is True
+    assert isinstance(k_res.output, dict)
+    assert k_res.output["status"] == "success"
+    assert "Albert Einstein" in k_res.output["topic"]
+
+def test_greeting_override_prevention(tmp_path):
+    from main import setup_tools
+    from core.state import StateManager
+    from core.schemas import UserProfile, PipelinePlan
+    db_path = str(tmp_path / "test_greet.db")
+    state = StateManager(db_path=db_path)
+    registry = setup_tools(state=state)
+    planner = Planner(registry=registry, state_manager=state)
+
+    # If an LLM returns a direct response, a query starting with 'hi' must NOT return a generic greeting
+    plan = PipelinePlan(
+        goal="hi what is the capital of France?",
+        steps=[],
+        context={"direct_response": "The capital of France is Paris."},
+        status="completed"
+    )
+    spoken = planner.formulate_spoken_response(plan, profile=UserProfile(preferred_name="Dyvorn"))
+    assert spoken == "The capital of France is Paris."
+    assert "Online and ready" not in spoken
+
 
 
 

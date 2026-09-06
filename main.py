@@ -23,6 +23,8 @@ from tools.native.home_assistant import HomeAssistantMock, ha_call_schema
 from tools.native.file_tools import read_text_file, read_file_schema, write_text_file, write_file_schema, list_dir_contents, list_dir_schema
 from tools.native.math_tools import calculate_math, calculate_math_schema, summarize_numbers, summarize_numbers_schema
 from tools.native.network_tools import scan_local_network, scan_local_network_schema, inspect_lan_device, inspect_lan_device_schema
+from tools.native.weather_tools import get_weather, weather_schema
+from tools.native.knowledge_tools import lookup_knowledge, knowledge_schema
 from tools.remote_dispatcher import RemoteToolDispatcher
 from brain.dynamic_generator import DynamicGenerator
 from brain.pipeline_engine import PipelineEngine
@@ -171,6 +173,10 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
     # Network & Device Topology Introspection Tools
     registry.register_tool("scan_local_network", scan_local_network, scan_local_network_schema)
     registry.register_tool("inspect_lan_device", inspect_lan_device, inspect_lan_device_schema)
+
+    # Real-Time Weather and Encyclopedic Knowledge Tools
+    registry.register_tool("get_weather", get_weather, weather_schema)
+    registry.register_tool("lookup_knowledge", lookup_knowledge, knowledge_schema)
 
     def list_registered_devices(zone_filter: Optional[str] = None):
         mgr = state or StateManager()
@@ -721,7 +727,7 @@ def main():
 
     # 3. Model Router & Brain
     model_router = ModelRouter(state_manager=state)
-    dyn_gen = DynamicGenerator(registry=registry, state_manager=state)
+    dyn_gen = DynamicGenerator(registry=registry, state_manager=state, model_router=model_router)
     planner = Planner(registry=registry, state_manager=state, dynamic_generator=dyn_gen, model_router=model_router)
     engine = PipelineEngine(registry=registry, state_manager=state, bus=bus)
     spoken_to = SpokenToReasoning(state_manager=state, registry=registry, planner=planner)
