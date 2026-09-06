@@ -11,7 +11,7 @@
 ```
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 56/56 TESTS PASSED ]  [ PYTHON: 3.13+ ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 68/68 TESTS PASSED ]  [ PYTHON: 3.13+ ]
 [ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]     [ ETHOS: #ANTISLOP ]
 ```
 
@@ -88,6 +88,7 @@ Core AI is built around a non-negotiable sovereign identity and purpose:
   - [Jarvis-Like Failure Awareness](#4-jarvis-like-failure-awareness)
   - [Multi-Sink Logging & Audit Trails](#5-multi-sink-logging--audit-trails)
   - [Spatial Audio Routing & Cross-Zone Handoff](#6-spatial-audio-routing--cross-zone-handoff)
+  - [Sovereign Reasoning & Execution Harness](#7-sovereign-reasoning--execution-harness)
 - [Repository Structure](#repository-structure)
 - [Ubiquitous Device & Zone Ecosystem](#ubiquitous-device--zone-ecosystem)
 - [Multi-Platform & Operating System Strategy](#multi-platform--operating-system-strategy)
@@ -251,6 +252,20 @@ Core AI enforces three immutable security tiers:
 - Seamlessly transfers active microphone and speaker streams when the operator moves between spaces (`SpatialHandoffEvent`).
 - Dispatches ambient greeting and status HUD cards to the destination mirror or wall projection.
 
+### 7. Sovereign Reasoning & Execution Harness
+- **File References**: [brain/planner.py](brain/planner.py), [brain/safety.py](brain/safety.py), [brain/model_router.py](brain/model_router.py), [tools/native/weather_tools.py](tools/native/weather_tools.py), [tools/native/knowledge_tools.py](tools/native/knowledge_tools.py)
+- The execution harness wraps neural and heuristic models within a deterministic, sandboxed, and presence-aware operating runtime:
+  1. **Intent Normalization & Prefix Stripping**: Conversational greetings and casual fillers (`"hi, "`, `"hey core, "`, `"hallo, "`) are stripped from the core intent so questions like `"hi whats the temp in Halle (Saale)"` are planned accurately without triggering canned greeting overrides.
+  2. **Verbal Spatial Relocation**: Natural relocation commands (e.g. `"I'm in the office rn"`, `"ich bin jetzt im büro"`, `"moved to kitchen"`) dynamically synthesize a relocation step, re-route audio streams, dispatch ambient HUD cards, and update the interactive prompt (`Core [Dyvorn@office] >`).
+  3. **The #ANTISLOP Anti-Hallucination Invariant**: When external hardware or integrations are missing (e.g. smart fridge), Core AI refuses to fabricate tool steps or hallucinate false data. Instead, it inspects the physical LAN via ARP/IP scanning (`scan_local_network`, `inspect_lan_device`) to search for smart hardware, or provides an honest, polite offline notification when no AI model is connected.
+  4. **Harm-Free Unstoppable Agency (`SafetyGate`)**: Protects against catastrophic system destruction (`format c:`, `rm -rf /`, fork bombs) while leaving ordinary human tasks completely unhindered by artificial corporate moralizing.
+  5. **Thinking Model Safeguards**: Generous token headroom (`1024` tokens) and `finish_reason` safety checks prevent reasoning models with internal chain-of-thought tokens (such as Gemini 2.5 Flash Thinking) from cutting off spoken sentences mid-speech.
+  6. **Real-Time World & Network Sensing**:
+     - `get_weather`: Free, zero-auth global weather, temperature (°C/°F), conditions, humidity, and wind via Open-Meteo.
+     - `lookup_knowledge`: Factual encyclopedic summaries via Wikipedia (EN/DE).
+     - `scan_local_network` & `inspect_lan_device`: Local hardware discovery and edge node inspection.
+  7. **Harness Diagnostic Command (`harness` / `eval`)**: Live multi-subsystem diagnostic in the Core Terminal evaluating State Manager, Tool Registry, Model Router, EventBus, Audio Matrix, Safety Gate, and Universal Gateway in one command.
+
 ---
 
 ## Repository Structure
@@ -310,22 +325,30 @@ Core AI/
 |   +-- native/                 # Built-in native tools
 |   |   +-- file_tools.py       # File reading, writing, and directory listing
 |   |   +-- home_assistant.py   # Home Assistant smart device integration mock
+|   |   +-- knowledge_tools.py  # Factual encyclopedic summaries via Wikipedia
 |   |   +-- math_tools.py       # Safe mathematical evaluation & statistics
+|   |   +-- network_tools.py    # ARP/IP local network scan & device discovery
 |   |   +-- spatial_tools.py    # Spatial audio routing tool for autonomous planner
 |   |   +-- system_tools.py     # System time and platform status
+|   |   +-- weather_tools.py    # Real-time weather & temperature via Open-Meteo
 |   +-- registry.py             # Dynamic tool registry, catalog introspection, & safe execution
-+-- tests/                      # Automated Test Suite (pytest, 42/42 tests passing)
++-- tests/                      # Automated Test Suite (pytest, 68/68 tests passing)
 |   +-- test_bus.py             # EventBus pub/sub and in-memory queue tests
 |   +-- test_dynamic_generator.py # AST security validation & sandbox execution tests
 |   +-- test_gateway.py         # REST & WebSocket endpoint tests
 |   +-- test_logging.py         # JSONL pipeline audit and logger tests
+|   +-- test_mesh_client.py     # Intercontinental mesh, export/import & offline tests
+|   +-- test_model_router.py    # Dynamic provider auto-discovery & role routing tests
 |   +-- test_pipeline_engine.py # DAG concurrency, variable piping, and retry tests
-|   +-- test_planner.py         # Introspection, gap detection, and model availability tests
+|   +-- test_planner.py         # Introspection, gap detection, weather, & relocation tests
 |   +-- test_proactive.py       # Proactive daemon condition-action watcher tests
 |   +-- test_registry.py        # Tool discovery, catalog schemas, and execution timing tests
-|   +-- test_spatial.py         # Spatial context, dynamic zones, and security tiers tests
+|   +-- test_remote_dispatcher.py # Distributed RPC edge tool dispatch tests
+|   +-- test_safety.py          # SafetyGate catastrophic protection & agency tests
+|   +-- test_service_and_updater.py # Lifecycle, PID, and update guard tests
 |   +-- test_spatial_audio.py   # Dynamic audio routing, handoff, and soundcard tests
-|   +-- test_voice_pipeline.py  # Voice input initialization tests
+|   +-- test_spoken_to.py       # Discourse posture, showcase, and bystander tests
+|   +-- test_voice_pipeline.py  # Voice input, STT, and neural TTS synthesis tests
 +-- core_ai.db                  # SQLite database (pipelines, steps, dynamic tools, audio routes)
 +-- requirements.txt            # Python dependencies
 +-- main.py                     # Core AI microkernel runtime entrypoint
@@ -611,6 +634,7 @@ Inside the terminal shell (`Core [Operator@zone] > `), type any natural language
 | `hud <title> \| <body>` | Dispatch ambient HUD card to smart mirror / wall projection |
 | `logs [count]` | View recent execution audit logs stored in SQLite |
 | `proactive` | Trigger proactive state evaluation cycle on demand |
+| `harness / eval` | Run live reasoning & execution harness diagnostic across all subsystems |
 | `clear` | Clear terminal screen |
 | `exit / quit` | Cleanly terminate all background servers, audio threads, and bus |
 
@@ -629,7 +653,7 @@ Whenever you want to start, stop, or manage Core AI:
   .\core.bat status      # Inspect process PID, memory usage, and health
   .\core.bat stop        # Stop server suite and free GPU / RAM (for video editing)
   .\core.bat update      # Update from GitHub with automated test guard
-  .\core.bat test        # Run pytest test suite (55+ tests)
+  .\core.bat test        # Run pytest test suite (68+ tests)
   .\core.bat uninstall   # Clean zero-residue uninstallation
 
   # Linux / macOS

@@ -21,10 +21,10 @@ class SafetyGate:
     ]
 
     DESTRUCTIVE_PATTERNS = [
-        r"\brm\s+-rf\s+/\b",
-        r"\bformat\s+[c-z]:\b",
-        r"\b(dd\s+if=.*of=/dev/[a-z]+)\b",
-        r"\b(:(){ :\|:& };:)\b"  # Fork bomb
+        r"\brm\s+-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*\s+(?:/|\*)",
+        r"\bformat\s+[a-zA-Z]:",
+        r"\b(dd\s+if=.*of=/dev/[a-z]+)",
+        r":\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:"  # Fork bomb
     ]
 
     def requires_confirmation(self, tool_name: str, args: Dict[str, Any]) -> bool:

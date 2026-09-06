@@ -9,6 +9,7 @@ from core.state import StateManager
 from core.logging_setup import get_pipeline_logger
 from tools.registry import ToolRegistry
 from brain.dynamic_generator import DynamicGenerator
+from brain.safety import SafetyGate
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,8 @@ class Planner:
         fallback_model: str = "gemini/gemini-2.5-flash",
         state_manager: Optional[StateManager] = None,
         dynamic_generator: Optional[DynamicGenerator] = None,
-        model_router: Optional[Any] = None
+        model_router: Optional[Any] = None,
+        safety_gate: Optional[SafetyGate] = None
     ):
         self.registry = registry
         self.state_manager = state_manager or StateManager()
@@ -38,6 +40,7 @@ class Planner:
         self.model_name = model_name
         self.fallback_model = fallback_model
         self.dynamic_generator = dynamic_generator or DynamicGenerator(registry=self.registry, state_manager=self.state_manager)
+        self.safety_gate = safety_gate or SafetyGate()
         self.pipeline_logger = get_pipeline_logger()
         self._model_status_cache: Dict[str, bool] = {}
 
@@ -60,6 +63,19 @@ class Planner:
         """
         clean_goal, active_model = self.model_router.resolve_model(goal, context=context, role="planner")
         target_goal = clean_goal or goal
+
+        # 0. SafetyGate validation against catastrophic destruction
+        is_harmful, reason = self.safety_gate.is_harmful_action(target_goal)
+        if is_harmful:
+            logger.warning(f"Catastrophic safety pattern intercepted by SafetyGate: '{target_goal}'")
+            return PipelinePlan(
+                id=str(uuid.uuid4()),
+                goal=target_goal,
+                steps=[],
+                context={"direct_response": f"Action rejected: {reason}"},
+                status="failed",
+                error_summary=reason
+            )
 
         logger.info(f"Planning solution for goal: '{target_goal}' (model: '{active_model or 'heuristic'}')")
         self.pipeline_logger.log_event("PLANNING_STARTED", {
