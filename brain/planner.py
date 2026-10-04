@@ -27,8 +27,8 @@ class Planner:
     def __init__(
         self,
         registry: ToolRegistry,
-        model_name: str = "ollama/qwen3.5:2b",
-        fallback_model: str = "gemini/gemini-2.5-flash",
+        model_name: Optional[str] = None,
+        fallback_model: Optional[str] = None,
         state_manager: Optional[StateManager] = None,
         dynamic_generator: Optional[DynamicGenerator] = None,
         model_router: Optional[Any] = None,
@@ -38,6 +38,8 @@ class Planner:
         self.state_manager = state_manager or StateManager()
         from brain.model_router import ModelRouter
         self.model_router = model_router or ModelRouter(state_manager=self.state_manager)
+        if model_name is None and (os.getenv("CORE_FORCE_HEURISTIC") == "1" or os.getenv("PYTEST_CURRENT_TEST")):
+            model_name = "heuristic"
         self.model_name = model_name
         self.fallback_model = fallback_model
         self.dynamic_generator = dynamic_generator or DynamicGenerator(registry=self.registry, state_manager=self.state_manager)
@@ -54,6 +56,10 @@ class Planner:
 
     def get_active_model(self, context: Optional[Dict[str, Any]] = None) -> Optional[str]:
         """Returns the primary model if online, then fallback model, or None if fully offline."""
+        if self.model_name == "heuristic":
+            return None
+        if self.model_name:
+            return self.model_name if self.check_model_availability(self.model_name) else None
         _, resolved = self.model_router.resolve_model(goal="", context=context, role="planner")
         return resolved
 
@@ -62,7 +68,13 @@ class Planner:
         Main entrypoint: analyzes problem against available tools, identifies missing capabilities,
         synthesizes dynamic tools if necessary, and produces an executable PipelinePlan DAG.
         """
-        clean_goal, active_model = self.model_router.resolve_model(goal, context=context, role="planner")
+        if self.model_name == "heuristic":
+            clean_goal, active_model = goal, None
+        elif self.model_name:
+            clean_goal = goal
+            active_model = self.model_name if self.check_model_availability(self.model_name) else None
+        else:
+            clean_goal, active_model = self.model_router.resolve_model(goal, context=context, role="planner")
         target_goal = clean_goal or goal
 
         # 0. SafetyGate validation against catastrophic destruction
@@ -93,10 +105,34 @@ class Planner:
         # Re-fetch catalog in case dynamic tools were just added
         catalog = self.registry.get_tool_catalog()
 
+        # 1.5 Instant Deterministic Dispatch for Routine Operations:
+        # Bypasses local LLM cold-start latency for unambiguous routine operational tasks
+        ctx = dict(context or {})
+        heuristic_plan = self._heuristic_generate_plan(target_goal, catalog, dict(ctx))
+        routine_tools = {
+            "get_time", "calculate_math", "media_control", "launch_application",
+            "lock_workstation", "take_screenshot", "open_youtube", "open_path_in_explorer",
+            "relocate_operator"
+        }
+        is_routine_action = (
+            len(heuristic_plan.steps) == 1 and
+            heuristic_plan.steps[0].tool_name in routine_tools and
+            not ctx.get("force_llm")
+        )
+        if is_routine_action:
+            heuristic_plan.context["mode"] = "instant_heuristic"
+            logger.info(f"Instant deterministic dispatch for routine goal: '{target_goal}' (tool: {heuristic_plan.steps[0].tool_name})")
+            self.pipeline_logger.log_event("PLAN_GENERATED", {
+                "mode": "instant_heuristic",
+                "step_count": len(heuristic_plan.steps),
+                "steps": [s.model_dump() for s in heuristic_plan.steps]
+            }, pipeline_id=heuristic_plan.id)
+            return heuristic_plan
+
         # 2. Decompose into PipelinePlan using LLM or Heuristic Engine
         if active_model:
             try:
-                plan = self._llm_generate_plan(target_goal, catalog, active_model, context or {})
+                plan = self._llm_generate_plan(target_goal, catalog, active_model, ctx)
                 if plan and (plan.steps or plan.context.get("direct_response")):
                     if not plan.steps:
                         plan.status = "completed"
@@ -186,6 +222,7 @@ class Planner:
         Robust heuristic planner that constructs valid execution pipelines with concurrency.
         Specially optimized for natural spoken voice commands and system operations.
         """
+        context = dict(context or {})
         raw_goal_clean = goal.lower().strip(" .!?")
         # Strip conversational greeting prefixes if followed by actual commands/questions
         # e.g. "hi whats the temp in Halle" -> "whats the temp in Halle"
@@ -492,7 +529,7 @@ Output ONLY a JSON object matching this schema:
 }}
 Do NOT output any markdown formatting or commentary outside the JSON.
 """
-        call_timeout = 60.0 if "ollama" in model.lower() else 20.0
+        call_timeout = 120.0 if "ollama" in model.lower() else 25.0
         kwargs: Dict[str, Any] = {"timeout": call_timeout, "num_retries": 0}
         if "ollama" in model.lower():
             kwargs["api_base"] = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
@@ -504,13 +541,37 @@ Do NOT output any markdown formatting or commentary outside the JSON.
             ],
             **kwargs
         )
-        content = response.choices[0].message.content.strip()
+        choice = response.choices[0]
+        content = (choice.message.content or "").strip()
+        # If content is empty but model provided reasoning_content (e.g. reasoning models)
+        if not content and hasattr(choice.message, "reasoning_content"):
+            content = (choice.message.reasoning_content or "").strip()
+
+        # Strip <think>...</think> reasoning traces if present
+        raw_text_without_think = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+        if raw_text_without_think:
+            content = raw_text_without_think
+
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
             content = content.split("```")[1].split("```")[0].strip()
 
-        data = json.loads(content)
+        # Robust JSON extraction between outermost { and }
+        start_idx = content.find("{")
+        end_idx = content.rfind("}")
+        json_candidate = ""
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            json_candidate = content[start_idx:end_idx + 1].strip()
+
+        data = {}
+        if json_candidate:
+            try:
+                data = json.loads(json_candidate)
+            except Exception as jde:
+                logger.warning(f"JSON parsing notice on model output ({jde}). Attempting fallback extraction.")
+                data = {}
+
         raw_steps = data.get("steps", [])
         steps = []
         for s in raw_steps:
@@ -540,6 +601,12 @@ Do NOT output any markdown formatting or commentary outside the JSON.
 
         if data.get("direct_response"):
             context["direct_response"] = data["direct_response"]
+        elif not steps and content:
+            # If the model answered in natural language rather than strict JSON, preserve its answer directly
+            clean_direct = content.replace("```json", "").replace("```", "").strip()
+            if clean_direct and not (clean_direct.startswith("{") and clean_direct.endswith("}")):
+                context["direct_response"] = clean_direct
+
         return PipelinePlan(
             goal=goal,
             steps=steps,
@@ -640,9 +707,18 @@ Do NOT output any markdown formatting or commentary outside the JSON.
         step_outputs = {s.tool_name: s.output for s in plan.steps if s.status == "completed"}
 
         # Dynamic LLM Spoken Synthesis: If an active model is available and tools produced outputs,
-        # have the neural model synthesize a natural, conversational spoken summary
+        # have the neural model synthesize a natural, conversational spoken summary for complex/multi-step flows.
+        # Routine operational tools and instant heuristic plans bypass this to provide instantaneous sub-second response.
         active_model = self.get_active_model()
-        if active_model and step_outputs:
+        is_instant = plan.context.get("mode") == "instant_heuristic"
+        routine_deterministic_tools = {
+            "get_time", "calculate_math", "media_control", "launch_application",
+            "open_path_in_explorer", "lock_workstation", "take_screenshot",
+            "relocate_operator", "open_youtube"
+        }
+        is_pure_routine = bool(step_outputs) and all(t in routine_deterministic_tools for t in step_outputs.keys())
+
+        if active_model and step_outputs and not is_instant and not is_pure_routine:
             try:
                 from litellm import completion  # type: ignore
                 synth_prompt = (
@@ -652,11 +728,17 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                     f"Formulate a concise, natural, spoken response (1 to 2 sentences max) in {language}. "
                     f"Provide clear, direct insight based on the tool results. Do not include markdown formatting, bullet points, or JSON."
                 )
+                call_kwargs: Dict[str, Any] = {
+                    "max_tokens": 256,
+                    "timeout": 30.0 if "ollama" in active_model.lower() else 15.0
+                }
+                if "ollama" in active_model.lower():
+                    call_kwargs["api_base"] = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+
                 resp = completion(
                     model=active_model,
                     messages=[{"role": "system", "content": synth_prompt}],
-                    max_tokens=1024,
-                    timeout=12.0
+                    **call_kwargs
                 )
                 first_choice = resp.choices[0]
                 spoken_text = first_choice.message.content.strip()

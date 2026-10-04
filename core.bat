@@ -1,5 +1,8 @@
 @echo off
 setlocal
+chcp 65001 >nul 2>&1
+set "PYTHONIOENCODING=utf-8"
+set "PYTHONUTF8=1"
 
 set "ROOT=%~dp0"
 cd /d "%ROOT%"
@@ -19,6 +22,8 @@ if /i "%~1"=="setup" goto setup
 if /i "%~1"=="stop" goto stop
 if /i "%~1"=="restart" goto restart
 if /i "%~1"=="status" goto status
+if /i "%~1"=="models" goto models
+if /i "%~1"=="model" goto models
 if /i "%~1"=="account" goto account
 if /i "%~1"=="reset" goto reset
 if /i "%~1"=="logo" goto logo
@@ -56,6 +61,10 @@ goto :eof
 
 :status
 "%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); s.print_status_card()"
+goto :eof
+
+:models
+"%PYTHON%" -c "from brain.model_router import ModelRouter; from core.state import StateManager; r = ModelRouter(StateManager()); s = r.get_status_summary(); print('\n--- Configured AI Providers & Models ---'); [print(f'  - {p:<16}: [ONLINE]' if v else f'  - {p:<16}: [OFFLINE]') for p, v in s['configured_providers'].items()]; m_list = s.get('ollama_models', []); (lambda: print(f'    Installed in Ollama: {\", \".join(m_list)}'))() if m_list else None; print('\n--- Active Model Roles ---'); [print(f'  - {role:<16}: {info[\"model\"]}') for role, info in s['roles'].items()]; print()"
 goto :eof
 
 :account

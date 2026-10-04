@@ -12,6 +12,18 @@ from dotenv import load_dotenv
 # Ensure project root is on sys.path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
+# Force UTF-8 encoding on standard streams to prevent Windows cp1252 UnicodeEncodeError with local LLMs
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from core.logging_setup import setup_logging
 from core.bus import EventBus
 from core.schemas import TextEvent, CommandEvent, AdaptiveResponseEvent, TTSRequestEvent
@@ -626,19 +638,26 @@ def run_interactive_repl(
                     print(f"  {dyn_flag}{t['name']:<24} {t.get('description', '')[:50]}")
                 print()
 
-            elif cmd_lower == "models":
+            elif cmd_lower in ["models", "model", "providers"]:
                 summary = model_router.get_status_summary()
                 print(f"\n{BRIGHT}--- Configured AI Providers & Models ---{RESET}")
                 for prov, enabled in summary["configured_providers"].items():
                     col = GREEN if enabled else YELLOW
                     status_lbl = "Configured / Online" if enabled else "Not Configured / Offline"
-                    print(f"  - {prov:<16} : [{col}{status_lbl}{RESET}]")
+                    extra = ""
+                    if prov == "ollama_local" and enabled:
+                        m_list = summary.get("ollama_models", [])
+                        if m_list:
+                            extra = f" (Installed: {', '.join(m_list)})"
+                    print(f"  - {prov:<16} : [{col}{status_lbl}{RESET}]{extra}")
                 print(f"\n{BRIGHT}--- Active Model Roles & Assignments ---{RESET}")
                 for role, info in summary["roles"].items():
                     col = GREEN if info["online"] else YELLOW
                     status_lbl = "ONLINE" if info["online"] else "OFFLINE (Heuristic Fallback)"
                     print(f"  - {role:<16} : {CYAN}{info['model']:<26}{RESET} [{col}{status_lbl}{RESET}]")
-                print()
+                print(f"\n  To assign a model:")
+                print(f"    model set planner <model_name>   (e.g. model set planner ollama/qwen3.5:2b)")
+                print(f"    model set deep_reasoning <model> (e.g. model set deep_reasoning gemini/gemini-2.5-pro)\n")
 
             elif cmd_lower.startswith("model set"):
                 parts = user_input.split(maxsplit=3)

@@ -330,16 +330,28 @@ Output a JSON object ONLY with:
   "rationale": "one sentence explanation"
 }}
 """
+        call_kwargs: Dict[str, Any] = {
+            "timeout": 20.0 if "ollama" in model.lower() else 5.0
+        }
+        if "ollama" in model.lower():
+            call_kwargs["api_base"] = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+
         response = completion(
             model=model,
             messages=[{"role": "user", "content": prompt}],
-            timeout=3.0
+            **call_kwargs
         )
         content = response.choices[0].message.content.strip()
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
             content = content.split("```")[1].split("```")[0].strip()
+
+        # Robust extraction: outermost { ... }
+        start_idx = content.find("{")
+        end_idx = content.rfind("}")
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            content = content[start_idx:end_idx + 1].strip()
 
         data = json.loads(content)
         role = DiscourseRole(data.get("discourse_role", "bystander"))

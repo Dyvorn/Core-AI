@@ -221,6 +221,15 @@ class ModelRouter:
             self._status_cache[model] = False
             return False
 
+    def is_ollama_online(self) -> bool:
+        """Returns True if the local Ollama server is running and reachable."""
+        return self.check_model_availability("ollama/default")
+
+    def get_installed_ollama_models(self) -> List[str]:
+        """Returns list of installed model names from local Ollama instance."""
+        self.check_model_availability("ollama/default")
+        return list(self._ollama_models or [])
+
     def resolve_model(
         self,
         goal: str,
@@ -267,11 +276,12 @@ class ModelRouter:
             return clean_goal, fallback_model
 
         # 5. Dynamic provider discovery: Check if any other provider is configured or Ollama is online
+        first_ollama = f"ollama/{self._ollama_models[0]}" if self._ollama_models else "ollama/default"
         candidate_providers = [
             ("gemini/gemini-2.5-flash", bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))),
             ("openai/gpt-4o-mini", bool(os.getenv("OPENAI_API_KEY"))),
             ("anthropic/claude-3-5-sonnet-20241022", bool(os.getenv("ANTHROPIC_API_KEY"))),
-            ("ollama/llama3", self.check_model_availability("ollama/test")),
+            (first_ollama, self.is_ollama_online()),
         ]
         for candidate_model, is_configured in candidate_providers:
             if is_configured and self.check_model_availability(candidate_model):
@@ -292,7 +302,7 @@ class ModelRouter:
             "gemini": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
             "openai": bool(os.getenv("OPENAI_API_KEY")),
             "anthropic": bool(os.getenv("ANTHROPIC_API_KEY")),
-            "ollama_local": self.check_model_availability("ollama/test")
+            "ollama_local": self.is_ollama_online()
         }
 
         active_roles = {}
@@ -305,5 +315,6 @@ class ModelRouter:
         return {
             "configured_providers": providers,
             "roles": active_roles,
+            "ollama_models": self.get_installed_ollama_models(),
             "offline_heuristic_available": True
         }

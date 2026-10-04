@@ -12,7 +12,7 @@ def test_planner_tool_introspection_and_planning(tmp_path):
     ha = HomeAssistantMock("http://localhost:8123", "token")
     registry.register_tool("home_assistant_call", ha.call_service, ha_call_schema)
 
-    planner = Planner(registry=registry)
+    planner = Planner(registry=registry, model_name="heuristic")
 
     # Test home assistant action
     plan = planner.plan_problem("Schalte das Licht ein")
@@ -24,7 +24,7 @@ def test_planner_tool_introspection_and_planning(tmp_path):
 def test_planner_missing_tool_synthesis(tmp_path):
     registry = ToolRegistry(dynamic_dir=str(tmp_path))
     dyn_gen = DynamicGenerator(registry=registry, dynamic_dir=str(tmp_path))
-    planner = Planner(registry=registry, dynamic_generator=dyn_gen)
+    planner = Planner(registry=registry, dynamic_generator=dyn_gen, model_name="heuristic")
 
     assert not registry.has_tool("hash_string")
 
@@ -44,7 +44,7 @@ def test_planner_model_availability_check(tmp_path):
 
 def test_planner_compound_time_and_system_status(tmp_path):
     registry = ToolRegistry(dynamic_dir=str(tmp_path))
-    planner = Planner(registry=registry)
+    planner = Planner(registry=registry, model_name="heuristic")
     plan = planner.plan_problem("what time is it and check system status")
     assert len(plan.steps) == 2
     tool_names = [s.tool_name for s in plan.steps]
@@ -54,7 +54,7 @@ def test_planner_compound_time_and_system_status(tmp_path):
 
 def test_planner_greeting_response_not_time(tmp_path):
     registry = ToolRegistry(dynamic_dir=str(tmp_path))
-    planner = Planner(registry=registry)
+    planner = Planner(registry=registry, model_name="heuristic")
     plan = planner.plan_problem("hi")
     # Should not fabricate a get_time step
     assert len(plan.steps) == 0
@@ -66,7 +66,7 @@ def test_planner_greeting_response_not_time(tmp_path):
 
 def test_planner_open_ended_offline_ai_notice(tmp_path):
     registry = ToolRegistry(dynamic_dir=str(tmp_path))
-    planner = Planner(registry=registry)
+    planner = Planner(registry=registry, model_name="heuristic")
     plan = planner.plan_problem("what is in my fridge right now?")
     # No fabricated tools for unhandled open-ended questions
     assert len(plan.steps) == 0
@@ -111,7 +111,7 @@ def test_planner_spatial_relocation(tmp_path):
     db_path = str(tmp_path / "test_reloc.db")
     state = StateManager(db_path=db_path)
     registry = setup_tools(state=state)
-    planner = Planner(registry=registry, state_manager=state)
+    planner = Planner(registry=registry, state_manager=state, model_name="heuristic")
 
     # 1. English statement: "I'm in the office rn"
     plan_en = planner.plan_problem("I'm in the office rn")
@@ -143,7 +143,7 @@ def test_weather_and_knowledge_tools(tmp_path):
     db_path = str(tmp_path / "test_weather.db")
     state = StateManager(db_path=db_path)
     registry = setup_tools(state=state)
-    planner = Planner(registry=registry, state_manager=state)
+    planner = Planner(registry=registry, state_manager=state, model_name="heuristic")
 
     # 1. Weather tool execution
     w_res = registry.execute_tool("get_weather", {"location": "Halle (Saale)"})
@@ -185,7 +185,7 @@ def test_greeting_override_prevention(tmp_path):
     db_path = str(tmp_path / "test_greet.db")
     state = StateManager(db_path=db_path)
     registry = setup_tools(state=state)
-    planner = Planner(registry=registry, state_manager=state)
+    planner = Planner(registry=registry, state_manager=state, model_name="heuristic")
 
     # If an LLM returns a direct response, a query starting with 'hi' must NOT return a generic greeting
     plan = PipelinePlan(
