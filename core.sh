@@ -55,6 +55,13 @@ case "$COMMAND" in
     test)
         "$PYTHON" -m pytest tests
         ;;
+    autostart)
+        "$PYTHON" -m core.service autostart "$2"
+        ;;
+    watchdog)
+        shift
+        "$PYTHON" -m core.watchdog "$@"
+        ;;
     uninstall)
         "$PYTHON" interfaces/install/uninstall.py
         ;;
@@ -77,6 +84,8 @@ case "$COMMAND" in
         echo "    logo / anim - Launch interactive 3D Sovereign Core holographic viewer"
         echo "    update      - Self-update from GitHub with state backup & test guard"
         echo "    test        - Run automated test suite (pytest)"
+        echo "    autostart   - Configure 24/7 boot autostart (./core.sh autostart on|off|status|visible)"
+        echo "    watchdog    - Run self-healing supervisor (auto-revives crashes with backoff)"
         echo "    setup       - Run interactive bootstrap & autostart setup"
         echo "    uninstall   - Clean zero-residue uninstallation"
         echo ""

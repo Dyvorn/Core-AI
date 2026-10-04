@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any, Tuple
 logger = logging.getLogger(__name__)
 
 PID_FILE = ".core_ai.pid"
+WATCHDOG_PID_FILE = ".core_watchdog.pid"
 
 def is_pid_alive(pid: int) -> bool:
     """Verifies if a process ID is running using OS built-in commands."""
@@ -101,6 +102,33 @@ class ServiceManager:
             except Exception:
                 pass
 
+    def get_watchdog_pid(self) -> Optional[int]:
+        """Returns the active PID if Watchdog Supervisor is currently running."""
+        w_path = os.path.join(self.root_dir, WATCHDOG_PID_FILE)
+        if not os.path.exists(w_path):
+            return None
+        try:
+            with open(w_path, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if not content:
+                    return None
+                pid = int(content)
+            if is_pid_alive(pid):
+                return pid
+            self._clear_watchdog_pid()
+            return None
+        except Exception:
+            self._clear_watchdog_pid()
+            return None
+
+    def _clear_watchdog_pid(self):
+        w_path = os.path.join(self.root_dir, WATCHDOG_PID_FILE)
+        if os.path.exists(w_path):
+            try:
+                os.remove(w_path)
+            except Exception:
+                pass
+
     def check_health(self, port: int = 8000, timeout: float = 1.0) -> Tuple[bool, Dict[str, Any]]:
         """Checks if Gateway server answers on HTTP."""
         url = f"http://localhost:{port}/api/v1/health"
@@ -134,7 +162,13 @@ class ServiceManager:
         if not in_new_terminal and "--headless" not in args_to_use:
             args_to_use.append("--headless")
 
-        cmd = [sys.executable, "main.py", "--port", str(port)] + args_to_use
+        executable = sys.executable
+        if not in_new_terminal and os.name == "nt":
+            pythonw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+            if os.path.exists(pythonw):
+                executable = pythonw
+
+        cmd = [executable, "main.py", "--port", str(port)] + args_to_use
 
         try:
             if in_new_terminal:
@@ -171,28 +205,41 @@ class ServiceManager:
     def stop(self) -> Tuple[bool, str]:
         """
         Gracefully stops Core AI, freeing RAM, GPU, VRAM, and ports for video editing / gaming.
+        Also terminates any active Watchdog supervisor to prevent unwanted revival.
         """
+        watchdog_pid = self.get_watchdog_pid()
+        watchdog_msg = ""
+        if watchdog_pid:
+            kill_process_tree(watchdog_pid)
+            self._clear_watchdog_pid()
+            watchdog_msg = f" (Watchdog PID {watchdog_pid} stopped)"
+
         pid = self.get_running_pid()
         if not pid:
+            if watchdog_msg:
+                return True, f"Core AI Watchdog supervisor stopped.{watchdog_msg}"
             return False, "Core AI is not currently running."
 
         try:
             kill_process_tree(pid)
             self._clear_pid()
             logger.info(f"Core AI (PID {pid}) stopped successfully.")
-            return True, f"Core AI server (PID {pid}) stopped. GPU and RAM freed."
+            return True, f"Core AI server (PID {pid}) stopped. GPU and RAM freed.{watchdog_msg}"
         except Exception as e:
             self._clear_pid()
             return False, f"Error while stopping Core AI: {e}"
 
     def status(self, port: int = 8000) -> Dict[str, Any]:
-        """Returns detailed process and gateway health status."""
+        """Returns detailed process, supervisor, and gateway health status."""
         pid = self.get_running_pid()
+        watchdog_pid = self.get_watchdog_pid()
         is_healthy, health_data = self.check_health(port=port)
 
         info = {
             "is_running": pid is not None,
             "pid": pid,
+            "watchdog_running": watchdog_pid is not None,
+            "watchdog_pid": watchdog_pid,
             "gateway_healthy": is_healthy,
             "port": port,
             "details": health_data
@@ -218,13 +265,15 @@ class ServiceManager:
         print(f"{C}|{B}   CORE AI :: DAEMON & GATEWAY STATUS CARD                           {RST}{C}|{RST}")
         print(f"{C}+=====================================================================+{RST}")
         daemon_str = f"{G}ONLINE (PID {info['pid']}){RST}" if running else f"{Y}OFFLINE{RST}"
+        watchdog_str = f"{G}ONLINE (PID {info['watchdog_pid']}, Self-Healing){RST}" if info.get("watchdog_running") else f"{Y}STANDALONE (No Watchdog){RST}"
         gateway_str = f"{G}ONLINE (http://localhost:{port}){RST}" if gw_ok else f"{Y}OFFLINE{RST}"
-        print(f"{C}|{RST}   Daemon Process:   {daemon_str}")
-        print(f"{C}|{RST}   Universal Gateway:{gateway_str}")
+        print(f"{C}|{RST}   Daemon Process:       {daemon_str}")
+        print(f"{C}|{RST}   Watchdog Supervisor:  {watchdog_str}")
+        print(f"{C}|{RST}   Universal Gateway:    {gateway_str}")
         if gw_ok and isinstance(details, dict):
-            print(f"{C}|{RST}   Active Operator:  {G}{details.get('active_user', 'N/A')}{RST}")
-            print(f"{C}|{RST}   Active Model:     {C}{details.get('active_model', 'N/A')}{RST}")
-            print(f"{C}|{RST}   Connected Nodes:  {Y}{len(details.get('connected_edge_nodes', []))}{RST}")
+            print(f"{C}|{RST}   Active Operator:      {G}{details.get('active_user', 'N/A')}{RST}")
+            print(f"{C}|{RST}   Active Model:         {C}{details.get('active_model', 'N/A')}{RST}")
+            print(f"{C}|{RST}   Connected Nodes:      {Y}{len(details.get('connected_edge_nodes', []))}{RST}")
         print(f"{C}+=====================================================================+{RST}\n")
 
     def get_autostart_path(self) -> Optional[str]:
@@ -238,8 +287,13 @@ class ServiceManager:
             return os.path.join(home, ".config", "autostart", "core-ai.desktop")
         return None
 
-    def enable_autostart(self, in_terminal: bool = True) -> Tuple[bool, str]:
-        """Configures OS autostart so Core AI boots with the system."""
+    def is_autostart_enabled(self) -> bool:
+        """Returns True if OS autostart is currently configured."""
+        path = self.get_autostart_path()
+        return bool(path and os.path.exists(path))
+
+    def enable_autostart(self, in_terminal: bool = False, use_watchdog: bool = True) -> Tuple[bool, str]:
+        """Configures OS autostart so Core AI boots with the system as a 24/7 background service."""
         path = self.get_autostart_path()
         if not path:
             return False, "Unsupported platform for automated autostart configuration."
@@ -247,19 +301,44 @@ class ServiceManager:
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
         if os.name == "nt":
-            python_exe = sys.executable
-            main_script = os.path.join(self.root_dir, "main.py")
-            content = f'@echo off\r\ntitle Core AI Server Suite\r\ncd /d "{self.root_dir}"\r\n"{python_exe}" "{main_script}"\r\n'
+            if in_terminal:
+                content = (
+                    "@echo off\r\n"
+                    f'cd /d "{self.root_dir}"\r\n'
+                    "call core.bat run\r\n"
+                )
+            else:
+                if use_watchdog:
+                    content = (
+                        "@echo off\r\n"
+                        f'cd /d "{self.root_dir}"\r\n'
+                        'if exist ".venv\\Scripts\\pythonw.exe" (\r\n'
+                        '    start "" /b ".venv\\Scripts\\pythonw.exe" -m core.watchdog\r\n'
+                        ") else (\r\n"
+                        "    call core.bat watchdog\r\n"
+                        ")\r\n"
+                    )
+                else:
+                    content = (
+                        "@echo off\r\n"
+                        f'cd /d "{self.root_dir}"\r\n'
+                        "call core.bat start\r\n"
+                    )
             try:
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(content)
-                return True, f"Windows autostart enabled at '{path}'."
+                mode_desc = "Interactive Terminal" if in_terminal else ("24/7 Self-Healing Watchdog" if use_watchdog else "24/7 Silent Daemon")
+                return True, f"Windows autostart enabled ({mode_desc}) at '{path}'."
             except Exception as e:
                 return False, f"Failed to write autostart file: {e}"
         else:
-            python_exe = sys.executable
-            main_script = os.path.join(self.root_dir, "main.py")
-            content = f"[Desktop Entry]\nType=Application\nName=Core AI Server\nExec={python_exe} {main_script}\nPath={self.root_dir}\nTerminal={str(in_terminal).lower()}\n"
+            python_exe = os.path.join(self.root_dir, ".venv", "bin", "python")
+            if not os.path.exists(python_exe):
+                python_exe = sys.executable
+            main_target = f"{python_exe} -m core.watchdog" if use_watchdog else f"{python_exe} main.py --headless"
+            if in_terminal:
+                main_target = f"bash -c 'cd \"{self.root_dir}\" && ./core.sh run'"
+            content = f"[Desktop Entry]\nType=Application\nName=Core AI Server\nExec={main_target}\nPath={self.root_dir}\nTerminal={str(in_terminal).lower()}\n"
             try:
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(content)
@@ -277,3 +356,67 @@ class ServiceManager:
             except Exception as e:
                 return False, f"Failed to remove autostart file: {e}"
         return True, "Autostart was not enabled."
+
+    def print_autostart_card(self):
+        """Prints a high-contrast autostart status overview."""
+        try:
+            from colorama import init, Fore, Style
+            init(autoreset=True)
+            G, C, Y, R, B, RST = Fore.GREEN, Fore.CYAN, Fore.YELLOW, Fore.RED, Style.BRIGHT, Style.RESET_ALL
+        except ImportError:
+            G = C = Y = R = B = RST = ""
+
+        enabled = self.is_autostart_enabled()
+        path = self.get_autostart_path()
+        status_lbl = f"{G}ENABLED (Active on Boot){RST}" if enabled else f"{Y}DISABLED{RST}"
+
+        print(f"\n{C}+=====================================================================+{RST}")
+        print(f"{C}|{B}   CORE AI :: 24/7 ALWAYS-ON AUTOSTART STATUS                        {RST}{C}|{RST}")
+        print(f"{C}+=====================================================================+{RST}")
+        print(f"{C}|{RST}   Autostart on Boot:  {status_lbl}")
+        print(f"{C}|{RST}   Supervisor Mode:    {G}Self-Healing 24/7 Watchdog{RST}")
+        print(f"{C}|{RST}   Startup Path:       {path}")
+        print(f"{C}|{RST}   Service Mode:       {G}24/7 Sovereign Main Server{RST}")
+        print(f"{C}+=====================================================================+{RST}\n")
+        print(f"  To manage autostart:")
+        print(f"    core autostart on       (Enable silent 24/7 background boot with Watchdog)")
+        print(f"    core autostart off      (Disable automatic boot)")
+        print(f"    core autostart visible  (Enable interactive terminal console on boot)")
+        print(f"    core autostart status   (Check autostart configuration)\n")
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Core AI Service Manager CLI")
+    parser.add_argument("action", choices=["start", "stop", "restart", "status", "autostart"], help="Action to execute")
+    parser.add_argument("subaction", nargs="?", default=None, help="Subaction (for autostart: on, off, status, visible)")
+    args = parser.parse_args()
+
+    sm = ServiceManager()
+    if args.action == "start":
+        ok, msg = sm.start(in_new_terminal=False, extra_args=["--headless"])
+        print(msg)
+    elif args.action == "stop":
+        ok, msg = sm.stop()
+        print(msg)
+    elif args.action == "restart":
+        sm.stop()
+        ok, msg = sm.start(in_new_terminal=False, extra_args=["--headless"])
+        print(msg)
+    elif args.action == "status":
+        sm.print_status_card()
+    elif args.action == "autostart":
+        sub = (args.subaction or "status").lower()
+        if sub in ["status", "card", "info"]:
+            sm.print_autostart_card()
+        elif sub in ["on", "enable", "yes"]:
+            ok, msg = sm.enable_autostart(in_terminal=False, use_watchdog=True)
+            print(msg)
+        elif sub in ["off", "disable", "no"]:
+            ok, msg = sm.disable_autostart()
+            print(msg)
+        elif sub in ["visible", "console", "terminal"]:
+            ok, msg = sm.enable_autostart(in_terminal=True, use_watchdog=False)
+            print(msg)
+        else:
+            print(f"Unknown autostart subaction: '{args.subaction}'. Valid options: on, off, status, visible")
+            sm.print_autostart_card()

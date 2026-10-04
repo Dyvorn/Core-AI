@@ -82,32 +82,20 @@ def run_service_setup():
 
     # 3. Autostart Question
     enable_auto = prompt_yn("[?] Start Core AI automatically on system boot?", default=False)
+    silent_watchdog = True
+    if enable_auto:
+        silent_watchdog = prompt_yn("    [?] Run silently in background with 24/7 self-healing Watchdog?", default=True)
 
     # 4. Update Check Question
     enable_update_check = prompt_yn("[?] Check for updates from GitHub on startup with automated test guard?", default=True)
 
     # Apply Autostart Configuration
     if enable_auto:
-        path = svc.get_autostart_path()
-        if path:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            python_exe = sys.executable
-
-            if os.name == "nt":
-                update_cmd = f'"{python_exe}" -c "from core.updater import CoreUpdater; u = CoreUpdater(); u.apply_update()"\r\n' if enable_update_check else ""
-                content = (
-                    f"@echo off\r\n"
-                    f"title Core AI Sovereign Terminal\r\n"
-                    f'cd /d "{root_dir}"\r\n'
-                    f"{update_cmd}"
-                    f'"{python_exe}" main.py\r\n'
-                )
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write(content)
-                print(f"[OK] Configured Windows autostart at: {path}")
-            else:
-                svc.enable_autostart(in_terminal=True)
-                print(f"[OK] Configured Linux autostart at: {path}")
+        ok, msg = svc.enable_autostart(in_terminal=not silent_watchdog, use_watchdog=silent_watchdog)
+        if ok:
+            print(f"[OK] {msg}")
+        else:
+            print(f"[WARNING] {msg}")
     else:
         svc.disable_autostart()
 
