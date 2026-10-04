@@ -10,21 +10,70 @@ if exist ".venv\Scripts\python.exe" (
     set "PYTHON=python"
 )
 
-if "%1"=="" goto run
-if "%1"=="run" goto run
-if "%1"=="console" goto run
-if "%1"=="start" goto run
-if "%1"=="help" goto help
-if "%1"=="setup" goto setup
-if "%1"=="stop" goto stop
-if "%1"=="restart" goto restart
-if "%1"=="status" goto status
-if "%1"=="update" goto update
-if "%1"=="test" goto test
-if "%1"=="uninstall" goto uninstall
+if "%~1"=="" goto run
+if /i "%~1"=="run" goto run
+if /i "%~1"=="console" goto run
+if /i "%~1"=="start" goto start_daemon
+if /i "%~1"=="help" goto help
+if /i "%~1"=="setup" goto setup
+if /i "%~1"=="stop" goto stop
+if /i "%~1"=="restart" goto restart
+if /i "%~1"=="status" goto status
+if /i "%~1"=="logo" goto logo
+if /i "%~1"=="anim" goto logo
+if /i "%~1"=="backup" goto backup
+if /i "%~1"=="update" goto update
+if /i "%~1"=="test" goto test
+if /i "%~1"=="uninstall" goto uninstall
+
+goto quick_solve
+
+:logo
+"%PYTHON%" -m core.animation
+goto :eof
 
 :run
+"%PYTHON%" main.py
+goto :eof
+
+:quick_solve
 "%PYTHON%" main.py %*
+goto :eof
+
+:start_daemon
+"%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); ok, msg = s.start(in_new_terminal=False, extra_args=['--headless']); print(msg)"
+goto :eof
+
+:stop
+"%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); ok, msg = s.stop(); print(msg)"
+goto :eof
+
+:restart
+"%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); s.stop(); ok, msg = s.start(in_new_terminal=False, extra_args=['--headless']); print(msg)"
+goto :eof
+
+:status
+"%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); s.print_status_card()"
+goto :eof
+
+:backup
+"%PYTHON%" -c "from core.updater import CoreUpdater; u = CoreUpdater(); d, e = u.create_state_snapshot(); print('[OK] Snapshot preserved:\n  Database: ' + str(d) + '\n  Config:   ' + str(e))"
+goto :eof
+
+:update
+"%PYTHON%" -c "from core.updater import CoreUpdater; u = CoreUpdater(); ok, msg = u.apply_update(); print(msg)"
+goto :eof
+
+:test
+"%PYTHON%" -m pytest tests
+goto :eof
+
+:setup
+"%PYTHON%" interfaces\install\setup_service.py
+goto end
+
+:uninstall
+"%PYTHON%" interfaces\install\uninstall.py
 goto end
 
 :help
@@ -32,46 +81,23 @@ echo.
 echo =======================================================================
 echo   CORE AI :: SOVEREIGN LIFE OS COMMAND CLI
 echo =======================================================================
-echo   Usage: core ^<command^>
+echo   Usage: core ^<command^> or core ^<goal^>
 echo.
-echo   Commands:
-echo     [no args]   - Launch Core AI Unified Terminal ^& Gateway Server
-echo     run         - Launch Core AI Unified Terminal ^& Gateway Server
-echo     setup       - Run interactive bootstrap ^& autostart setup (Y/N)
-echo     status      - Inspect running server status, PID, memory, and health
-echo     stop        - Stop running background server suite
-echo     update      - Check GitHub for updates with automated test guard
+echo   Lifecycle Commands:
+echo     [no args]   - Launch Core AI Unified Terminal ^& Interactive Shell
+echo     run         - Launch Core AI Unified Terminal ^& Interactive Shell
+echo     start       - Start Core AI in background daemon mode (24/7 Service)
+echo     stop        - Stop running background server suite ^& free GPU/RAM
+echo     restart     - Restart Core AI background daemon
+echo     status      - Inspect running server status card, PID, and health
+echo     update      - Self-update from GitHub with state backup ^& test guard
 echo     test        - Run automated test suite (pytest)
+echo     setup       - Run interactive bootstrap ^& autostart setup
 echo     uninstall   - Clean zero-residue uninstallation
 echo.
-goto end
-
-:setup
-"%PYTHON%" interfaces\install\setup_service.py
-goto end
-
-:stop
-"%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); ok, msg = s.stop(); print(msg)"
-goto end
-
-:restart
-"%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); s.stop(); ok, msg = s.start(in_new_terminal=True); print(msg)"
-goto end
-
-:status
-"%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); st = s.status(); print('Running:', st['is_running'], '| PID:', st['pid'], '| Gateway:', 'ONLINE' if st['gateway_healthy'] else 'OFFLINE', '| Memory:', st.get('memory_mb', 'N/A'), 'MB')"
-goto end
-
-:update
-"%PYTHON%" -c "from core.updater import CoreUpdater; u = CoreUpdater(); ok, msg = u.apply_update(); print(msg)"
-goto end
-
-:test
-"%PYTHON%" -m pytest tests
-goto end
-
-:uninstall
-"%PYTHON%" interfaces\install\uninstall.py
+echo   Daily One-Shot Execution:
+echo     core ^<goal^> - Execute any goal directly (e.g. core "open discord")
+echo.
 goto end
 
 :end

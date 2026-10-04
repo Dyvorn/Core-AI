@@ -126,7 +126,12 @@ class ServiceManager:
         if pid:
             return False, f"Core AI is already running (PID {pid})."
 
-        cmd = [sys.executable, "main.py", "--port", str(port)] + (extra_args or [])
+        os.makedirs(os.path.join(self.root_dir, "logs"), exist_ok=True)
+        args_to_use = list(extra_args or [])
+        if not in_new_terminal and "--headless" not in args_to_use:
+            args_to_use.append("--headless")
+
+        cmd = [sys.executable, "main.py", "--port", str(port)] + args_to_use
 
         try:
             if in_new_terminal:
@@ -144,7 +149,7 @@ class ServiceManager:
                         stderr=subprocess.STDOUT
                     )
             else:
-                log_file = open(os.path.join(self.root_dir, "logs", "server_daemon.log"), "a")
+                log_file = open(os.path.join(self.root_dir, "logs", "server_daemon.log"), "a", encoding="utf-8")
                 flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
                 proc = subprocess.Popen(
                     cmd,
@@ -191,6 +196,33 @@ class ServiceManager:
         }
 
         return info
+
+    def print_status_card(self, port: int = 8000):
+        """Prints a high-contrast terminal status card."""
+        info = self.status(port=port)
+        running = info["is_running"]
+        gw_ok = info["gateway_healthy"]
+        details = info.get("details", {})
+
+        try:
+            from colorama import init, Fore, Style
+            init(autoreset=True)
+            G, C, Y, R, B, RST = Fore.GREEN, Fore.CYAN, Fore.YELLOW, Fore.RED, Style.BRIGHT, Style.RESET_ALL
+        except ImportError:
+            G = C = Y = R = B = RST = ""
+
+        print(f"\n{C}+=====================================================================+{RST}")
+        print(f"{C}|{B}   CORE AI :: DAEMON & GATEWAY STATUS CARD                           {RST}{C}|{RST}")
+        print(f"{C}+=====================================================================+{RST}")
+        daemon_str = f"{G}ONLINE (PID {info['pid']}){RST}" if running else f"{Y}OFFLINE{RST}"
+        gateway_str = f"{G}ONLINE (http://localhost:{port}){RST}" if gw_ok else f"{Y}OFFLINE{RST}"
+        print(f"{C}|{RST}   Daemon Process:   {daemon_str}")
+        print(f"{C}|{RST}   Universal Gateway:{gateway_str}")
+        if gw_ok and isinstance(details, dict):
+            print(f"{C}|{RST}   Active Operator:  {G}{details.get('active_user', 'N/A')}{RST}")
+            print(f"{C}|{RST}   Active Model:     {C}{details.get('active_model', 'N/A')}{RST}")
+            print(f"{C}|{RST}   Connected Nodes:  {Y}{len(details.get('connected_edge_nodes', []))}{RST}")
+        print(f"{C}+=====================================================================+{RST}\n")
 
     def get_autostart_path(self) -> Optional[str]:
         """Returns the OS-specific autostart file path."""

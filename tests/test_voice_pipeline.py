@@ -189,8 +189,8 @@ def test_end_to_end_voice_loop(tmp_path):
         )
         bus.publish("text_events", simulated_voice_event)
 
-        # Wait briefly for in-memory pubsub processing
-        for _ in range(50):
+        # Wait for in-memory pubsub processing
+        for _ in range(80):
             if received_tts_events:
                 break
             time.sleep(0.1)

@@ -27,6 +27,8 @@ class ModelRouter:
     def __init__(self, state_manager: Optional[StateManager] = None):
         self.state_manager = state_manager or StateManager()
         self._status_cache: Dict[str, bool] = {}
+        self._ollama_endpoint_available: Optional[bool] = None
+        self._ollama_models: Optional[List[str]] = None
 
     def get_model_preferences(self) -> Dict[str, Any]:
         """Retrieves operator model preferences from SQLite with safe defaults."""
@@ -64,6 +66,8 @@ class ModelRouter:
         os.environ[env_var] = api_key.strip()
         # Invalidate status cache
         self._status_cache.clear()
+        self._ollama_endpoint_available = None
+        self._ollama_models = None
 
         # Auto-assign active provider to planner if currently on unconfigured Ollama default
         prefs = self.get_model_preferences()
@@ -139,14 +143,31 @@ class ModelRouter:
 
         # Fast pre-check for Ollama
         if "ollama" in model_lower:
+            if self._ollama_endpoint_available is False:
+                self._status_cache[model] = False
+                return False
+
+            if self._ollama_models is not None:
+                clean_target = model_lower.split("/", 1)[-1]
+                available = any(
+                    clean_target == inst or
+                    f"{clean_target}:latest" == inst or
+                    inst.startswith(f"{clean_target}:")
+                    for inst in self._ollama_models
+                ) if self._ollama_models and clean_target not in ("ollama", "default") else bool(self._ollama_models)
+                self._status_cache[model] = available
+                return available
+
             try:
                 import urllib.request
                 import json
                 api_base = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
-                with urllib.request.urlopen(f"{api_base}/api/tags", timeout=1.5) as resp:
+                with urllib.request.urlopen(f"{api_base}/api/tags", timeout=0.8) as resp:
                     if resp.status == 200:
                         data = json.loads(resp.read().decode("utf-8"))
                         installed = [m.get("name", "").lower() for m in data.get("models", [])]
+                        self._ollama_endpoint_available = True
+                        self._ollama_models = installed
                         clean_target = model_lower.split("/", 1)[-1]
                         available = any(
                             clean_target == inst or
@@ -156,9 +177,13 @@ class ModelRouter:
                         ) if installed and clean_target not in ("ollama", "default") else bool(installed)
                         self._status_cache[model] = available
                         return available
+                    self._ollama_endpoint_available = False
+                    self._ollama_models = []
                     self._status_cache[model] = False
                     return False
             except Exception:
+                self._ollama_endpoint_available = False
+                self._ollama_models = []
                 self._status_cache[model] = False
                 return False
 

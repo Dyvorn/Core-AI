@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import json
 import logging
@@ -188,12 +189,70 @@ class StateManager:
             ''')
 
             conn.commit()
-            logger.info("Database initialized successfully with pipeline, profile, dynamic zones, topology, and audio routing tables")
+            self._run_migrations(conn)
+            logger.info("Database initialized successfully with pipeline, profile, dynamic zones, topology, audio routing, and migrations.")
 
         except Exception as e:
             logger.error(f"Database initialization failed: {e}")
         finally:
             conn.close()
+
+    def _run_migrations(self, conn: sqlite3.Connection):
+        """
+        Manages sequential zero-downtime database schema upgrades over time.
+        Tracks version via PRAGMA user_version.
+        """
+        cursor = conn.execute("PRAGMA user_version")
+        row = cursor.fetchone()
+        current_version = row[0] if row else 0
+
+        if current_version < 1:
+            conn.execute("PRAGMA user_version = 1")
+            current_version = 1
+
+        if current_version < 2:
+            try:
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_pipelines_status ON pipelines(status)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_execution_logs_source ON execution_logs(source)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_device_topology_zone ON device_topology(current_zone)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_pipeline_steps_pipeline_id ON pipeline_steps(pipeline_id)")
+                conn.execute("PRAGMA user_version = 2")
+                logger.info("Database schema migration v2 applied successfully.")
+            except Exception as me:
+                logger.warning(f"Notice during migration v2: {me}")
+        conn.commit()
+
+    def get_schema_version(self) -> int:
+        """Returns the current PRAGMA user_version of the database."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("PRAGMA user_version")
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        finally:
+            conn.close()
+
+    def create_backup(self, backup_dir: str = "backups") -> Optional[str]:
+        """Creates a timestamped point-in-time snapshot using the lock-free SQLite online backup API."""
+        if self._is_uri or self.db_path == ":memory:":
+            return None
+        if not os.path.exists(self.db_path):
+            return None
+        os.makedirs(backup_dir, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        backup_file = os.path.join(backup_dir, f"state_backup_{timestamp}.db")
+        source_conn = self._get_connection()
+        try:
+            dest_conn = sqlite3.connect(backup_file)
+            source_conn.backup(dest_conn)
+            dest_conn.close()
+            logger.info(f"Database point-in-time snapshot created at: {backup_file}")
+            return backup_file
+        except Exception as e:
+            logger.error(f"Failed to create database snapshot: {e}")
+            return None
+        finally:
+            source_conn.close()
 
     # Room State methods
     def set_room_state(self, room_id: str, state_data: Dict[str, Any]):

@@ -15,6 +15,7 @@ ENV/
 *.db-journal
 *.db-wal
 *.db-shm
+backups/
 
 # Environment secrets
 config/.env

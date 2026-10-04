@@ -1,4 +1,5 @@
-# CORE AI
+# C.O.R.E. AI
+### Concurrent Omnipresent Reasoning Engine
 
 ```
 +-----------------------------------------------------------------------------+
@@ -11,8 +12,8 @@
 ```
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 74/74 TESTS PASSED ]  [ PYTHON: 3.13+ ]
-[ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]     [ ETHOS: #ANTISLOP ]
+[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.1.0-alpha ]  [ TESTS: 84/84 PASSED ]
+[ LICENSE: AGPL-3.0-ONLY ]   [ ARCHITECTURE: ASYNC-DAG ] [ ETHOS: #ANTISLOP ]
 ```
 
 > **A self-hosted, sovereign, and privacy-first AI companion built to integrate into daily life across your workspace, living spaces, grounds, vehicle, bicycle, wearables, and mobile devices. Zero big-tech cloud lock-in, zero hardcoded assumptions, and engineered for multi-year evolution.**
@@ -647,36 +648,83 @@ Inside the terminal shell (`Core [Operator@zone] > `), type any natural language
 | `logs [count]` | View recent execution audit logs stored in SQLite |
 | `proactive` | Trigger proactive state evaluation cycle on demand |
 | `harness / eval` | Run live reasoning & execution harness diagnostic across all subsystems |
+| `logo / anim` | Launch interactive real-time 3D Sovereign Core holographic viewer |
+| `update` | Pull GitHub updates with automated pre-update state backup & test guard |
+| `backup` | Create instant point-in-time snapshot of SQLite state (`core_ai.db`) and config (`.env`) |
+| `bg / daemon` | Transition terminal session to background headless daemon mode |
 | `clear` | Clear terminal screen |
 | `exit / quit` | Cleanly terminate all background servers, audio threads, and bus |
 
 ---
 
-### 1-Click Desktop Launcher & CLI (`core.bat` / `core.sh`)
+### Daily Driver CLI & Headless Daemon (`core.bat` / `core.sh`)
 
-Whenever you want to start, stop, or manage Core AI:
+Core AI is designed to run 24/7 as a dependable sovereign daemon on your main machine while offering instant CLI goal execution and zero-downtime evolutionary updates:
 
 - **Desktop**: Double-click `CoreAI.bat` on your Desktop to open the Sovereign Terminal.
-- **Terminal CLI**:
+- **One-Shot Goal Execution (Direct from Terminal)**:
+  Execute tasks directly without entering the interactive shell. Dispatches to the 24/7 background daemon in < 100ms, or executes local in-process microkernel if the daemon is offline:
   ```bash
   # Windows
-  .\core.bat             # Launch Unified Terminal & Gateway Server
+  .\core.bat "what time is it"
+  .\core.bat solve "check system status and calculate 42 * 1337"
+
+  # Linux / macOS
+  ./core.sh "what time is it"
+  ./core.sh solve "check system status and calculate 42 * 1337"
+  ```
+
+- **Daemon & 3D Visualizer Lifecycle**:
+  ```bash
+  # Windows
+  .\core.bat logo        # Real-time interactive 3D Sovereign Core holographic terminal viewer
+  .\core.bat anim        # Alias for 3D animation viewer
+  .\core.bat start       # Launch 24/7 background headless daemon (logs to logs/service.log)
+  .\core.bat status      # Colorized status card (Daemon PID, Gateway health, active model, operator)
+  .\core.bat stop        # Cleanly terminate background daemon
+  .\core.bat restart     # Hot restart background daemon
+  .\core.bat run         # Launch interactive REPL terminal
+  .\core.bat backup      # Snapshot SQLite database and config/.env into backups/
+  .\core.bat update      # Git pull with pre-backup state snapshot and automated rollback test guard
+  .\core.bat test        # Run full pytest test suite (84/84 tests)
   .\core.bat setup       # Re-run interactive bootstrap wizard
-  .\core.bat status      # Inspect process PID, memory usage, and health
-  .\core.bat stop        # Stop server suite and free GPU / RAM (for video editing)
-  .\core.bat update      # Update from GitHub with automated test guard
-  .\core.bat test        # Run pytest test suite (68+ tests)
   .\core.bat uninstall   # Clean zero-residue uninstallation
 
   # Linux / macOS
-  ./core.sh              # Launch Unified Terminal & Gateway Server
-  ./core.sh setup
+  ./core.sh logo
+  ./core.sh anim
+  ./core.sh start
   ./core.sh status
   ./core.sh stop
+  ./core.sh restart
+  ./core.sh run
+  ./core.sh backup
   ./core.sh update
   ./core.sh test
+  ./core.sh setup
   ./core.sh uninstall
   ```
+
+---
+
+### 3D Holographic Terminal Engine (`core/animation.py`)
+
+A real-time mathematical 3D rendering pipeline built directly inside Python without external graphics libraries:
+
+- **2D Terminal Rasterization**: Uses perspective division, aspect-ratio font height compensation, and a floating-point **Z-buffer** to calculate accurate depth occlusion.
+- **3 Real-Time Geometric Models**:
+  - **Quantum Gyroscopic Core**: Rotating crystal nucleus with dual counter-rotating gimbal rings and orbiting plasma particle beads.
+  - **4D Hypercube (Tesseract)**: 16-vertex, 32-edge 4D polytope rotated simultaneously across 4D hyperplanes ($X-W$, $Y-Z$) and projected through 3D into 2D terminal space.
+  - **Hexagonal Sovereign Monolith**: Extruded hexagonal crystal cylinder with internal spinning diamond core.
+- **5 TrueColor / 256-Color Themes**: Cyber Cyan, Sovereign Void, Matrix Emerald, Solar Flare, and Hyper Steel.
+- **Interactive Controls**:
+  - `[T]` : Cycle color themes
+  - `[M]` : Switch 3D geometry model
+  - `[W / A / S / D]` or `[Arrow Keys]` : Rotate camera in 3D space
+  - `[Space]` : Pause / resume animation
+  - `[+ / -]` : Adjust rotation speed
+  - `[R]` : Reset camera orientation
+  - `[Q / Esc / Enter]` : Return to terminal
 
 ---
 

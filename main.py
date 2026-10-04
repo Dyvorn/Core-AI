@@ -70,7 +70,16 @@ try:
 except ImportError:
     CYAN = GREEN = YELLOW = RED = MAGENTA = BRIGHT = RESET = ""
 
-def play_boot_sequence():
+def play_boot_sequence(skip_anim: bool = False):
+    if not skip_anim:
+        try:
+            from core.animation import play_boot_animation
+            played = play_boot_animation(duration=2.2)
+            if played:
+                return
+        except Exception:
+            pass
+
     print(f"\n{CYAN}======================================================================={RESET}")
     print(f"{CYAN}  CORE AI :: SOVEREIGN LIFE OS - INITIALIZING MICROKERNEL{RESET}")
     print(f"{CYAN}======================================================================={RESET}")
@@ -82,14 +91,14 @@ def play_boot_sequence():
         "Spawning Universal Gateway (REST & WebSocket Mesh)"
     ]
     for step in steps:
-        time.sleep(0.08)
+        time.sleep(0.06)
         print(f"  [+] {step:<54} [{GREEN}OK{RESET}]")
     print(f"{CYAN}-----------------------------------------------------------------------{RESET}\n")
 
 def print_banner(operator_name: str, zone: str, port: int):
     print(f"{CYAN}+=====================================================================+{RESET}")
-    print(f"{CYAN}|{BRIGHT}   CORE AI :: SOVEREIGN LIFE OS - COMMAND TERMINAL                    {RESET}{CYAN}|{RESET}")
-    print(f"{CYAN}|{RESET}   Self-Hosted - Privacy-First - Autonomous Problem Solver           {CYAN}|{RESET}")
+    print(f"{CYAN}|{BRIGHT}   C.O.R.E. AI :: CONCURRENT OMNIPRESENT REASONING ENGINE            {RESET}{CYAN}|{RESET}")
+    print(f"{CYAN}|{RESET}   v0.1.0-alpha [Genesis] - Sovereign Ubiquitous Life OS              {CYAN}|{RESET}")
     print(f"{CYAN}+=====================================================================+{RESET}")
     print(f"{CYAN}|{RESET}   Operator: {GREEN}{operator_name:<16}{RESET} Zone: {YELLOW}{zone:<16}{RESET} Status: {GREEN}ONLINE       {RESET}{CYAN}|{RESET}")
     print(f"{CYAN}|{RESET}   Gateway:  {CYAN}http://localhost:{port:<5}{RESET} API Docs: {CYAN}/docs{RESET} WebSocket: {CYAN}/ws/events{RESET}   {CYAN}|{RESET}")
@@ -123,6 +132,10 @@ def print_help():
     print(f"  {GREEN}logs [N]{RESET}                  - View recent execution audit logs from SQLite")
     print(f"  {GREEN}proactive{RESET}                 - Run proactive watcher evaluation on demand")
     print(f"  {GREEN}harness / eval{RESET}            - Run live reasoning & execution harness diagnostic")
+    print(f"  {GREEN}logo / anim{RESET}               - Launch interactive 3D Sovereign Core holographic viewer")
+    print(f"  {GREEN}update{RESET}                    - Apply GitHub updates with automated state backup & test guard")
+    print(f"  {GREEN}backup{RESET}                    - Create instant point-in-time snapshot of SQLite state & config")
+    print(f"  {GREEN}bg / daemon{RESET}               - Send Core AI to background headless daemon mode")
     print(f"  {GREEN}clear{RESET}                     - Clear terminal screen")
     print(f"  {GREEN}exit / quit{RESET}               - Cleanly shut down Core AI and background services\n")
 
@@ -332,6 +345,11 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Core AI Sovereign Life OS Microkernel")
+    parser.add_argument("goal", nargs="*", default=None, help="Optional one-shot goal to execute and exit")
+    parser.add_argument("--solve", "-s", default=None, help="Explicit one-shot goal to execute and exit")
+    parser.add_argument("--heuristic", action="store_true", help="Force deterministic heuristic planner (fast offline mode)")
+    parser.add_argument("--no-anim", "--fast", action="store_true", help="Skip 3D boot animation for instant start")
+    parser.add_argument("--logo", "--anim", action="store_true", help="Run interactive 3D logo animation and exit")
     parser.add_argument("--voice", action="store_true", help="Enable full continuous voice loop (Mic STT + Speaker TTS)")
     parser.add_argument("--voice-in", action="store_true", help="Enable background microphone listening only")
     parser.add_argument("--no-tts", action="store_true", help="Disable audio speech output")
@@ -719,6 +737,38 @@ def run_interactive_repl(
                 print(f"{CYAN}-----------------------------------------------------------------------{RESET}")
                 print(f"  {BRIGHT}Harness Status:{RESET} {GREEN}ALL REASONING & EXECUTION SUBSYSTEMS GREEN{RESET}\n")
 
+            elif cmd_lower in ["update", "check-update", "upgrade"]:
+                from core.updater import CoreUpdater
+                updater = CoreUpdater()
+                print(f"{CYAN}[*] Checking for updates and executing test-guarded upgrade...{RESET}")
+                ok, msg = updater.apply_update()
+                print(f"{GREEN if ok else RED}[{'OK' if ok else 'FAILED'}] {msg}{RESET}\n")
+
+            elif cmd_lower.startswith("backup"):
+                print(f"{CYAN}[*] Creating point-in-time state snapshot...{RESET}")
+                from core.updater import CoreUpdater
+                updater = CoreUpdater()
+                db_s, env_s = updater.create_state_snapshot()
+                print(f"{GREEN}[OK] Snapshot preserved:{RESET}\n  - Database: {db_s}\n  - Config:   {env_s}\n")
+
+            elif cmd_lower in ["daemon", "bg", "background"]:
+                print(f"{YELLOW}[*] Transitioning Core AI to background headless daemon...{RESET}")
+                from core.service import ServiceManager
+                sm = ServiceManager()
+                ok, msg = sm.start(in_new_terminal=False, port=port, extra_args=["--headless"])
+                if ok:
+                    print(f"{GREEN}[OK] {msg}{RESET}")
+                    print(f"{CYAN}Use 'core stop' to terminate, or 'core status' to inspect.{RESET}\n")
+                    shutdown_event.set()
+                    break
+                else:
+                    print(f"{RED}[!] {msg}{RESET}\n")
+
+            elif cmd_lower in ["logo", "anim", "intro", "3d"]:
+                from core.animation import run_interactive_animation
+                run_interactive_animation()
+                print_banner(active_name, active_zone, port)
+
             # --- Conversational Dialogues, Greetings & Small Talk ---
             elif clean_cmd in [
                 "hi", "hello", "hey", "hallo", "moin", "servus", "guten tag",
@@ -827,8 +877,70 @@ def main():
     load_dotenv("config/.env")
     args = parse_args()
 
+    # Standalone 3D Animation Viewer
+    if getattr(args, "logo", False) or getattr(args, "anim", False):
+        from core.animation import run_interactive_animation
+        run_interactive_animation()
+        sys.exit(0)
+
+    # One-Shot Goal Execution Mode (CLI Instant Dispatch)
+    target_goal = args.solve
+    if not target_goal and args.goal:
+        target_goal = " ".join(args.goal).strip()
+
+    if target_goal:
+        target_port = args.port or int(os.getenv("CORE_PORT", 8000))
+        from core.service import ServiceManager
+        sm = ServiceManager()
+        is_healthy, _ = sm.check_health(port=target_port)
+
+        if is_healthy:
+            import urllib.request
+            import json
+            try:
+                url = f"http://localhost:{target_port}/api/v1/pipeline/solve_sync"
+                req_data = json.dumps({"goal": target_goal}).encode("utf-8")
+                req = urllib.request.Request(
+                    url,
+                    data=req_data,
+                    headers={"Content-Type": "application/json", "User-Agent": "CoreAI-CLI/2.0"}
+                )
+                with urllib.request.urlopen(req, timeout=30.0) as resp:
+                    res = json.loads(resp.read().decode("utf-8"))
+                    out_text = res.get("final_output") or (res["steps"][-1].get("output") if res.get("steps") else "Task complete.")
+                    if isinstance(out_text, dict):
+                        out_msg = out_text.get("message") or out_text.get("status") or str(out_text)
+                    else:
+                        out_msg = str(out_text)
+                    print(f"\n{CYAN}Core AI [Daemon]:{RESET} {BRIGHT}{out_msg}{RESET}\n")
+                    sys.exit(0 if res.get("status") == "completed" else 1)
+            except Exception as de:
+                logger.warning(f"Daemon dispatch encountered notice ({de}). Falling through to in-process execution.")
+
+        # Local in-process one-shot execution
+        state = StateManager()
+        registry = setup_tools(state=state)
+        model_router = ModelRouter(state_manager=state)
+        dyn_gen = DynamicGenerator(registry=registry, state_manager=state, model_router=model_router)
+        use_heuristic = getattr(args, "heuristic", False) or os.getenv("CORE_FORCE_HEURISTIC") == "1"
+        if use_heuristic:
+            planner = Planner(registry=registry, state_manager=state, dynamic_generator=dyn_gen, model_name="heuristic")
+        else:
+            planner = Planner(registry=registry, state_manager=state, dynamic_generator=dyn_gen, model_router=model_router)
+
+        bus = EventBus()
+        engine = PipelineEngine(registry=registry, state_manager=state, bus=bus)
+        profile = state.get_user_profile()
+        active_zone = profile.preferences.get("primary_space", "studio")
+
+        plan = planner.plan_problem(target_goal, {"zone": active_zone, "operator": profile.preferred_name})
+        finished = asyncio.run(engine.execute_pipeline(plan))
+        spoken = planner.formulate_spoken_response(finished, profile=profile)
+        print(f"\n{CYAN}Core AI:{RESET} {BRIGHT}{spoken}{RESET}\n")
+        sys.exit(0 if finished.status == "completed" else 1)
+
     if not args.headless:
-        play_boot_sequence()
+        play_boot_sequence(skip_anim=getattr(args, "no_anim", False))
 
     logger.info("Initializing Core AI Microkernel with Universal Gateway, Proactive Engine & Model Router...")
 
