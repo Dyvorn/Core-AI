@@ -390,6 +390,28 @@ class Planner:
                 depends_on=[]
             ))
 
+        # Pattern: Local Network Scanning & Registered Devices
+        elif any(k in goal_lower for k in [
+            "scan network", "scan lan", "scan wifi", "network devices", "devices on my network",
+            "connected devices", "what devices are connected", "are they connected", "in my network",
+            "in the network", "devices are connected", "see them", "tell me what devices",
+            "geräte im netzwerk", "netzwerk scan", "welche geräte sind verbunden"
+        ]):
+            steps.append(PipelineStep(
+                id="scan_network_step",
+                name="Scan Local Network",
+                tool_name="scan_local_network",
+                arguments={"timeout_sec": 1.0},
+                depends_on=[]
+            ))
+            steps.append(PipelineStep(
+                id="list_registered_devices_step",
+                name="List Registered Mesh Devices",
+                tool_name="list_registered_devices",
+                arguments={},
+                depends_on=[]
+            ))
+
         # Pattern: Verbal presence relocation
         # (e.g. "I'm in the office rn", "I'm at the desk", "I am in the kitchen", "moved to studio", "ich bin jetzt im büro")
         elif reloc_match_en := re.search(r"\b(?:i'?m\s+(?:in|at)|i am\s+(?:in|at)|moved to|relocate to|relocated to|now (?:in|at)|currently (?:in|at))\s+(?:the\s+)?([a-zA-Z0-9_\-]+)", goal_lower):
@@ -782,11 +804,29 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                 else:
                     return f"The result of {expr} is {result}, {name}."
 
-        # 4. Network Discovery & Device Inspection
-        if "scan_local_network" in step_outputs or "inspect_lan_device" in step_outputs:
+        # 4. Network Discovery, LAN Devices & Mesh Topology
+        if "scan_local_network" in step_outputs or "list_registered_devices" in step_outputs or "inspect_lan_device" in step_outputs:
             scan_res = step_outputs.get("scan_local_network") or {}
+            reg_res = step_outputs.get("list_registered_devices") or {}
             insp_res = step_outputs.get("inspect_lan_device") or {}
-            dev_count = scan_res.get("device_count", 0)
+
+            lan_devs = scan_res.get("devices", []) if isinstance(scan_res, dict) else []
+            lan_count = scan_res.get("device_count", len(lan_devs))
+            mesh_devs = reg_res.get("devices", []) if isinstance(reg_res, dict) else []
+            mesh_count = reg_res.get("device_count", len(mesh_devs))
+
+            if "scan_local_network" in step_outputs and "list_registered_devices" in step_outputs:
+                if language == "de":
+                    return (
+                        f"Sie befinden sich aktuell nur im lokalen WLAN/LAN-Netzwerk, {name}. "
+                        f"Ich sehe {lan_count} aktive Netzwerkgeräte via ARP, aber als Core-AI-Knoten gekoppelt sind aktuell {mesh_count} Gerät(e)."
+                    )
+                else:
+                    return (
+                        f"They are currently just hosts on your local network, {name}. "
+                        f"I can see {lan_count} active devices on your local Wi-Fi/LAN, but only {mesh_count} device(s) are officially paired in your Core AI mesh topology."
+                    )
+
             if insp_res and not insp_res.get("core_installed", False):
                 hint = insp_res.get("device_hint", "Gerät")
                 host = insp_res.get("host", "LAN")
@@ -794,10 +834,18 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                     return f"Ich habe ein {hint} auf {host} im Netzwerk gefunden, allerdings ist dort noch kein Core AI Knoten installiert."
                 else:
                     return f"I found a {hint} at {host} on your local network, but the Core AI edge node is not installed on it yet."
-            if language == "de":
-                return f"Der Netzwerkscan wurde abgeschlossen. Es wurden {dev_count} aktive Geräte im lokalen Netz gefunden, {name}."
-            else:
-                return f"Network scan completed. Found {dev_count} active devices on your local network, {name}."
+
+            if "scan_local_network" in step_outputs:
+                if language == "de":
+                    return f"Der Netzwerkscan wurde abgeschlossen. Es wurden {lan_count} aktive Geräte im lokalen Netz gefunden, {name}."
+                else:
+                    return f"Network scan completed. Found {lan_count} active devices on your local network, {name}."
+
+            if "list_registered_devices" in step_outputs:
+                if language == "de":
+                    return f"In deiner Core AI Topologie sind aktuell {mesh_count} Gerät(e) registriert, {name}."
+                else:
+                    return f"There are currently {mesh_count} registered device(s) in your Core AI mesh topology, {name}."
 
         # 5. Home Assistant service call
         if "home_assistant_call" in step_outputs:

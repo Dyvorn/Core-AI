@@ -240,56 +240,96 @@ class PipelineEngine:
             error=step.error
         )
 
+    def _traverse_field_path(self, output: Any, field_path: Optional[str]) -> Any:
+        """
+        Traverses complex nested data structures supporting list indices (e.g. [0], .0)
+        and common LLM fuzzy property naming conventions.
+        """
+        if not field_path:
+            return output
+        tokens = re.findall(r'[^.\[\]]+', field_path)
+        curr = output
+        for token in tokens:
+            if curr is None:
+                break
+            if token.isdigit():
+                idx = int(token)
+                if isinstance(curr, (list, tuple)):
+                    curr = curr[idx] if 0 <= idx < len(curr) else None
+                elif isinstance(curr, dict) and token in curr:
+                    curr = curr[token]
+                else:
+                    curr = None
+                continue
+
+            if isinstance(curr, dict):
+                if token in curr:
+                    curr = curr[token]
+                elif token in ("discovered_devices", "device_list", "hosts", "found_devices") and "devices" in curr:
+                    curr = curr["devices"]
+                elif token in ("ip_address", "target_ip", "address", "host_ip") and "ip" in curr:
+                    curr = curr["ip"]
+                elif token in ("ip", "target_ip_address", "ip_address") and "host" in curr:
+                    curr = curr["host"]
+                elif token in ("device_name", "title") and "name" in curr:
+                    curr = curr["name"]
+                else:
+                    curr = None
+            elif isinstance(curr, (list, tuple)) and curr:
+                first = curr[0]
+                if isinstance(first, dict):
+                    if token in first:
+                        curr = first[token]
+                    elif token in ("ip_address", "target_ip", "address", "host_ip") and "ip" in first:
+                        curr = first["ip"]
+                    elif token in ("ip", "target_ip_address") and "host" in first:
+                        curr = first["host"]
+                    else:
+                        curr = None
+                else:
+                    curr = None
+            else:
+                curr = None
+
+        return curr
+
     def _resolve_arguments(self, args: Dict[str, Any], step_map: Dict[str, PipelineStep]) -> Dict[str, Any]:
         """
-        Recursively replaces placeholder expressions like '{{steps.step_1.output.result}}'
-        or '$step_1.result' with evaluated values from previous step outputs.
+        Recursively replaces placeholder expressions like '{{steps.step_1.output.result}}',
+        '{{steps.scan_step.output.devices[0].ip}}', or '$step_1.result'
+        with evaluated values from previous step outputs.
         """
         def resolve_value(val: Any) -> Any:
             if isinstance(val, str):
                 # Pattern 1: {{steps.<step_id>.output.<field>}}
-                pattern = r"\{\{steps\.([a-zA-Z0-9_\-]+)\.output(?:\.([a-zA-Z0-9_\.]+))?\}\}"
-                match = re.search(pattern, val)
-                if match:
-                    step_id = match.group(1)
-                    field_path = match.group(2)
-                    referenced_step = step_map.get(step_id)
-                    if referenced_step and referenced_step.output is not None:
-                        output = referenced_step.output
-                        if not field_path:
-                            return output
-                        # Traverse nested field path
-                        curr = output
-                        for field in field_path.split("."):
-                            if isinstance(curr, dict) and field in curr:
-                                curr = curr[field]
-                            else:
-                                curr = None
-                                break
-                        # If string was exactly the placeholder, return actual typed object
-                        if val == match.group(0):
-                            return curr
-                        return val.replace(match.group(0), str(curr))
+                pattern = r"\{\{steps\.([a-zA-Z0-9_\-]+)\.output(?:\.([^\}]+))?\}\}"
+                matches = list(re.finditer(pattern, val))
+                if matches:
+                    for match in matches:
+                        step_id = match.group(1)
+                        field_path = match.group(2)
+                        referenced_step = step_map.get(step_id)
+                        if referenced_step and referenced_step.output is not None:
+                            resolved = self._traverse_field_path(referenced_step.output, field_path)
+                            if val == match.group(0):
+                                return resolved
+                            val = val.replace(match.group(0), str(resolved if resolved is not None else ""))
+                    return val
 
                 # Pattern 2: $step_<id>.<field>
-                pattern_short = r"\$([a-zA-Z0-9_\-]+)\.([a-zA-Z0-9_\.]+)"
-                match_short = re.search(pattern_short, val)
-                if match_short:
-                    step_id = match_short.group(1)
-                    field_path = match_short.group(2)
-                    referenced_step = step_map.get(step_id)
-                    if referenced_step and referenced_step.output is not None:
-                        output = referenced_step.output
-                        curr = output
-                        for field in field_path.split("."):
-                            if isinstance(curr, dict) and field in curr:
-                                curr = curr[field]
-                            else:
-                                curr = None
-                                break
-                        if val == match_short.group(0):
-                            return curr
-                        return val.replace(match_short.group(0), str(curr))
+                pattern_short = r"\$([a-zA-Z0-9_\-]+)\.([a-zA-Z0-9_\.\[\]]+)"
+                matches_short = list(re.finditer(pattern_short, val))
+                if matches_short:
+                    for match_short in matches_short:
+                        step_id = match_short.group(1)
+                        field_path = match_short.group(2)
+                        referenced_step = step_map.get(step_id)
+                        if referenced_step and referenced_step.output is not None:
+                            resolved = self._traverse_field_path(referenced_step.output, field_path)
+                            if val == match_short.group(0):
+                                return resolved
+                            val = val.replace(match_short.group(0), str(resolved if resolved is not None else ""))
+                    return val
 
                 return val
             elif isinstance(val, dict):

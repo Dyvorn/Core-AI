@@ -4,33 +4,39 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
-def read_text_file(file_path: str) -> Dict[str, Any]:
+def read_text_file(file_path: str = "", **kwargs) -> Dict[str, Any]:
     """Reads content from a text file."""
+    target = file_path or kwargs.get("path") or kwargs.get("filepath") or kwargs.get("filename") or ""
     try:
-        if not os.path.exists(file_path):
-            return {"status": "error", "error": f"File not found: {file_path}"}
-        with open(file_path, "r", encoding="utf-8") as f:
+        if not target or not os.path.exists(target):
+            return {"status": "error", "error": f"File not found: {target}"}
+        with open(target, "r", encoding="utf-8") as f:
             content = f.read()
         return {"status": "success", "content": content, "size_bytes": len(content)}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
-def write_text_file(file_path: str, content: str) -> Dict[str, Any]:
+def write_text_file(file_path: str = "", content: str = "", **kwargs) -> Dict[str, Any]:
     """Writes content to a text file."""
+    target = file_path or kwargs.get("path") or kwargs.get("filepath") or ""
+    body = content if content != "" else kwargs.get("text", kwargs.get("data", ""))
     try:
-        os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        return {"status": "success", "file_path": file_path, "bytes_written": len(content)}
+        if not target:
+            return {"status": "error", "error": "Missing destination file path"}
+        os.makedirs(os.path.dirname(os.path.abspath(target)), exist_ok=True)
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(body)
+        return {"status": "success", "file_path": target, "bytes_written": len(body)}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
-def list_dir_contents(directory_path: str = ".") -> Dict[str, Any]:
+def list_dir_contents(directory_path: str = ".", **kwargs) -> Dict[str, Any]:
     """Lists files and folders in a directory."""
+    target = kwargs.get("path") or kwargs.get("dir") or kwargs.get("folder") or directory_path or "."
     try:
-        if not os.path.exists(directory_path):
-            return {"status": "error", "error": f"Directory not found: {directory_path}"}
-        items = os.listdir(directory_path)
+        if not os.path.exists(target):
+            return {"status": "error", "error": f"Directory not found: {target}"}
+        items = os.listdir(target)
         return {"status": "success", "items": items, "count": len(items)}
     except Exception as e:
         return {"status": "error", "error": str(e)}

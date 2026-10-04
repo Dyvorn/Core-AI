@@ -3,11 +3,11 @@ import platform
 import os
 import sys
 
-def get_time() -> str:
+def get_time(**kwargs) -> str:
     """Returns the current system time."""
     return datetime.datetime.now().strftime("%H:%M")
 
-def get_system_status() -> dict:
+def get_system_status(**kwargs) -> dict:
     """
     Returns cross-platform system diagnostics:
     Works identically across Linux, Android/Termux, macOS, and Windows.
