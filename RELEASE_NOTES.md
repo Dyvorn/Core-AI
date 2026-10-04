@@ -71,7 +71,7 @@ Technology must elevate humanity—not extract rent, hoard behavioral telemetry,
 
 ---
 
-## 🛰️ SYSTEM ARCHITECTURE TOPOLOGY
+## 🛰️ SYSTEM ARCHITECTURE TOPOLOGY  (MADE WITH HELP OF AI)
 
 ```mermaid
 flowchart TB
