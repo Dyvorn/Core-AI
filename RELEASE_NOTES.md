@@ -11,7 +11,7 @@
 ║   ╚═════╝  ╚═════╝  ╚═╝  ╚═╝ ╚══════╝ ╚═╝   ╚═╝  ╚═╝ ╚═╝                             ║
 ║                                                                                      ║
 ║   CONCURRENT OMNIPRESENT REASONING ENGINE // SOVEREIGN LIFE OS                       ║
-║   ZERO CORPORATE RENT  //  ZERO CLOUD LOCK-IN  //  100% SELF-HOSTED                  ║
+║                                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════════════════════╝
 ```
 
