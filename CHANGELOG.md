@@ -18,11 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [[0.1.1-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.1.1-alpha) — 2026-10-04
 ### Codename: "Genesis (Patch 1)"
 
-```text
-┌───────────────────────┬───────────────────────┬───────────────────────┬───────────────────────┐
-│ KERNEL: v0.1.1-alpha  │ STATUS: OPERATIONAL   │ VERIFICATION: 96/96   │ ETHOS: #ANTISLOP      │
-└───────────────────────┴───────────────────────┴───────────────────────┴───────────────────────┘
-```
+| Kernel | Status | Verification | Ethos |
+| :---: | :---: | :---: | :---: |
+| **`v0.1.1-alpha`** | 🟢 **OPERATIONAL** | 🧪 **96 / 96 PASSED** | 🛡️ **#ANTISLOP** |
+
 
 Critical patch release hardening pipeline variable resolution, OS process resource tracking, and physical spatial zone lifecycle management.
 
