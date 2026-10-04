@@ -911,6 +911,8 @@ def run_interactive_repl(
 
 def main():
     setup_logging()
+    from interfaces.cli.setup_wizard import ensure_env_template
+    ensure_env_template()
     load_dotenv("config/.env")
     args = parse_args()
 
@@ -980,6 +982,14 @@ def main():
         play_boot_sequence(skip_anim=getattr(args, "no_anim", False))
 
     logger.info("Initializing Core AI Microkernel with Universal Gateway, Proactive Engine & Model Router...")
+
+    # Write PID file for process tracking
+    pid_file = os.path.join(os.path.dirname(__file__), ".core_ai.pid")
+    try:
+        with open(pid_file, "w", encoding="utf-8") as pf:
+            pf.write(str(os.getpid()))
+    except Exception:
+        pass
 
     # 1. State & Bus Core
     bus = EventBus()
@@ -1217,6 +1227,11 @@ def main():
             voice_out.stop()
         proactive.stop()
         bus.stop_listening()
+        if os.path.exists(pid_file):
+            try:
+                os.remove(pid_file)
+            except Exception:
+                pass
         logger.info("Core AI shutdown complete.")
 
 if __name__ == "__main__":

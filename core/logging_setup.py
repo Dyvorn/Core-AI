@@ -103,12 +103,13 @@ def setup_logging(
 
     context_filter = ContextFilter()
 
-    # 1. Colored Console Handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(log_level)
-    console_handler.setFormatter(ColoredConsoleFormatter())
-    console_handler.addFilter(context_filter)
-    root_logger.addHandler(console_handler)
+    # 1. Colored Console Handler (if attached to an active console)
+    if sys.stdout is not None:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(log_level)
+        console_handler.setFormatter(ColoredConsoleFormatter())
+        console_handler.addFilter(context_filter)
+        root_logger.addHandler(console_handler)
 
     # 2. Rotating File Handler
     file_handler = RotatingFileHandler(

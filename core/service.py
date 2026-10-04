@@ -16,13 +16,13 @@ def is_pid_alive(pid: int) -> bool:
         return False
     if os.name == "nt":
         try:
-            res = subprocess.run(
-                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-                capture_output=True,
-                text=True,
-                timeout=2.0
-            )
-            return str(pid) in res.stdout
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x00100000, False, pid)
+            if handle != 0:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
         except Exception:
             return False
     else:
@@ -36,8 +36,11 @@ def kill_process_tree(pid: int) -> bool:
     """Gracefully terminates a process and its child tree using OS native tools."""
     if os.name == "nt":
         try:
+            taskkill_bin = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "taskkill.exe")
+            if not os.path.exists(taskkill_bin):
+                taskkill_bin = "taskkill"
             res = subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                [taskkill_bin, "/F", "/T", "/PID", str(pid)],
                 capture_output=True,
                 text=True,
                 timeout=5.0
@@ -149,13 +152,13 @@ class ServiceManager:
                         stderr=subprocess.STDOUT
                     )
             else:
-                log_file = open(os.path.join(self.root_dir, "logs", "server_daemon.log"), "a", encoding="utf-8")
-                flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+                flags = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == "nt" else 0
                 proc = subprocess.Popen(
                     cmd,
                     cwd=self.root_dir,
-                    stdout=log_file,
-                    stderr=subprocess.STDOUT,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                     creationflags=flags
                 )
 

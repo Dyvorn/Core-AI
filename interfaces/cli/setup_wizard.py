@@ -90,7 +90,15 @@ def print_account_status_card(state: Optional[StateManager] = None):
     print(f"{CYAN}+=====================================================================+{RESET}\n")
 
 
-def reset_account_to_day_zero(state: Optional[StateManager] = None) -> bool:
+def ensure_env_template(env_path: str = "config/.env", example_path: str = "config/.env.example"):
+    """Ensures config/.env exists initialized from example template if absent."""
+    if not os.path.exists(env_path) and os.path.exists(example_path):
+        import shutil
+        os.makedirs(os.path.dirname(env_path), exist_ok=True)
+        shutil.copy(example_path, env_path)
+
+
+def reset_account_to_day_zero(state: Optional[StateManager] = None, full_wipe: bool = True) -> bool:
     """Resets local state database to a clean Day-Zero blank slate."""
     mgr = state or StateManager()
     default_profile = UserProfile(
@@ -101,11 +109,26 @@ def reset_account_to_day_zero(state: Optional[StateManager] = None) -> bool:
         preferences={}
     )
     mgr.save_user_profile(default_profile)
+    if full_wipe:
+        conn = mgr._get_connection()
+        try:
+            conn.execute("DELETE FROM zones")
+            conn.execute("DELETE FROM device_topology")
+            conn.execute("DELETE FROM audio_routes")
+            conn.execute("DELETE FROM execution_logs")
+            conn.execute("DELETE FROM pipeline_steps")
+            conn.execute("DELETE FROM pipelines")
+            conn.commit()
+        except Exception:
+            pass
+        finally:
+            conn.close()
     return True
 
 
 def run_setup(state: Optional[StateManager] = None):
     """Interactive first-run configuration wizard for Day-Zero initialization."""
+    ensure_env_template()
     load_dotenv("config/.env")
     mgr = state or StateManager()
     router = ModelRouter(state_manager=mgr)
@@ -232,10 +255,15 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "status":
         print_account_status_card()
     elif len(sys.argv) > 1 and sys.argv[1] == "reset":
-        confirm = input("[!] Are you sure you want to reset your local Sovereign Account to Day-Zero? [y/N]: ").strip().lower()
-        if confirm in ["y", "yes"]:
-            reset_account_to_day_zero()
-            print("[OK] Account reset to Day-Zero blank slate.")
+        force = "--force" in sys.argv or "-f" in sys.argv
+        if not force:
+            confirm = input("[!] Are you sure you want to reset your local Sovereign Account and data to Day-Zero? [y/N]: ").strip().lower()
+            do_reset = confirm in ["y", "yes"]
+        else:
+            do_reset = True
+        if do_reset:
+            reset_account_to_day_zero(full_wipe=True)
+            print("[OK] Local database and operator account reset to Day-Zero blank slate.")
         else:
             print("[*] Reset cancelled.")
     else:
