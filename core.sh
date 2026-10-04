@@ -31,6 +31,18 @@ case "$COMMAND" in
     status)
         "$PYTHON" -c "from core.service import ServiceManager; s = ServiceManager(); s.print_status_card()"
         ;;
+    account)
+        if [ "$2" = "setup" ] || [ "$2" = "init" ]; then
+            "$PYTHON" interfaces/install/setup_service.py
+        elif [ "$2" = "reset" ]; then
+            "$PYTHON" interfaces/cli/setup_wizard.py reset
+        else
+            "$PYTHON" interfaces/cli/setup_wizard.py status
+        fi
+        ;;
+    reset)
+        "$PYTHON" interfaces/cli/setup_wizard.py reset
+        ;;
     logo|anim)
         "$PYTHON" -m core.animation
         ;;
@@ -60,6 +72,9 @@ case "$COMMAND" in
         echo "    stop        - Stop running background server suite & free GPU/RAM"
         echo "    restart     - Restart Core AI background daemon"
         echo "    status      - Inspect running server status card, PID, and health"
+        echo "    account     - View Sovereign Operator Account identity & security card"
+        echo "    reset       - Reset local account database to clean Day-Zero state"
+        echo "    logo / anim - Launch interactive 3D Sovereign Core holographic viewer"
         echo "    update      - Self-update from GitHub with state backup & test guard"
         echo "    test        - Run automated test suite (pytest)"
         echo "    setup       - Run interactive bootstrap & autostart setup"

@@ -40,9 +40,9 @@ Thank you for contributing to Core AI. Core AI is an autonomous, open-source, so
 
 ## 3. Adding Tools
 
-- **Native Tools**: Add deterministic, system-level, or hardware tools to [tools/native/](file:///g:/VSC_Projects/Core%20AI/tools/native/) and expose a valid JSON schema.
-- **Dynamic Tools**: Tools generated dynamically by the AI are persisted in [tools/dynamic/](file:///g:/VSC_Projects/Core%20AI/tools/dynamic/). Dynamic tools must pass AST security inspection (no `subprocess`, `ctypes`, or arbitrary code injection).
-- **Remote Edge Tools**: Register physical device capabilities via [tools/remote_dispatcher.py](file:///g:/VSC_Projects/Core%20AI/tools/remote_dispatcher.py).
+- **Native Tools**: Add deterministic, system-level, or hardware tools to [tools/native/](tools/native/) and expose a valid JSON schema.
+- **Dynamic Tools**: Tools generated dynamically by the AI are persisted in [tools/dynamic/](tools/dynamic/). Dynamic tools must pass AST security inspection (no `subprocess`, `ctypes`, or arbitrary code injection).
+- **Remote Edge Tools**: Register physical device capabilities via [tools/remote_dispatcher.py](tools/remote_dispatcher.py).
 
 ---
 

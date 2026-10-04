@@ -110,14 +110,14 @@ def test_gateway_hud_card_dispatch(gateway_client):
 def test_gateway_device_enrollment_owner_and_guest(gateway_client):
     client, state = gateway_client
 
-    # 1. Enroll Owner Laptop with valid secret
+    valid_secret = os.getenv("CORE_AUTH_SECRET", "core_sovereign_secret")
     owner_req = {
         "device_id": "laptop_thinkpad",
-        "device_name": "Lennard ThinkPad",
+        "device_name": "Operator ThinkPad",
         "device_type": "laptop",
         "target_zone": "home/indoor/studio",
         "requested_trust_tier": "owner",
-        "auth_secret": "core_sovereign_secret"
+        "auth_secret": valid_secret
     }
     res1 = client.post("/api/v1/devices/enroll", json=owner_req)
     assert res1.status_code == 200

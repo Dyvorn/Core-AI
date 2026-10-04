@@ -12,7 +12,7 @@
 ```
 
 ```text
-[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.1.0-alpha ]  [ TESTS: 84/84 PASSED ]
+[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.1.0-alpha ]  [ TESTS: 86/86 PASSED ]
 [ LICENSE: AGPL-3.0-ONLY ]   [ ARCHITECTURE: ASYNC-DAG ] [ ETHOS: #ANTISLOP ]
 ```
 
@@ -211,21 +211,21 @@ Core AI enforces three immutable security tiers:
 ## Subsystem Deep Dive
 
 ### 1. Tool Introspection & Registry
-- **File Reference**: [tools/registry.py](file:///g:/VSC_Projects/Core%20AI/tools/registry.py)
+- **File Reference**: [tools/registry.py](tools/registry.py)
 - Maintains both native built-in tools and self-synthesized dynamic tools.
 - Generates runtime JSON schemas via `get_tool_catalog()` formatted for LLM reasoning.
 - Scans `tools/dynamic/` on startup with zero-restart hot-reloading (`reload_dynamic_tools()`).
 - Yields structured `StepResult` objects containing exact execution duration (`duration_ms`), success status, output payloads, and stacktraces.
 
 ### 2. Autonomous DAG Pipeline Engine
-- **File Reference**: [brain/pipeline_engine.py](file:///g:/VSC_Projects/Core%20AI/brain/pipeline_engine.py)
+- **File Reference**: [brain/pipeline_engine.py](brain/pipeline_engine.py)
 - Parses multi-step dependency graphs from arbitrary operational goals.
 - **Concurrent Execution ("Multiple Things At Once")**: Automatically identifies independent branches and runs them in parallel via `asyncio.gather` and thread worker pools.
 - **Dynamic Variable Piping**: Steps reference earlier outputs using runtime syntax like `{{steps.math_step.output.result}}` or `$step_id.field`.
 - Persists step state transitions directly to SQLite (`core_ai.db`).
 
 ### 3. Self-Extension & Dynamic Tool Synthesis
-- **File Reference**: [brain/dynamic_generator.py](file:///g:/VSC_Projects/Core%20AI/brain/dynamic_generator.py)
+- **File Reference**: [brain/dynamic_generator.py](brain/dynamic_generator.py)
 - When a required tool is missing:
   1. **Code Generation**: Generates compliant Python implementations conforming to strict schema rules.
   2. **Security Gate (AST Validation)**: Validates the abstract syntax tree to disallow unsafe packages (`subprocess`, `shutil`, `ctypes`) and dangerous calls (`fork`, `eval`, `exec`).
@@ -233,21 +233,21 @@ Core AI enforces three immutable security tiers:
   4. **Persistence & Hot-Reload**: Writes the tool to `tools/dynamic/<tool_name>.py`, stores metadata in SQLite, and registers it into `ToolRegistry` with zero downtime.
 
 ### 4. Jarvis-Like Failure Awareness
-- **File Reference**: [brain/pipeline_engine.py](file:///g:/VSC_Projects/Core%20AI/brain/pipeline_engine.py) & [brain/planner.py](file:///g:/VSC_Projects/Core%20AI/brain/planner.py)
+- **File Reference**: [brain/pipeline_engine.py](brain/pipeline_engine.py) & [brain/planner.py](brain/planner.py)
 - When a tool returns an error status or throws an exception:
   - Generates a structured `FailureDiagnosis` (failed step, tool name, error message, root-cause analysis, remediation strategy).
   - Distinguishes between retryable faults (transient network glitches, parameter formatting) and fatal faults (missing hardware, unregistered tools).
   - Triggers self-healing retries with exponential backoff or re-plans alternative tool routes.
 
 ### 5. Multi-Sink Logging & Audit Trails
-- **File Reference**: [core/logging_setup.py](file:///g:/VSC_Projects/Core%20AI/core/logging_setup.py)
+- **File Reference**: [core/logging_setup.py](core/logging_setup.py)
 - **High-Contrast Console**: Formatted log lines with timestamps, log levels, and subsystem tags.
 - **Rotating System Log**: `logs/core_ai.log` with automatic 5MB rotation and 5 archival backups.
 - **Immutable JSONL Audit Trail**: `logs/pipelines.jsonl` recording machine-readable lifecycle transitions for every pipeline execution.
 - **Database Logs**: Structured execution history stored in the `execution_logs` SQLite table.
 
 ### 6. Spatial Audio Routing & Cross-Zone Handoff
-- **File References**: [engines/audio_router.py](file:///g:/VSC_Projects/Core%20AI/engines/audio_router.py) & [brain/spatial_handoff.py](file:///g:/VSC_Projects/Core%20AI/brain/spatial_handoff.py)
+- **File References**: [engines/audio_router.py](engines/audio_router.py) & [brain/spatial_handoff.py](brain/spatial_handoff.py)
 - Dynamically queries host soundcards via `sounddevice.query_devices()` without hardcoding device indices.
 - Binds audio inputs and outputs to arbitrary zone IDs in SQLite.
 - Seamlessly transfers active microphone and speaker streams when the operator moves between spaces (`SpatialHandoffEvent`).
@@ -539,7 +539,7 @@ Real-time audio route binding stored in SQLite and managed on the fly:
 
 To ensure issues and edge-cases are **never lost** over this multi-year initiative, all bugs, limitations, and architectural debts are logged in:
 
-**[docs/PROBLEMS_AND_DEBT.md](file:///g:/VSC_Projects/Core%20AI/docs/PROBLEMS_AND_DEBT.md)**
+**[docs/PROBLEMS_AND_DEBT.md](docs/PROBLEMS_AND_DEBT.md)**
 
 Whenever you discover a bug or limitation, record:
 1. Issue ID & Component.

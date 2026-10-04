@@ -114,6 +114,10 @@ def print_help():
     print(f"  {GREEN}handoff <zone>{RESET}            - Transition spatial anchor & auto-route audio to new zone")
     print(f"  {GREEN}voice on / voice off{RESET}       - Toggle background microphone listening")
     print(f"  {GREEN}status{RESET}                    - Inspect system health, platform architecture & model status")
+    print(f"  {GREEN}account{RESET}                   - View Sovereign Operator Account identity, space & credentials")
+    print(f"  {GREEN}account edit{RESET}              - Re-run interactive Sovereign Account setup wizard")
+    print(f"  {GREEN}account secret{RESET}            - View Sovereign Auth Secret for edge device pairing")
+    print(f"  {GREEN}account reset{RESET}             - Safely reset local account database to clean Day-Zero state")
     print(f"  {GREEN}profile{RESET}                   - View operator identity, aliases, and preferences")
     print(f"  {GREEN}profile set <name> [alias]{RESET}- Update operator name and aliases")
     print(f"  {GREEN}zones{RESET}                     - List all dynamically registered spatial zones")
@@ -523,6 +527,39 @@ def run_interactive_repl(
                     print(f"  Chime-In Reply: {MAGENTA}'{dec.autonomous_response}'{RESET}")
                 print()
 
+            elif cmd_lower in ["account", "account show", "account status"]:
+                from interfaces.cli.setup_wizard import print_account_status_card
+                print_account_status_card(state)
+
+            elif cmd_lower in ["account edit", "account setup", "account init"]:
+                from interfaces.cli.setup_wizard import run_setup
+                p = run_setup(state=state)
+                active_name = p.preferred_name
+                active_zone = p.preferences.get("primary_space", "office")
+                print(f"{GREEN}[OK] Sovereign account updated. Operator: {active_name} @ {active_zone}{RESET}\n")
+
+            elif cmd_lower == "account secret":
+                auth_secret = os.getenv("CORE_AUTH_SECRET", "core_sovereign_secret")
+                print(f"\n{BRIGHT}--- Sovereign Auth Secret ---{RESET}")
+                print(f"  Secret: {CYAN}{auth_secret}{RESET}")
+                print(f"  To enroll another device (laptop, phone, SBC):")
+                print(f"    python -m interfaces.install.enroll --host http://localhost:{port} --secret \"{auth_secret}\"\n")
+
+            elif cmd_lower == "account reset":
+                try:
+                    conf = input(f"{RED}[!] Are you sure you want to reset your local Sovereign Account to Day-Zero? [y/N]: {RESET}").strip().lower()
+                    if conf in ["y", "yes"]:
+                        from interfaces.cli.setup_wizard import reset_account_to_day_zero
+                        reset_account_to_day_zero(state)
+                        p = state.get_user_profile()
+                        active_name = p.preferred_name
+                        active_zone = "default"
+                        print(f"{GREEN}[OK] Local account reset to Day-Zero blank slate.{RESET}\n")
+                    else:
+                        print(f"{YELLOW}[*] Account reset cancelled.{RESET}\n")
+                except (KeyboardInterrupt, EOFError):
+                    print()
+
             elif cmd_lower == "profile":
                 p = state.get_user_profile()
                 print(f"\n{BRIGHT}--- Operator Profile ---{RESET}")
@@ -907,7 +944,7 @@ def main():
                 )
                 with urllib.request.urlopen(req, timeout=30.0) as resp:
                     res = json.loads(resp.read().decode("utf-8"))
-                    out_text = res.get("final_output") or (res["steps"][-1].get("output") if res.get("steps") else "Task complete.")
+                    out_text = res.get("spoken_response") or res.get("final_output") or (res["steps"][-1].get("output") if res.get("steps") else "Task complete.")
                     if isinstance(out_text, dict):
                         out_msg = out_text.get("message") or out_text.get("status") or str(out_text)
                     else:
@@ -931,7 +968,7 @@ def main():
         bus = EventBus()
         engine = PipelineEngine(registry=registry, state_manager=state, bus=bus)
         profile = state.get_user_profile()
-        active_zone = profile.preferences.get("primary_space", "studio")
+        active_zone = profile.preferences.get("primary_space", "office")
 
         plan = planner.plan_problem(target_goal, {"zone": active_zone, "operator": profile.preferred_name})
         finished = asyncio.run(engine.execute_pipeline(plan))
@@ -951,9 +988,22 @@ def main():
     relocator = OperatorRelocator(state_manager=state)
     registry = setup_tools(state=state, relocator=relocator)
     profile = state.get_user_profile()
+
+    # Day-Zero Check for interactive console
+    if not args.headless:
+        from interfaces.cli.setup_wizard import is_account_initialized, run_setup
+        if not is_account_initialized(state):
+            print(f"\n{YELLOW}[!] Day-Zero Blank Slate: No Sovereign Operator Account configured.{RESET}")
+            try:
+                init_resp = input(f"{CYAN}[?] Initialize your Sovereign Core Account now? [Y/n]: {RESET}").strip().lower()
+                if init_resp in ["", "y", "yes"]:
+                    profile = run_setup(state=state)
+            except (KeyboardInterrupt, EOFError):
+                print()
+
     operator_name = profile.preferred_name
-    primary_zone = profile.preferences.get("primary_space", "studio")
-    state.ensure_zone_exists(primary_zone, display_name=f"{operator_name}'s Primary Zone")
+    primary_zone = profile.preferences.get("primary_space", "office")
+    state.ensure_zone_exists(primary_zone, display_name=f"{operator_name}'s Primary Space")
 
     # 2. Remote Edge Dispatcher
     remote_dispatcher = RemoteToolDispatcher(registry=registry)

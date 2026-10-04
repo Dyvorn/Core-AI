@@ -19,6 +19,8 @@ if /i "%~1"=="setup" goto setup
 if /i "%~1"=="stop" goto stop
 if /i "%~1"=="restart" goto restart
 if /i "%~1"=="status" goto status
+if /i "%~1"=="account" goto account
+if /i "%~1"=="reset" goto reset
 if /i "%~1"=="logo" goto logo
 if /i "%~1"=="anim" goto logo
 if /i "%~1"=="backup" goto backup
@@ -56,6 +58,17 @@ goto :eof
 "%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); s.print_status_card()"
 goto :eof
 
+:account
+if /i "%~2"=="setup" goto setup
+if /i "%~2"=="init" goto setup
+if /i "%~2"=="reset" goto reset
+"%PYTHON%" interfaces\cli\setup_wizard.py status
+goto :eof
+
+:reset
+"%PYTHON%" interfaces\cli\setup_wizard.py reset
+goto :eof
+
 :backup
 "%PYTHON%" -c "from core.updater import CoreUpdater; u = CoreUpdater(); d, e = u.create_state_snapshot(); print('[OK] Snapshot preserved:\n  Database: ' + str(d) + '\n  Config:   ' + str(e))"
 goto :eof
@@ -90,6 +103,9 @@ echo     start       - Start Core AI in background daemon mode (24/7 Service)
 echo     stop        - Stop running background server suite ^& free GPU/RAM
 echo     restart     - Restart Core AI background daemon
 echo     status      - Inspect running server status card, PID, and health
+echo     account     - View Sovereign Operator Account identity ^& security card
+echo     reset       - Reset local account database to clean Day-Zero state
+echo     logo / anim - Launch interactive 3D Sovereign Core holographic viewer
 echo     update      - Self-update from GitHub with state backup ^& test guard
 echo     test        - Run automated test suite (pytest)
 echo     setup       - Run interactive bootstrap ^& autostart setup

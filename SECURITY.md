@@ -46,7 +46,7 @@ flowchart TD
 
 ## 2. Dynamic Tool Synthesis Sandbox
 When Core AI synthesizes a new tool on the fly to bridge a capability gap:
-1. **Static AST Analysis**: Before code is ever loaded into Python, [brain/dynamic_generator.py](file:///g:/VSC_Projects/Core%20AI/brain/dynamic_generator.py) inspects the Abstract Syntax Tree. Any attempt to import prohibited modules (`subprocess`, `shutil`, `ctypes`, `socket`, `pty`, `multiprocessing`) or execute arbitrary reflection (`eval`, `exec`, `__import__`) is rejected.
+1. **Static AST Analysis**: Before code is ever loaded into Python, [brain/dynamic_generator.py](brain/dynamic_generator.py) inspects the Abstract Syntax Tree. Any attempt to import prohibited modules (`subprocess`, `shutil`, `ctypes`, `socket`, `pty`, `multiprocessing`) or execute arbitrary reflection (`eval`, `exec`, `__import__`) is rejected.
 2. **Ephemeral Sandbox Execution**: The tool is executed in an isolated local dictionary scope with test parameters.
 3. **Atomic Persistence**: Only after the sandbox execution succeeds is the tool written to `tools/dynamic/` and hot-loaded into the runtime.
 
@@ -54,9 +54,9 @@ When Core AI synthesizes a new tool on the fly to bridge a capability gap:
 
 ## 3. Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 2.0.x   | :white_check_mark: |
+| Version    | Supported          |
+| ---------- | ------------------ |
+| 0.1.x      | :white_check_mark: |
 | 1.0.x   | :x:                |
 
 ---

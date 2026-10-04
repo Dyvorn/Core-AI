@@ -59,5 +59,11 @@ The inaugural public alpha release of **C.O.R.E. AI** (**C**oncurrent **O**mnipr
 - **Harm-Free Unstoppable Agency (`brain/safety.py`)**:
   - Rejection of corporate refusal slop and patronizing lectures.
   - Defense gates strictly targeting true catastrophic destruction (disk wipes, fork bombs).
+- **Sovereign Operator Account & Day-Zero Architecture (`interfaces/cli/setup_wizard.py`)**:
+  - Pure day-zero blank slate: repository contains zero hardcoded user profiles or personal credentials.
+  - Automatic first-boot detection prompting new operators to configure their call sign, aliases, primary space, and model preferences.
+  - Cryptographic Sovereign Auth Secret generation (256-bit) for secure OWNER-tier device enrollment across LAN/Mesh.
+  - Terminal-native account lifecycle commands (`core account`, `core account setup`, `core account reset`).
+  - Terminal-first UI model: zero hardcoded graphical/web UI bloat in core; all external displays act as decoupled WebSocket/REST clients.
 - **Verification**:
-  - 84 automated unit and integration tests passing with 100% green status.
+  - 86 automated unit and integration tests passing with 100% green status.

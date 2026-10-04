@@ -238,11 +238,14 @@ def create_gateway_app(
         """Synchronously decompose, execute, and return completed pipeline result."""
         plan = planner.plan_problem(request.goal, request.context)
         finished = await pipeline_engine.execute_pipeline(plan)
+        profile = state_manager.get_user_profile()
+        spoken = planner.formulate_spoken_response(finished, profile=profile)
         return {
             "pipeline_id": finished.id,
             "status": finished.status,
             "goal": finished.goal,
             "final_output": finished.final_output,
+            "spoken_response": spoken,
             "error_summary": finished.error_summary,
             "step_count": len(finished.steps),
             "steps": [s.model_dump() for s in finished.steps]

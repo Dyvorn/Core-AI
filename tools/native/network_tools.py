@@ -41,31 +41,13 @@ def scan_local_network(timeout_sec: float = 1.0) -> Dict[str, Any]:
 
                 if candidate_ip and candidate_ip not in seen_ips:
                     seen_ips.add(candidate_ip)
-                    # Attempt quick reverse hostname lookup
-                    hostname = None
-                    try:
-                        hostname = socket.gethostbyaddr(candidate_ip)[0]
-                    except Exception:
-                        hostname = None
-
-                    # Infer device hint
-                    hint = "smart_device"
-                    h_lower = (hostname or "").lower()
-                    if "fridge" in h_lower or "refrigerator" in h_lower or "samsung" in h_lower:
-                        hint = "smart_fridge"
-                    elif "homeassistant" in h_lower or "hass" in h_lower:
-                        hint = "home_assistant_server"
-                    elif "tv" in h_lower or "roku" in h_lower or "bravia" in h_lower:
-                        hint = "smart_tv"
-                    elif "phone" in h_lower or "android" in h_lower or "iphone" in h_lower:
-                        hint = "mobile_phone"
-                    elif "router" in h_lower or "gateway" in h_lower:
-                        hint = "network_router"
+                    # Fast local device hint without blocking DNS
+                    hint = "network_router" if candidate_ip.endswith(".1") else "smart_device"
 
                     devices.append({
                         "ip": candidate_ip,
                         "mac": mac or "unknown",
-                        "hostname": hostname,
+                        "hostname": None,
                         "device_hint": hint
                     })
     except Exception as e:
