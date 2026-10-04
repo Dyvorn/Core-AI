@@ -538,6 +538,37 @@ class StateManager:
         finally:
             conn.close()
 
+    def delete_zone(self, zone_id: str) -> bool:
+        """Deletes a spatial zone from the database."""
+        clean_id = zone_id.strip().lower()
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("DELETE FROM zones WHERE LOWER(zone_id) = ?", (clean_id,))
+            conn.commit()
+            deleted = cursor.rowcount > 0
+            if deleted:
+                logger.info(f"Deleted spatial zone: '{clean_id}'")
+            return deleted
+        finally:
+            conn.close()
+
+    def delete_all_zones_except(self, keep_zone_ids: List[str]) -> List[str]:
+        """Deletes all spatial zones except the specified keep list."""
+        clean_keeps = [k.strip().lower() for k in keep_zone_ids if k.strip()]
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT zone_id FROM zones")
+            all_zones = [row[0] for row in cursor.fetchall()]
+            to_delete = [z for z in all_zones if z.lower() not in clean_keeps]
+            for zid in to_delete:
+                conn.execute("DELETE FROM zones WHERE zone_id = ?", (zid,))
+            conn.commit()
+            if to_delete:
+                logger.info(f"Deleted spatial zones: {to_delete}. Preserved: {clean_keeps}")
+            return to_delete
+        finally:
+            conn.close()
+
     # --- Device Topology (Fixed vs. Roaming Devices) ---
     def register_or_update_device(self, record: DeviceTopologyRecord):
         conn = self._get_connection()

@@ -15,6 +15,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [[0.1.1-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.1.1-alpha) — 2026-10-04
+### Codename: "Genesis (Patch 1)"
+
+```text
+┌───────────────────────┬───────────────────────┬───────────────────────┬───────────────────────┐
+│ KERNEL: v0.1.1-alpha  │ STATUS: OPERATIONAL   │ VERIFICATION: 96/96   │ ETHOS: #ANTISLOP      │
+└───────────────────────┴───────────────────────┴───────────────────────┴───────────────────────┘
+```
+
+Critical patch release hardening pipeline variable resolution, OS process resource tracking, and physical spatial zone lifecycle management.
+
+### 🐛 Fixed & Hardened
+
+#### 🧠 Pipeline Engine Nested Array Resolution & Fuzzy Property Matching (`brain/pipeline_engine.py`)
+- **Nested Bracket Template Parsing**: Added `_traverse_field_path` to support array and index bracket syntax (`discovered_devices.[0].ip_address`, `devices[0].ip`, `devices.0.ip`).
+- **Semantic Field Aliasing**: Resolves common LLM hallucinations transparently (e.g. mapping `discovered_devices` $\to$ `devices`, `ip_address` $\to$ `ip`, and `device_name` $\to$ `name`).
+
+#### ⚡ RAM & Hardware Metric Process Inspection (`tools/native/process_tools.py`, `brain/planner.py`)
+- **Memory Consumption Aggregation & Sorting**: Parses raw OS process memory strings on Windows/Linux, sorting processes descending by RAM usage and aggregating instances across applications (e.g., grouping multi-process browser tabs and background workers).
+- **Native RAM Query Routing**: Directly routes queries like *"whats pulling most ram"* and *"whats my ram doing"* to concurrent hardware metrics and sorted process analysis, delivering concrete utilization numbers and top memory consumers in spoken output.
+- **Resilient Math Evaluation (`tools/native/math_tools.py`)**: Added keyword argument resilience to `calculate_math` to gracefully handle unexpected parameter calls (`field="memory_usage"`) without raising `TypeError`.
+
+#### 🏛️ True Spatial Zone Pruning & Removal Lifecycle (`core/state.py`, `main.py`)
+- **Database-Level Zone Deletion**: Implemented `StateManager.delete_zone()` and `StateManager.delete_all_zones_except()`, ensuring spatial zone cleanup persists cleanly in SQLite.
+- **Native Tool `remove_spatial_zone`**: Registered native deletion tool with support for `all_except` / `keep_zone` filtering (e.g., *"remove all zones exept office"* cleanly purges unneeded zones from SQLite without generating unneeded dynamic tools).
+- **CLI REPL Command**: Added `zone rm <zone_id>` and `zone remove <zone_id>` to the interactive Core Terminal shell.
+
+---
+
 ## [[0.1.0-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.1.0-alpha) — 2026-10-04
 ### Codename: "Genesis"
 

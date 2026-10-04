@@ -12,13 +12,13 @@
 ```
 
 ```text
-[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.1.0-alpha ]  [ TESTS: 87/87 PASSED (100%) ]
+[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.1.1-alpha ]  [ TESTS: 96/96 PASSED (100%) ]
 [ LICENSE: AGPL-3.0-ONLY ]   [ ARCHITECTURE: ASYNC-DAG ] [ ETHOS: #ANTISLOP ]
 ```
 
 > **A self-hosted, sovereign, and privacy-first AI companion built to integrate into daily life across your workspace, living spaces, grounds, vehicle, bicycle, wearables, and mobile devices. Zero big-tech cloud lock-in, zero hardcoded assumptions, and engineered for multi-year evolution.**
 >
-> 🚀 **Genesis Release v0.1.0-alpha is LIVE!** Explore the full [Release Notes](RELEASE_NOTES.md) and [Changelog](CHANGELOG.md).
+> 🚀 **Release v0.1.1-alpha is LIVE!** Explore the full [Release Notes](RELEASE_NOTES.md) and [Changelog](CHANGELOG.md).
 
 ---
 

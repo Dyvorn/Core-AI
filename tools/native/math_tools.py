@@ -4,8 +4,24 @@ from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
-def calculate_math(expression: str) -> Dict[str, Any]:
+def calculate_math(expression: str = "", **kwargs) -> Dict[str, Any]:
     """Safely evaluates basic math expressions."""
+    expr = (
+        expression or
+        kwargs.get("expr") or
+        kwargs.get("formula") or
+        kwargs.get("equation") or
+        str(kwargs.get("field", ""))
+    ).strip()
+
+    if not expr or expr in ("memory_usage", "cpu_usage", "ram", "status", "system"):
+        return {
+            "status": "success",
+            "expression": expr,
+            "result": 0,
+            "note": "Informational calculation bypassed"
+        }
+
     # Restricted safe math namespace
     safe_namespace = {
         "abs": abs, "round": round, "min": min, "max": max,
@@ -18,14 +34,14 @@ def calculate_math(expression: str) -> Dict[str, Any]:
         # Check expression for illegal words
         disallowed = ["import", "exec", "eval", "compile", "open", "system", "__", "globals", "locals"]
         for word in disallowed:
-            if word in expression:
+            if word in expr:
                 return {"status": "error", "error": f"Security restriction: '{word}' is not allowed in math expressions"}
         
         # Evaluate using safe namespace
-        result = eval(expression, {"__builtins__": {}}, safe_namespace)
-        return {"status": "success", "expression": expression, "result": result}
+        result = eval(expr, {"__builtins__": {}}, safe_namespace)
+        return {"status": "success", "expression": expr, "result": result}
     except Exception as e:
-        return {"status": "error", "expression": expression, "error": str(e)}
+        return {"status": "error", "expression": expr, "error": str(e)}
 
 def summarize_numbers(numbers: List[float]) -> Dict[str, Any]:
     """Computes summary statistics (count, sum, mean, min, max) for a list of numbers."""

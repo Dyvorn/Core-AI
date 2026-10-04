@@ -6,7 +6,9 @@ import subprocess
 import csv
 import io
 import logging
+import re
 from typing import Dict, Any, Optional, List
+from collections import defaultdict
 
 logger = logging.getLogger("CoreAI.ProcessTools")
 
@@ -17,13 +19,27 @@ PROTECTED_PROCESSES = {
     "dwm.exe", "explorer.exe", "kernel", "init", "systemd"
 }
 
-def list_running_processes(filter_name: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
+def _format_kb(kb: int) -> str:
+    if kb >= 1024 * 1024:
+        return f"{round(kb / (1024 * 1024), 2)} GB"
+    elif kb >= 1024:
+        return f"{round(kb / 1024, 1)} MB"
+    return f"{kb} KB"
+
+def list_running_processes(
+    filter_name: Optional[str] = None,
+    limit: int = 15,
+    sort_by: str = "memory",
+    **kwargs
+) -> Dict[str, Any]:
     """
     Lists currently running OS processes, memory usage, and PIDs.
     Uses native tasklist on Windows or ps on Linux/macOS with zero pip dependencies.
+    Accurately sorts and aggregates memory consumption to identify resource-heavy applications.
     """
     system = platform.system()
-    filter_clean = filter_name.lower().strip() if filter_name else None
+    filter_clean = (filter_name or kwargs.get("name") or kwargs.get("filter", "")).lower().strip() or None
+    sort_target = (sort_by or kwargs.get("sort", "memory")).lower().strip()
     results = []
 
     try:
@@ -37,10 +53,14 @@ def list_running_processes(filter_name: Optional[str] = None, limit: int = 20) -
                     img_name, pid, session_name, session_num, mem_usage = row[0], row[1], row[2], row[3], row[4]
                     if filter_clean and filter_clean not in img_name.lower():
                         continue
+                    clean_digits = re.sub(r"[^\d]", "", mem_usage)
+                    mem_kb = int(clean_digits) if clean_digits else 0
                     results.append({
                         "name": img_name,
                         "pid": pid,
-                        "memory": mem_usage
+                        "memory": mem_usage.strip(),
+                        "memory_kb": mem_kb,
+                        "memory_formatted": _format_kb(mem_kb)
                     })
         else:
             cmd = ["ps", "-eo", "pid,comm,%mem,%cpu", "--sort=-%mem"]
@@ -52,17 +72,47 @@ def list_running_processes(filter_name: Optional[str] = None, limit: int = 20) -
                     pid, comm, pmem, pcpu = parts[0], parts[1], parts[2], parts[3]
                     if filter_clean and filter_clean not in comm.lower():
                         continue
+                    try:
+                        mem_val = float(pmem.replace("%", ""))
+                    except Exception:
+                        mem_val = 0.0
                     results.append({
                         "name": comm,
                         "pid": pid,
                         "memory": f"{pmem}%",
+                        "memory_kb": int(mem_val * 1000),
                         "cpu": f"{pcpu}%"
                     })
 
-        total_found = len(results)
+        # Sort by memory if requested
+        if sort_target in ("memory", "ram", "mem"):
+            results.sort(key=lambda p: p.get("memory_kb", 0), reverse=True)
+
+        # Aggregate memory per application name (grouping all instances of chrome, python, etc.)
+        aggregated: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"count": 0, "total_kb": 0})
+        for p in results:
+            name_key = p["name"]
+            aggregated[name_key]["count"] += 1
+            aggregated[name_key]["total_kb"] += p.get("memory_kb", 0)
+
+        sorted_groups = sorted(aggregated.items(), key=lambda kv: kv[1]["total_kb"], reverse=True)
+        top_apps = [
+            {
+                "app": app_name,
+                "total_memory": _format_kb(info["total_kb"]),
+                "instances": info["count"]
+            }
+            for app_name, info in sorted_groups[:5]
+        ]
+
+        leader = top_apps[0] if top_apps else None
+        top_summary = f"{leader['app']} pulling {leader['total_memory']} across {leader['instances']} process(es)" if leader else "None"
+
         return {
             "status": "success",
-            "count": total_found,
+            "count": len(results),
+            "top_consumer": top_summary,
+            "top_apps": top_apps,
             "processes": results[:limit]
         }
     except Exception as e:
@@ -190,7 +240,7 @@ def lock_workstation() -> Dict[str, Any]:
 
 list_running_processes_schema = {
     "name": "list_running_processes",
-    "description": "Lists running applications and processes on the machine with memory usage and PIDs.",
+    "description": "Lists running applications and processes on the machine with memory usage and PIDs. Can sort by memory consumption to find RAM hogs.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -198,9 +248,13 @@ list_running_processes_schema = {
                 "type": "string",
                 "description": "Optional name or substring to filter processes (e.g. 'chrome', 'python')"
             },
+            "sort_by": {
+                "type": "string",
+                "description": "Metric to sort by: 'memory' (default, to find what is pulling the most RAM), 'cpu', or 'name'"
+            },
             "limit": {
                 "type": "integer",
-                "description": "Maximum number of processes to return (default: 20)"
+                "description": "Maximum number of processes to return (default: 15)"
             }
         }
     }

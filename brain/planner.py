@@ -368,6 +368,53 @@ class Planner:
                 depends_on=[]
             ))
 
+        # Pattern: RAM & Process Inspection ("whats pulling most ram", "whats my ram doing", "welche app zieht ram")
+        elif any(k in goal_lower for k in [
+            "pulling most ram", "pulling ram", "using most ram", "taking most ram", "most ram",
+            "top ram", "ram doing", "my ram", "speicherfresser", "zieht ram", "ram verbrauch", "highest memory"
+        ]):
+            steps.append(PipelineStep(
+                id="get_hardware_step",
+                name="Inspect Hardware Metrics",
+                tool_name="get_hardware_metrics",
+                arguments={},
+                depends_on=[]
+            ))
+            steps.append(PipelineStep(
+                id="list_processes_step",
+                name="List Top RAM Processes",
+                tool_name="list_running_processes",
+                arguments={"sort_by": "memory", "limit": 10},
+                depends_on=[]
+            ))
+
+        # Pattern: Spatial Zone Pruning & Removal ("remove all zones exept office", "delete zone studio")
+        elif any(k in goal_lower for k in [
+            "remove all zones", "delete all zones", "alle zonen löschen", "alle zonen entfernen",
+            "remove zone", "delete zone", "lösche zone", "entferne zone"
+        ]):
+            # Check for "except" or "exept" or "außer"
+            except_match = re.search(r"(?:except|exept|außer|ausser|preserving|keep|keeping)\s+([a-zA-Z0-9_\-]+)", goal_lower)
+            if except_match:
+                keep_target = except_match.group(1).strip()
+                steps.append(PipelineStep(
+                    id="remove_zones_step",
+                    name=f"Remove All Zones Except '{keep_target}'",
+                    tool_name="remove_spatial_zone",
+                    arguments={"all_except": keep_target},
+                    depends_on=[]
+                ))
+            else:
+                zone_match = re.search(r"(?:zone|raum)\s+([a-zA-Z0-9_\-]+)", goal_lower)
+                target_zid = zone_match.group(1).strip() if zone_match else "temp"
+                steps.append(PipelineStep(
+                    id="remove_zone_step",
+                    name=f"Remove Spatial Zone '{target_zid}'",
+                    tool_name="remove_spatial_zone",
+                    arguments={"zone_id": target_zid},
+                    depends_on=[]
+                ))
+
         # Pattern: Home assistant device control
         elif any(k in goal_lower for k in ["turn on", "turn off", "schalte", "licht", "light", "lampe"]):
             entity = "light.living_room"
@@ -872,7 +919,50 @@ Do NOT output any markdown formatting or commentary outside the JSON.
             else:
                 return f"Understood {name}. Updated your location to the {target_name}. Audio and display context re-routed."
 
-        # 8. Real-Time Weather & Temperature
+        # 8. Spatial Zone Pruning & Removal
+        if "remove_spatial_zone" in step_outputs:
+            rm_res = step_outputs["remove_spatial_zone"]
+            if isinstance(rm_res, dict) and rm_res.get("status") == "success":
+                action = rm_res.get("action")
+                if action == "delete_all_except":
+                    kept = ", ".join(rm_res.get("kept_zones", ["office"])).title()
+                    del_count = rm_res.get("deleted_count", 0)
+                    if language == "de":
+                        return f"Alle Zonen außer '{kept}' wurden erfolgreich gelöscht ({del_count} entfernt), {name}."
+                    else:
+                        return f"All spatial zones except '{kept}' have been removed ({del_count} deleted), {name}."
+                else:
+                    zid = rm_res.get("zone_id", "zone")
+                    if language == "de":
+                        return f"Die Zone '{zid}' wurde gelöscht, {name}."
+                    else:
+                        return f"Spatial zone '{zid}' has been removed, {name}."
+
+        # 9. RAM & Process Monitoring
+        if "list_running_processes" in step_outputs or ("get_hardware_metrics" in step_outputs and any(w in plan.goal.lower() for w in ["ram", "memory", "speicher"])):
+            proc_res = step_outputs.get("list_running_processes") or {}
+            hw_res = step_outputs.get("get_hardware_metrics") or {}
+            top_con = proc_res.get("top_consumer") if isinstance(proc_res, dict) else None
+            mem_info = hw_res.get("metrics", {}).get("memory", {}) if isinstance(hw_res, dict) else {}
+            used_pct = mem_info.get("percent_used")
+
+            if top_con and used_pct is not None:
+                if language == "de":
+                    return f"Dein RAM ist aktuell zu {used_pct}% ausgelastet, {name}. Der größte Speicherverbraucher ist {top_con}."
+                else:
+                    return f"Your RAM is currently at {used_pct}% utilization, {name}. The application pulling the most memory is {top_con}."
+            elif top_con:
+                if language == "de":
+                    return f"Der größte RAM-Verbraucher ist aktuell {top_con}, {name}."
+                else:
+                    return f"The application pulling the most RAM right now is {top_con}, {name}."
+            elif used_pct is not None:
+                if language == "de":
+                    return f"Dein Arbeitsspeicher ist aktuell zu {used_pct}% belegt, {name}."
+                else:
+                    return f"Your RAM is currently at {used_pct}% utilization, {name}."
+
+        # 10. Real-Time Weather & Temperature
         if "get_weather" in step_outputs:
             w_res = step_outputs["get_weather"]
             if isinstance(w_res, dict) and w_res.get("status") == "success":

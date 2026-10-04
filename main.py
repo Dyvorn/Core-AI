@@ -110,7 +110,7 @@ def play_boot_sequence(skip_anim: bool = False):
 def print_banner(operator_name: str, zone: str, port: int):
     print(f"{CYAN}+=====================================================================+{RESET}")
     print(f"{CYAN}|{BRIGHT}   C.O.R.E. AI :: CONCURRENT OMNIPRESENT REASONING ENGINE            {RESET}{CYAN}|{RESET}")
-    print(f"{CYAN}|{RESET}   v0.1.0-alpha [Genesis] - Sovereign Ubiquitous Life OS              {CYAN}|{RESET}")
+    print(f"{CYAN}|{RESET}   v0.1.1-alpha [Genesis Patch 1] - Sovereign Ubiquitous Life OS      {CYAN}|{RESET}")
     print(f"{CYAN}+=====================================================================+{RESET}")
     print(f"{CYAN}|{RESET}   Operator: {GREEN}{operator_name:<16}{RESET} Zone: {YELLOW}{zone:<16}{RESET} Status: {GREEN}ONLINE       {RESET}{CYAN}|{RESET}")
     print(f"{CYAN}|{RESET}   Gateway:  {CYAN}http://localhost:{port:<5}{RESET} API Docs: {CYAN}/docs{RESET} WebSocket: {CYAN}/ws/events{RESET}   {CYAN}|{RESET}")
@@ -285,6 +285,60 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
         "name": "list_spatial_zones",
         "description": "Lists all physical spatial zones and rooms configured in the environment",
         "parameters": {"type": "object", "properties": {}}
+    })
+
+    def remove_spatial_zone(
+        zone_id: Optional[str] = None,
+        keep_zone: Optional[str] = None,
+        all_except: Optional[str] = None,
+        **kwargs
+    ):
+        mgr = state or StateManager()
+        # Handle "all except" / keep pattern
+        target_keep = keep_zone or all_except or kwargs.get("keep") or kwargs.get("preserve")
+        if target_keep:
+            if isinstance(target_keep, str):
+                # May be comma-separated or space-separated
+                keeps = [k.strip().lower() for k in target_keep.replace(",", " ").split() if k.strip()]
+            elif isinstance(target_keep, (list, tuple)):
+                keeps = [str(k).strip().lower() for k in target_keep if str(k).strip()]
+            else:
+                keeps = [str(target_keep).strip().lower()]
+            deleted = mgr.delete_all_zones_except(keeps)
+            current_zones = mgr.list_zones()
+            return {
+                "status": "success",
+                "action": "delete_all_except",
+                "kept_zones": keeps,
+                "deleted_zones": deleted,
+                "deleted_count": len(deleted),
+                "remaining_zones": [{"zone_id": z.zone_id, "display_name": z.display_name} for z in current_zones]
+            }
+
+        target_zone = zone_id or kwargs.get("zone") or kwargs.get("name") or kwargs.get("target_zone")
+        if target_zone:
+            clean_zid = str(target_zone).strip().lower()
+            deleted = mgr.delete_zone(clean_zid)
+            return {
+                "status": "success" if deleted else "not_found",
+                "action": "delete_zone",
+                "zone_id": clean_zid,
+                "deleted": deleted
+            }
+
+        return {"status": "error", "error": "Specify either zone_id to delete or keep_zone/all_except to prune."}
+
+    registry.register_tool("remove_spatial_zone", remove_spatial_zone, {
+        "name": "remove_spatial_zone",
+        "description": "Deletes spatial zone(s) from the system. Can remove a specific zone by zone_id, or delete all zones except a preserved zone (e.g. keep_zone='office' or all_except='office')",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "zone_id": {"type": "string", "description": "Specific zone ID to delete"},
+                "all_except": {"type": "string", "description": "Delete all configured zones EXCEPT this preserved zone (e.g. 'office')"},
+                "keep_zone": {"type": "string", "description": "Alias for all_except: zone to preserve while removing others"}
+            }
+        }
     })
 
     def relocate_operator_tool(target_zone: str):
@@ -621,6 +675,14 @@ def run_interactive_repl(
                     print(f"{GREEN}[OK] Spatial zone '{zid}' registered.{RESET}")
                 else:
                     print(f"{RED}[!] Usage: zone add <zone_id> [display_name]{RESET}")
+
+            elif cmd_lower.startswith("zone rm ") or cmd_lower.startswith("zone remove ") or cmd_lower.startswith("zone delete "):
+                zid = user_input.split(maxsplit=2)[2].strip()
+                deleted = state.delete_zone(zid)
+                if deleted:
+                    print(f"{GREEN}[OK] Spatial zone '{zid}' deleted.{RESET}")
+                else:
+                    print(f"{YELLOW}[!] Zone '{zid}' not found.{RESET}")
 
             elif cmd_lower == "devices":
                 devs = state.list_all_devices()

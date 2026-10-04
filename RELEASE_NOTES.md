@@ -1,5 +1,5 @@
 # C.O.R.E. AI :: SYSTEM RELEASE PROTOCOL
-### KERNEL PROTOCOL v0.1.0-alpha // CODENAME: "GENESIS"
+### KERNEL PROTOCOL v0.1.1-alpha // CODENAME: "GENESIS (PATCH 1)"
 
 ```text
 ╔══════════════════════════════════════════════════════════════════════════════════════╗
@@ -17,7 +17,7 @@
 
 ```text
 ┌───────────────────────┬───────────────────────┬───────────────────────┬───────────────────────┐
-│ KERNEL: v0.1.0-alpha  │ STATUS: OPERATIONAL   │ VERIFICATION: 87/87   │ ETHOS: #ANTISLOP      │
+│ KERNEL: v0.1.1-alpha  │ STATUS: OPERATIONAL   │ VERIFICATION: 96/96   │ ETHOS: #ANTISLOP      │
 ├───────────────────────┼───────────────────────┼───────────────────────┼───────────────────────┤
 │ MESH: SECURE WAL-MODE │ ENCRYPT: 256-BIT SOV  │ TELEMETRY: 0.00%      │ LICENSE: AGPL-3.0     │
 └───────────────────────┴───────────────────────┴───────────────────────┴───────────────────────┘

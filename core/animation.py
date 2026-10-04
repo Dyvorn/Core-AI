@@ -599,7 +599,7 @@ class Core3DRenderer:
                 c = BOLD + rgb(*theme["primary"]) if ch == "█" else dim_col
                 self.buffer.set_pixel(sx + col_idx, sub_y, 20.0, ch, c)
         else:
-            subtitle = "[ C.O.R.E. v0.1.0-alpha · SOVEREIGN UBIQUITOUS LIFE OS ]"
+            subtitle = "[ C.O.R.E. v0.1.1-alpha · SOVEREIGN UBIQUITOUS LIFE OS ]"
             sx = max(0, int((self.width - len(subtitle)) / 2))
             for col_idx, ch in enumerate(subtitle):
                 self.buffer.set_pixel(sx + col_idx, sub_y, 20.0, ch, dim_col)
