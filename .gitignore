@@ -34,3 +34,4 @@ core_state_bundle.json
 .idea/
 .DS_Store
 Thumbs.db
+dist/
