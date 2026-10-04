@@ -1,12 +1,17 @@
-# Changelog
+# C.O.R.E. AI :: CHANGELOG PROTOCOL
 
-All notable changes to **Core AI** will be documented in this file.
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║   C.O.R.E. AI // SYSTEM EVOLUTION & CHANGELOG REGISTRY                               ║
+║   CONCURRENT OMNIPRESENT REASONING ENGINE // SOVEREIGN LIFE OS                       ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable engineering developments and protocol updates to **Core AI** are documented here.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 > [!TIP]
-> For the complete visual release overview, architecture diagrams, and the sovereign manifesto, see [RELEASE_NOTES.md](RELEASE_NOTES.md).
+> For the comprehensive architectural deep-dive, topology diagrams, and the sovereign manifesto, see [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ---
 
@@ -14,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Codename: "Genesis"
 
 ```text
-[ VERSION: v0.1.0-alpha ]  [ TESTS: 87/87 PASSED (100%) ]  [ ETHOS: #ANTISLOP ]
+┌───────────────────────┬───────────────────────┬───────────────────────┬───────────────────────┐
+│ KERNEL: v0.1.0-alpha  │ STATUS: OPERATIONAL   │ VERIFICATION: 87/87   │ ETHOS: #ANTISLOP      │
+└───────────────────────┴───────────────────────┴───────────────────────┴───────────────────────┘
 ```
 
 The inaugural public alpha release of **C.O.R.E. AI** (**C**oncurrent **O**mnipresent **R**easoning **E**ngine) — a sovereign, privacy-first, self-hosted pervasive life operating system microkernel built to free personal technology from cloud lock-in, recurring rents, and corporate surveillance.
