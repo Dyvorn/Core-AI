@@ -50,6 +50,24 @@
 - **Root Cause**: REPL defaulted any unrecognized input to a problem-solving goal, and the heuristic planner's catch-all branch fabricated a `get_time` step.
 - **Fix Applied**: Added conversational dialogue branches for greetings, small talk, identity, and pleasantries in `main.py` and `brain/spoken_to.py`. Updated `brain/planner.py` to produce zero steps for greetings, and updated `formulate_spoken_response` to reply conversationally and truthfully indicate when tools are absent.
 
+### Issue #007: Pipeline Variable Cascading Regex & Parameter Mismatches `[RESOLVED]`
+- **Found**: 2026-10-04 during network query execution.
+- **Symptom**: `TypeError: inspect_lan_device() got an unexpected keyword argument 'target_ip_address'` and unparsed `{{steps.scan_local_network_step.output.discovered_devices.[0].ip_address}}`.
+- **Root Cause**: Pipeline engine regex rejected brackets `[` and `]`, and strict tool signatures threw `TypeError` on LLM parameter variations.
+- **Fix Applied**: Added `_traverse_field_path` to handle nested array bracket indices (`.[0]`, `[0]`, `.0`) and fuzzy property aliases (`discovered_devices` $\to$ `devices`, `ip_address` $\to$ `ip`). Added `**kwargs` and parameter aliases across all native tools (`network_tools.py`, `file_tools.py`, `system_tools.py`).
+
+### Issue #008: RAM Process Consumption & Math Tool Keyword Invocation `[RESOLVED]`
+- **Found**: 2026-10-04 during RAM query execution (`whats pulling most ram`).
+- **Symptom**: `calculate_math() got an unexpected keyword argument 'field'`.
+- **Root Cause**: LLM generated a step calling `calculate_math` with `field='memory_usage'`, and Windows process listing lacked RAM parsing and aggregation.
+- **Fix Applied**: Added keyword argument resilience to `calculate_math`, implemented memory string parsing and process instance aggregation in `list_running_processes`, and routed RAM queries to concurrent hardware and process inspection.
+
+### Issue #009: In-Memory Spatial Zone Filter Hallucination `[RESOLVED]`
+- **Found**: 2026-10-04 during zone cleanup (`remove all zones exept office`).
+- **Symptom**: Core AI dynamically synthesized `filter_list` and reported zones deleted, but SQLite was never modified and all zones remained active.
+- **Root Cause**: No native zone removal or pruning tools existed in the registry or `StateManager`.
+- **Fix Applied**: Implemented `StateManager.delete_zone()` and `StateManager.delete_all_zones_except()`, registered native tool `remove_spatial_zone` with `all_except` support, and added `zone rm <id>` to CLI REPL.
+
 ---
 
 ## 2. Watchlist & Architectural Debt to Address in Future Phases
