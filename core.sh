@@ -62,6 +62,10 @@ case "$COMMAND" in
         shift
         "$PYTHON" -m core.watchdog "$@"
         ;;
+    mesh)
+        shift
+        "$PYTHON" -m core.mesh_client "$@"
+        ;;
     uninstall)
         "$PYTHON" interfaces/install/uninstall.py
         ;;
@@ -86,6 +90,7 @@ case "$COMMAND" in
         echo "    test        - Run automated test suite (pytest)"
         echo "    autostart   - Configure 24/7 boot autostart (./core.sh autostart on|off|status|visible)"
         echo "    watchdog    - Run self-healing supervisor (auto-revives crashes with backoff)"
+        echo "    mesh        - Intercontinental mesh pairing (./core.sh mesh connect <url> | status)"
         echo "    setup       - Run interactive bootstrap & autostart setup"
         echo "    uninstall   - Clean zero-residue uninstallation"
         echo ""

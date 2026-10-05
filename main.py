@@ -1010,6 +1010,36 @@ def main():
 
     if target_goal:
         target_port = args.port or int(os.getenv("CORE_PORT", 8000))
+        from core.mesh_client import MeshClient
+        mesh_client = MeshClient()
+
+        # 1. Edge Node Mode: Dispatch directly to remote server across mesh
+        if mesh_client.role == "edge_node" and mesh_client.main_server_url:
+            is_online, _ = mesh_client.ping_main_server(timeout=1.5)
+            if is_online:
+                import urllib.request
+                import json
+                try:
+                    url = f"{mesh_client.main_server_url}/api/v1/pipeline/solve_sync"
+                    req_data = json.dumps({"goal": target_goal}).encode("utf-8")
+                    req = urllib.request.Request(
+                        url,
+                        data=req_data,
+                        headers={"Content-Type": "application/json", "User-Agent": "CoreAI-EdgeCLI/2.0"}
+                    )
+                    with urllib.request.urlopen(req, timeout=30.0) as resp:
+                        res = json.loads(resp.read().decode("utf-8"))
+                        out_text = res.get("spoken_response") or res.get("final_output") or (res["steps"][-1].get("output") if res.get("steps") else "Task complete.")
+                        if isinstance(out_text, dict):
+                            out_msg = out_text.get("message") or out_text.get("status") or str(out_text)
+                        else:
+                            out_msg = str(out_text)
+                        print(f"\n{CYAN}Core AI [Server @ {mesh_client.main_server_url}]:{RESET} {BRIGHT}{out_msg}{RESET}\n")
+                        sys.exit(0 if res.get("status") == "completed" else 1)
+                except Exception as de:
+                    logger.warning(f"Remote mesh dispatch failed ({de}). Falling through to local execution.")
+
+        # 2. Local Daemon Mode: Dispatch to local running daemon if healthy
         from core.service import ServiceManager
         sm = ServiceManager()
         is_healthy, _ = sm.check_health(port=target_port)

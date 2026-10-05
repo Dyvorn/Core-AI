@@ -681,14 +681,17 @@ Core AI is designed to run 24/7 as a dependable sovereign daemon on your main ma
   # Windows
   .\core.bat logo        # Real-time interactive 3D Sovereign Core holographic terminal viewer
   .\core.bat anim        # Alias for 3D animation viewer
-  .\core.bat start       # Launch 24/7 background headless daemon (logs to logs/service.log)
-  .\core.bat status      # Colorized status card (Daemon PID, Gateway health, active model, operator)
-  .\core.bat stop        # Cleanly terminate background daemon
+  .\core.bat start       # Launch 24/7 background headless daemon
+  .\core.bat status      # Colorized status card (Daemon PID, Watchdog, Gateway health, active model)
+  .\core.bat stop        # Cleanly terminate background daemon & watchdog supervisor
   .\core.bat restart     # Hot restart background daemon
+  .\core.bat autostart   # Configure 24/7 boot autostart (.\core.bat autostart on|off|status|visible)
+  .\core.bat watchdog    # Run self-healing supervisor (auto-revives crashes with backoff)
+  .\core.bat mesh        # Pair as edge node or check mesh status (.\core.bat mesh connect <url>)
   .\core.bat run         # Launch interactive REPL terminal
   .\core.bat backup      # Snapshot SQLite database and config/.env into backups/
   .\core.bat update      # Git pull with pre-backup state snapshot and automated rollback test guard
-  .\core.bat test        # Run full pytest test suite (84/84 tests)
+  .\core.bat test        # Run full pytest test suite (101/101 tests passed)
   .\core.bat setup       # Re-run interactive bootstrap wizard
   .\core.bat uninstall   # Clean zero-residue uninstallation
 
@@ -699,6 +702,9 @@ Core AI is designed to run 24/7 as a dependable sovereign daemon on your main ma
   ./core.sh status
   ./core.sh stop
   ./core.sh restart
+  ./core.sh autostart
+  ./core.sh watchdog
+  ./core.sh mesh
   ./core.sh run
   ./core.sh backup
   ./core.sh update
@@ -706,6 +712,8 @@ Core AI is designed to run 24/7 as a dependable sovereign daemon on your main ma
   ./core.sh setup
   ./core.sh uninstall
   ```
+
+> 📖 **Comprehensive Server Guide**: For headless setup, laptop-as-server lid management, systemd units, and local Ollama routing, see the [24/7 Sovereign Server & Autostart Guide](docs/SERVER_SETUP_AND_AUTOSTART.md).
 
 ---
 

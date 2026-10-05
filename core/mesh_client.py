@@ -224,3 +224,68 @@ class MeshClient:
 
         logger.info(f"Imported state bundle: {counts}")
         return counts
+
+def main():
+    import sys
+    client = MeshClient()
+    args = sys.argv[1:]
+
+    try:
+        from colorama import init, Fore, Style
+        init(autoreset=True)
+        G, C, Y, R, B, RST = Fore.GREEN, Fore.CYAN, Fore.YELLOW, Fore.RED, Style.BRIGHT, Style.RESET_ALL
+    except ImportError:
+        G = C = Y = R = B = RST = ""
+
+    if not args or args[0] in ["status", "info"]:
+        is_online, ping_info = client.ping_main_server()
+        status_str = f"{G}REACHABLE (Online){RST}" if is_online else f"{Y}UNREACHABLE ({ping_info.get('error', 'offline')}){RST}"
+        print(f"\n{C}+=====================================================================+{RST}")
+        print(f"{C}|{B}   CORE AI :: INTERCONTINENTAL SOVEREIGN MESH STATUS                 {RST}{C}|{RST}")
+        print(f"{C}+=====================================================================+{RST}")
+        print(f"{C}|{RST}   Node Role:        {C}{client.role.upper()}{RST}")
+        print(f"{C}|{RST}   Main Server URL:  {client.main_server_url}")
+        print(f"{C}|{RST}   Server Status:    {status_str}")
+        print(f"{C}|{RST}   Offline Buffer:   {len(client.offline_buffer)} items queued")
+        if client.role == "edge_node" and not is_online:
+            print(f"{C}|{RST}   {Y}↳ Autonomous Local Fallback is ACTIVE (never locked out).{RST}")
+        print(f"{C}+=====================================================================+{RST}\n")
+        print("  Commands:")
+        print("    core mesh connect <http://host:port>   (Bind this machine as edge node to server)")
+        print("    core mesh role <main_server|edge_node> (Set operational node role)")
+        print("    core mesh disconnect                   (Revert to standalone main server)\n")
+
+    elif args[0] == "connect":
+        if len(args) > 1:
+            url = args[1].rstrip("/")
+            if not url.startswith("http://") and not url.startswith("https://"):
+                url = "http://" + url
+            client.save_configuration(role="edge_node", main_server_url=url)
+            is_online, ping = client.ping_main_server()
+            if is_online:
+                print(f"{G}[OK] Paired as EDGE_NODE to Main Server at {url}!{RST}")
+                print(f"All goals executed on this PC will now run on the server.")
+            else:
+                print(f"{Y}[!] Saved server URL '{url}', but server is currently unreachable ({ping.get('error', 'offline')}).{RST}")
+                print("Local autonomous fallback is active until server is reached.")
+        else:
+            print("Usage: core mesh connect <http://<SERVER-IP>:8000>")
+
+    elif args[0] == "role":
+        if len(args) > 1:
+            new_role = "main_server" if "main" in args[1].lower() else "edge_node"
+            client.save_configuration(role=new_role)
+            print(f"{G}[OK] Node role set to: {new_role}{RST}")
+        else:
+            print("Usage: core mesh role <main_server|edge_node>")
+
+    elif args[0] in ["disconnect", "reset"]:
+        client.save_configuration(role="main_server", main_server_url="http://localhost:8000")
+        print(f"{G}[OK] Reset to standalone MAIN_SERVER mode.{RST}")
+
+    else:
+        print(f"Unknown mesh command: {args[0]}")
+        print("Valid commands: status, connect, role, disconnect")
+
+if __name__ == "__main__":
+    main()

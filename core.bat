@@ -33,6 +33,7 @@ if /i "%~1"=="update" goto update
 if /i "%~1"=="test" goto test
 if /i "%~1"=="autostart" goto autostart
 if /i "%~1"=="watchdog" goto watchdog
+if /i "%~1"=="mesh" goto mesh
 if /i "%~1"=="uninstall" goto uninstall
 
 goto quick_solve
@@ -100,6 +101,10 @@ goto :eof
 "%PYTHON%" -m core.watchdog %2 %3 %4 %5
 goto :eof
 
+:mesh
+"%PYTHON%" -m core.mesh_client %2 %3 %4 %5
+goto :eof
+
 :setup
 "%PYTHON%" interfaces\install\setup_service.py
 goto end
@@ -129,6 +134,7 @@ echo     update      - Self-update from GitHub with state backup ^& test guard
 echo     test        - Run automated test suite (pytest)
 echo     autostart   - Configure 24/7 boot autostart (core autostart on^|off^|status^|visible)
 echo     watchdog    - Run self-healing supervisor (auto-revives crashes with backoff)
+echo     mesh        - Intercontinental mesh pairing (core mesh connect ^<url^> ^| status)
 echo     setup       - Run interactive bootstrap ^& autostart setup
 echo     uninstall   - Clean zero-residue uninstallation
 echo.
