@@ -225,6 +225,15 @@ class MeshClient:
         logger.info(f"Imported state bundle: {counts}")
         return counts
 
+    def scan_for_servers(self, timeout: float = 2.0) -> List[Dict[str, Any]]:
+        """Scans local subnet for active Core AI Sovereign Main Servers via UDP broadcast."""
+        try:
+            from core.discovery import discover_core_servers
+            return discover_core_servers(timeout=timeout)
+        except Exception as e:
+            logger.warning(f"Error scanning LAN for Core AI servers: {e}")
+            return []
+
 def main():
     import sys
     client = MeshClient()
@@ -251,12 +260,42 @@ def main():
             print(f"{C}|{RST}   {Y}↳ Autonomous Local Fallback is ACTIVE (never locked out).{RST}")
         print(f"{C}+=====================================================================+{RST}\n")
         print("  Commands:")
+        print("    core mesh scan                         (Scan LAN subnet for running Main Servers)")
+        print("    core mesh connect auto                 (Auto-discover and pair to first LAN Server)")
         print("    core mesh connect <http://host:port>   (Bind this machine as edge node to server)")
         print("    core mesh role <main_server|edge_node> (Set operational node role)")
         print("    core mesh disconnect                   (Revert to standalone main server)\n")
 
+    elif args[0] in ["scan", "discover"]:
+        print(f"\n{C}[*] Scanning local network for active Core AI Sovereign Main Servers...{RST}")
+        servers = client.scan_for_servers(timeout=2.0)
+        if not servers:
+            print(f"{Y}[!] No active Core AI servers discovered on local subnet broadcast.{RST}")
+            print(f"    Ensure the Main Server is running (`core start`) on the same LAN or Wi-Fi.\n")
+        else:
+            print(f"{G}[+] Discovered {len(servers)} active Sovereign Server(s) on LAN:{RST}\n")
+            for idx, s in enumerate(servers, 1):
+                print(f"  [{idx}] {B}{s.get('hostname', 'Server')}{RST} - {C}{s.get('url')}{RST}")
+                print(f"      Operator: {G}{s.get('active_user', 'Operator')}{RST} | Cognitive Model: {s.get('active_model', 'N/A')}")
+                print(f"      LAN IPv4: {s.get('lan_ip')} | Port: {s.get('port')}\n")
+            print(f"  To pair: core mesh connect {servers[0].get('url')}\n")
+
     elif args[0] == "connect":
-        if len(args) > 1:
+        if len(args) > 1 and args[1].lower() == "auto":
+            print(f"{C}[*] Scanning LAN for active Core AI Sovereign Server...{RST}")
+            servers = client.scan_for_servers(timeout=2.0)
+            if not servers:
+                print(f"{R}[-] No server discovered on LAN. Specify URL manually:{RST} core mesh connect <http://IP:8000>")
+                return
+            target_url = servers[0].get("url")
+            print(f"{G}[+] Found server at {target_url}! Pairing...{RST}")
+            client.save_configuration(role="edge_node", main_server_url=target_url)
+            is_online, ping = client.ping_main_server()
+            if is_online:
+                print(f"{G}[OK] Paired as EDGE_NODE to {target_url} ({servers[0].get('active_user')})!{RST}")
+            else:
+                print(f"{Y}[!] Saved server URL '{target_url}', but could not establish HTTP connection.{RST}")
+        elif len(args) > 1:
             url = args[1].rstrip("/")
             if not url.startswith("http://") and not url.startswith("https://"):
                 url = "http://" + url
@@ -269,7 +308,7 @@ def main():
                 print(f"{Y}[!] Saved server URL '{url}', but server is currently unreachable ({ping.get('error', 'offline')}).{RST}")
                 print("Local autonomous fallback is active until server is reached.")
         else:
-            print("Usage: core mesh connect <http://<SERVER-IP>:8000>")
+            print("Usage: core mesh connect <http://<SERVER-IP>:8000> or core mesh connect auto")
 
     elif args[0] == "role":
         if len(args) > 1:
@@ -285,7 +324,7 @@ def main():
 
     else:
         print(f"Unknown mesh command: {args[0]}")
-        print("Valid commands: status, connect, role, disconnect")
+        print("Valid commands: status, scan, connect, role, disconnect")
 
 if __name__ == "__main__":
     main()

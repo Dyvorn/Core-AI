@@ -31,6 +31,24 @@ case "$COMMAND" in
     status)
         "$PYTHON" -c "from core.service import ServiceManager; s = ServiceManager(); s.print_status_card()"
         ;;
+    metrics|vitals)
+        "$PYTHON" -m core.service metrics
+        ;;
+    scan)
+        "$PYTHON" -m core.mesh_client scan
+        ;;
+    config|settings)
+        shift
+        "$PYTHON" interfaces/cli/settings.py "$@"
+        ;;
+    models|model)
+        shift
+        "$PYTHON" interfaces/cli/settings.py model "$@"
+        ;;
+    dashboard|ui)
+        echo "[*] Launching Sovereign Mesh Master Dashboard at http://localhost:8000 ..."
+        "$PYTHON" -m webbrowser "http://localhost:8000"
+        ;;
     account)
         if [ "$2" = "setup" ] || [ "$2" = "init" ]; then
             "$PYTHON" interfaces/install/setup_service.py
@@ -83,12 +101,17 @@ case "$COMMAND" in
         echo "    stop        - Stop running background server suite & free GPU/RAM"
         echo "    restart     - Restart Core AI background daemon"
         echo "    status      - Inspect running server status card, PID, and health"
+        echo "    metrics     - Inspect full server telemetry & hardware vitals (RAM/CPU/DB/LAN)"
+        echo "    config      - System settings, operator identity, tone, & custom preferences"
+        echo "    models      - Dedicated easy AI model selector (interactive picker & roles)"
+        echo "    dashboard   - Launch dedicated Sovereign Mesh Master Dashboard in browser"
+        echo "    scan        - Scan local network for active Sovereign Main Servers"
         echo "    account     - View Sovereign Operator Account identity & security card"
         echo "    reset       - Reset local account database to clean Day-Zero state"
         echo "    logo / anim - Launch interactive 3D Sovereign Core holographic viewer"
         echo "    update      - Self-update from GitHub with state backup & test guard"
         echo "    test        - Run automated test suite (pytest)"
-        echo "    autostart   - Configure 24/7 boot autostart (./core.sh autostart on|off|status|visible)"
+        echo "    autostart   - Configure 24/7 boot autostart (./core.sh autostart on|off|status|visible|systemd)"
         echo "    watchdog    - Run self-healing supervisor (auto-revives crashes with backoff)"
         echo "    mesh        - Intercontinental mesh pairing (./core.sh mesh connect <url> | status)"
         echo "    setup       - Run interactive bootstrap & autostart setup"

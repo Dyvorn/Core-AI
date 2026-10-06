@@ -178,6 +178,8 @@ On Linux servers, `systemd` is the industry standard for production services tha
    sudo systemctl enable --now core-ai
    ```
 
+   *(Or simply run `core autostart systemd` on Linux to have Core AI automatically generate and install the systemd unit file for you).*
+
 3. Check live service status:
    ```bash
    systemctl status core-ai
@@ -364,6 +366,16 @@ You will see:
   Offline Buffer:   0 items queued
 ```
 
+#### Zero-UI LAN Auto-Discovery (mDNS / UDP Beacon)
+No need to guess or look up router IP tables. Core AI broadcasts a zero-UI UDP discovery beacon on port `8008`:
+```bash
+# Scan local network for running Core AI servers
+core mesh scan
+
+# Automatically pair to the first discovered server on LAN
+core mesh connect auto
+```
+
 Now, any goal you execute on your client:
 ```cmd
 core "whats pulling most ram"
@@ -400,6 +412,11 @@ Your server exposes open, interactive REST and WebSocket endpoints:
 | `core stop` | Gracefully stop both Core AI server and Watchdog (frees GPU/RAM) |
 | `core restart` | Hot restart the background microkernel |
 | `core status` | View PID, gateway health, active operator, and connected nodes |
+| `core metrics` | Full terminal telemetry card (CPU %, RAM RSS, system RAM, DB footprint, LAN endpoints) |
+| `core scan` | Scan local Wi-Fi / LAN for active Core AI servers |
+| `core mesh scan` | Scan local network for active Sovereign Main Servers |
+| `core mesh connect auto` | Auto-discover and pair this machine to first LAN server |
+| `core autostart systemd` | Generate and install production Linux systemd service unit |
 | `core models` | Inspect configured AI providers and installed Ollama models |
 | `core watchdog` | Launch process supervisor in foreground |
 | `core run` | Launch interactive terminal shell |

@@ -4,6 +4,7 @@ import time
 import asyncio
 import logging
 import argparse
+import subprocess
 import threading
 import uvicorn
 from typing import Optional, Any, Dict, List
@@ -254,7 +255,7 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
                     "device_type": d.device_type,
                     "current_zone": d.current_zone,
                     "trust_tier": d.trust_tier,
-                    "status": d.status,
+                    "status": getattr(d, "status", "online"),
                     "capabilities": d.capabilities,
                 }
                 for d in devs
@@ -478,7 +479,7 @@ def run_interactive_repl(
                 print_help()
 
             elif cmd_lower == "clear":
-                os.system("cls" if os.name == "nt" else "clear")
+                subprocess.run("cls" if os.name == "nt" else "clear", shell=True)
                 print_banner(active_name, active_zone, port)
 
             elif cmd_lower == "status":
@@ -537,6 +538,7 @@ def run_interactive_repl(
                     try:
                         voice_in = VoiceInEngine(model_size="distil-large-v3")
                         def on_speech(text: str):
+                            nonlocal active_zone
                             print(f"\n{MAGENTA}[SPEECH DETECTED]{RESET} \"{text}\"")
                             prof = state.get_user_profile()
                             dec = spoken_to.evaluate(text, profile=prof)
@@ -1010,7 +1012,6 @@ def main():
 
     if target_goal:
         target_port = args.port or int(os.getenv("CORE_PORT", 8000))
-        from core.mesh_client import MeshClient
         mesh_client = MeshClient()
 
         # 1. Edge Node Mode: Dispatch directly to remote server across mesh
@@ -1172,11 +1173,12 @@ def main():
         registry=registry,
         planner=planner,
         pipeline_engine=engine,
-        bus=bus
+        bus=bus,
+        remote_dispatcher=remote_dispatcher
     )
 
     # Voice state broadcast helper
-    def broadcast_voice_state(state_name: str, extra: dict = None):
+    def broadcast_voice_state(state_name: str, extra: Optional[Dict[str, Any]] = None):
         payload = {"state": state_name}
         if extra:
             payload.update(extra)

@@ -72,10 +72,13 @@
 
 ## 2. Watchlist & Architectural Debt to Address in Future Phases
 
-### Debt #101: Remote Edge Node Tool Transport `[OPEN]`
+### Debt #101: Remote Edge Node Tool Transport `[RESOLVED]`
 - **Context**: In `core/schemas.py`, `ToolCallRequest` has `target_node: Optional[str]`.
-- **Current State**: Tools currently execute within the local Python process on the Core AI host.
-- **Needed**: A transport bridge (e.g. WebSocket / Tailscale WireGuard / MQTT) to dispatch `ToolCallRequest` across the network to physical edge nodes (car head-unit, phone companion app, smart glasses) and receive asynchronous `ToolCallResponse`.
+- **Resolution**:
+  1. Built `RemoteToolDispatcher` in `tools/remote_dispatcher.py` to create dynamic proxy tools in `ToolRegistry` that transparently dispatch `ToolCallRequest` over active WebSockets (`/ws/nodes/{node_id}`).
+  2. Implemented bidirectional JSON RPC handshake in `core/gateway.py`: edge nodes advertise capabilities and dynamic tool definitions on connection, which are dynamically registered in `ToolRegistry`.
+  3. Built automatic tool lifecycle cleanup: when an edge node disconnects, its proxy tools are cleanly unregistered from the catalog, preventing phantom/ghost tools.
+  4. Verified with automated tests in `tests/test_remote_dispatcher.py` and `tests/test_server_upgrades.py`.
 
 ### Debt #102: Proactive Daemon & State Trigger Engine `[OPEN]`
 - **Context**: Autonomous behavior like *"I get a call from it while riding to work saying you forgot that, but don't worry, I handled it for you"*.

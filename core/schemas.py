@@ -199,6 +199,7 @@ class DeviceTopologyRecord(BaseModel):
     nearest_anchor_id: Optional[str] = None
     capabilities: List[str] = Field(default_factory=list)
     trust_tier: str = "owner"  # 'owner', 'ambient', 'guest'
+    status: str = "online"  # 'online', 'offline', 'roaming'
     last_seen: datetime = Field(default_factory=utc_now)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 

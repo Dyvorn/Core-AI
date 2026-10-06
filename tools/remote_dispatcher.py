@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Set, List
 
 from core.schemas import ToolCallRequest, StepResult
 from tools.registry import ToolRegistry
@@ -13,10 +13,12 @@ class RemoteToolDispatcher:
     """
     Bridges the local ToolRegistry with remote physical edge nodes (Car, Phone, Glasses).
     Allows the AI to execute tools that live on external edge hardware across the network.
+    Automatically manages dynamic proxy registration and clean deregistration when nodes disconnect.
     """
 
     def __init__(self, registry: ToolRegistry):
         self.registry = registry
+        self.node_tools: Dict[str, Set[str]] = {}
 
     def register_remote_edge_tool(
         self,
@@ -32,13 +34,15 @@ class RemoteToolDispatcher:
         """
         def remote_proxy_func(**kwargs) -> Dict[str, Any]:
             logger.info(f"Dispatching remote edge tool '{tool_name}' to physical node '{node_id}' with args: {kwargs}")
-            
-            # Check if event loop is running
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+
+            # Resolve loop: prefer connection manager's main async loop if available
+            loop = getattr(connection_manager, "loop", None)
+            if not loop or loop.is_closed():
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
 
             request = ToolCallRequest(
                 id=str(uuid.uuid4()),
@@ -51,10 +55,9 @@ class RemoteToolDispatcher:
 
             # If inside an async coroutine thread pool, run dispatch
             coro = connection_manager.dispatch_remote_tool_call(node_id=node_id, request=request, timeout=timeout)
-            
-            # Execute future in the current or active loop
+
+            # Execute future in the target loop
             try:
-                import concurrent.futures
                 future = asyncio.run_coroutine_threadsafe(coro, loop)
                 result = future.result(timeout=timeout)
                 return {"status": "success", "node_id": node_id, "result": result}
@@ -75,4 +78,24 @@ class RemoteToolDispatcher:
             schema=full_schema,
             is_dynamic=True
         )
+
+        if node_id not in self.node_tools:
+            self.node_tools[node_id] = set()
+        self.node_tools[node_id].add(tool_name)
+
         logger.info(f"Registered remote edge tool '{tool_name}' targeted to node '{node_id}'")
+
+    def unregister_tools_for_node(self, node_id: str) -> List[str]:
+        """
+        Removes all dynamic proxy tools associated with an edge node that disconnected.
+        Prevents ghost tools from lingering in the active catalog.
+        """
+        removed = []
+        if node_id in self.node_tools:
+            for tool_name in list(self.node_tools[node_id]):
+                if self.registry.unregister_tool(tool_name):
+                    removed.append(tool_name)
+            del self.node_tools[node_id]
+        if removed:
+            logger.info(f"Cleaned up {len(removed)} remote tools for disconnected edge node '{node_id}': {removed}")
+        return removed

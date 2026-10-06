@@ -22,6 +22,13 @@ if /i "%~1"=="setup" goto setup
 if /i "%~1"=="stop" goto stop
 if /i "%~1"=="restart" goto restart
 if /i "%~1"=="status" goto status
+if /i "%~1"=="metrics" goto metrics
+if /i "%~1"=="vitals" goto metrics
+if /i "%~1"=="scan" goto scan
+if /i "%~1"=="config" goto config
+if /i "%~1"=="settings" goto config
+if /i "%~1"=="dashboard" goto dashboard
+if /i "%~1"=="ui" goto dashboard
 if /i "%~1"=="models" goto models
 if /i "%~1"=="model" goto models
 if /i "%~1"=="account" goto account
@@ -66,8 +73,27 @@ goto :eof
 "%PYTHON%" -c "from core.service import ServiceManager; s = ServiceManager(); s.print_status_card()"
 goto :eof
 
+:metrics
+"%PYTHON%" -m core.service metrics
+goto :eof
+
+:scan
+"%PYTHON%" -m core.mesh_client scan
+goto :eof
+
+:config
+shift
+"%PYTHON%" interfaces\cli\settings.py %1 %2 %3 %4 %5 %6
+goto :eof
+
+:dashboard
+echo [*] Launching Sovereign Mesh Master Dashboard at http://localhost:8000 ...
+"%PYTHON%" -m webbrowser "http://localhost:8000"
+goto :eof
+
 :models
-"%PYTHON%" -c "from brain.model_router import ModelRouter; from core.state import StateManager; r = ModelRouter(StateManager()); s = r.get_status_summary(); print('\n--- Configured AI Providers & Models ---'); [print(f'  - {p:<16}: [ONLINE]' if v else f'  - {p:<16}: [OFFLINE]') for p, v in s['configured_providers'].items()]; m_list = s.get('ollama_models', []); (lambda: print(f'    Installed in Ollama: {\", \".join(m_list)}'))() if m_list else None; print('\n--- Active Model Roles ---'); [print(f'  - {role:<16}: {info[\"model\"]}') for role, info in s['roles'].items()]; print()"
+shift
+"%PYTHON%" interfaces\cli\settings.py model %1 %2 %3 %4 %5
 goto :eof
 
 :account
@@ -127,6 +153,11 @@ echo     start       - Start Core AI in background daemon mode (24/7 Service)
 echo     stop        - Stop running background server suite ^& free GPU/RAM
 echo     restart     - Restart Core AI background daemon
 echo     status      - Inspect running server status card, PID, and health
+echo     metrics     - Inspect full server telemetry ^& hardware vitals (RAM/CPU/DB/LAN)
+echo     config      - System settings, operator identity, tone, ^& custom preferences
+echo     models      - Dedicated easy AI model selector (interactive picker ^& roles)
+echo     dashboard   - Launch dedicated Sovereign Mesh Master Dashboard in browser
+echo     scan        - Scan local network for active Sovereign Main Servers
 echo     account     - View Sovereign Operator Account identity ^& security card
 echo     reset       - Reset local account database to clean Day-Zero state
 echo     logo / anim - Launch interactive 3D Sovereign Core holographic viewer

@@ -161,8 +161,8 @@ class ModelRouter:
             try:
                 import urllib.request
                 import json
-                api_base = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
-                with urllib.request.urlopen(f"{api_base}/api/tags", timeout=0.8) as resp:
+                api_base = os.getenv("OLLAMA_API_BASE", "http://127.0.0.1:11434")
+                with urllib.request.urlopen(f"{api_base}/api/tags", timeout=0.3) as resp:
                     if resp.status == 200:
                         data = json.loads(resp.read().decode("utf-8"))
                         installed = [m.get("name", "").lower() for m in data.get("models", [])]

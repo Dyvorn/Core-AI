@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks, Depends, Header
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -40,6 +42,7 @@ class ConnectionManager:
         self.edge_nodes: Dict[str, WebSocket] = {}
         # Pending remote tool calls: request_id -> asyncio.Future
         self.pending_tool_calls: Dict[str, asyncio.Future] = {}
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
 
     async def connect_broadcast(self, websocket: WebSocket):
         await websocket.accept()
@@ -128,9 +131,14 @@ def create_gateway_app(
     registry: ToolRegistry,
     planner: Planner,
     pipeline_engine: PipelineEngine,
-    bus: EventBus
+    bus: EventBus,
+    remote_dispatcher: Optional[Any] = None
 ) -> FastAPI:
     """Factory creating the configured FastAPI Gateway Application."""
+
+    if remote_dispatcher is None:
+        from tools.remote_dispatcher import RemoteToolDispatcher
+        remote_dispatcher = RemoteToolDispatcher(registry=registry)
 
     audio_router = SpatialAudioRouter(state_manager=state_manager)
     spatial_handoff = SpatialHandoffEngine(
@@ -142,12 +150,13 @@ def create_gateway_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        connection_manager.loop = asyncio.get_running_loop()
 
         # Startup: subscribe bus events to WebSocket broadcast
         def bus_event_bridge(data: dict):
             # Forward event bus traffic into the async event loop for WebSocket clients
             try:
-                loop = asyncio.get_event_loop()
+                loop = connection_manager.loop or asyncio.get_event_loop()
                 if loop.is_running():
                     asyncio.run_coroutine_threadsafe(
                         connection_manager.broadcast_event("BUS_EVENT", data),
@@ -159,7 +168,30 @@ def create_gateway_app(
         bus.subscribe("tts_events", bus_event_bridge)
         bus.subscribe("hud_events", bus_event_bridge)
         logger.info("Gateway bridge subscribed to EventBus channels")
+
+        # Zero-UI LAN Auto-Discovery Beacon
+        beacon = None
+        if os.getenv("CORE_DISABLE_DISCOVERY", "0") != "1":
+            try:
+                from core.discovery import LANBeacon
+                beacon = LANBeacon(
+                    service_port=8000,
+                    server_info_provider=lambda: {
+                        "active_user": state_manager.get_user_profile().preferred_name,
+                        "active_model": planner.get_active_model() or "heuristic"
+                    }
+                )
+                beacon.start()
+            except Exception as b_err:
+                logger.warning(f"Could not initialize LAN discovery beacon: {b_err}")
+
         yield
+
+        if beacon:
+            try:
+                beacon.stop()
+            except Exception:
+                pass
         logger.info("Gateway shutting down")
 
     app = FastAPI(
@@ -176,6 +208,19 @@ def create_gateway_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    dashboard_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "interfaces", "dashboard"))
+    if os.path.exists(dashboard_dir):
+        app.mount("/static", StaticFiles(directory=dashboard_dir), name="static")
+
+    @app.get("/", response_class=HTMLResponse)
+    @app.get("/dashboard", response_class=HTMLResponse)
+    def serve_dashboard():
+        """Serves the dedicated Sovereign Mesh Master Dashboard."""
+        index_file = os.path.join(dashboard_dir, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return HTMLResponse("<h1>Core AI Universal Gateway Online</h1>")
 
     # --- REST Endpoints ---
 
@@ -194,6 +239,35 @@ def create_gateway_app(
             "connected_edge_nodes": list(connection_manager.edge_nodes.keys()),
             "broadcast_clients_count": len(connection_manager.broadcast_clients)
         }
+
+    @app.get("/api/v1/server/status")
+    def get_server_status():
+        """Returns concise high-level server status, LAN endpoints, and active operator."""
+        profile = state_manager.get_user_profile()
+        from core.discovery import LANBeacon
+        lan_ip = LANBeacon.get_lan_ip()
+        return {
+            "status": "online",
+            "lan_ip": lan_ip,
+            "port": 8000,
+            "url": f"http://{lan_ip}:8000",
+            "active_user": profile.preferred_name,
+            "active_model": planner.get_active_model() or "offline_heuristic",
+            "connected_edge_nodes": list(connection_manager.edge_nodes.keys()),
+            "connected_nodes_count": len(connection_manager.edge_nodes),
+            "broadcast_clients_count": len(connection_manager.broadcast_clients)
+        }
+
+    @app.get("/api/v1/server/metrics")
+    def get_server_metrics():
+        """Returns comprehensive host hardware, memory, storage, and edge mesh telemetry."""
+        from core.service import ServiceManager
+        return ServiceManager.get_system_metrics(
+            state_manager=state_manager,
+            planner=planner,
+            connection_manager=connection_manager,
+            registry=registry
+        )
 
     @app.get("/api/v1/tools")
     def get_tool_catalog():
@@ -474,7 +548,8 @@ def create_gateway_app(
 
                     # Edge Registration
                     if msg_type == "register":
-                        reg = EdgeNodeRegistration(**msg.get("data", {}))
+                        reg_data = msg.get("data", {})
+                        reg = EdgeNodeRegistration(**reg_data)
                         topo_record = DeviceTopologyRecord(
                             device_id=node_id,
                             name=reg.node_id,
@@ -484,7 +559,26 @@ def create_gateway_app(
                             capabilities=reg.capabilities
                         )
                         state_manager.register_or_update_device(topo_record)
-                        await websocket.send_text(json.dumps({"type": "registered", "status": "ok"}))
+
+                        # Dynamic Remote Tool Registration (Debt #101)
+                        edge_tools = reg_data.get("tools", [])
+                        registered_tools_count = 0
+                        for t in edge_tools:
+                            if isinstance(t, dict) and "name" in t:
+                                remote_dispatcher.register_remote_edge_tool(
+                                    node_id=node_id,
+                                    tool_name=t["name"],
+                                    description=t.get("description", f"Remote tool on {node_id}"),
+                                    parameters_schema=t.get("parameters", {"type": "object", "properties": {}}),
+                                    timeout=float(t.get("timeout", 15.0))
+                                )
+                                registered_tools_count += 1
+
+                        await websocket.send_text(json.dumps({
+                            "type": "registered",
+                            "status": "ok",
+                            "registered_tools_count": registered_tools_count
+                        }))
 
                     # Response to a dispatched remote tool call
                     elif msg_type == "tool_call_response":
@@ -504,8 +598,10 @@ def create_gateway_app(
                     logger.error(f"Error parsing edge node message from '{node_id}': {parse_err}")
 
         except WebSocketDisconnect:
+            remote_dispatcher.unregister_tools_for_node(node_id)
             connection_manager.disconnect_edge_node(node_id)
         except Exception:
+            remote_dispatcher.unregister_tools_for_node(node_id)
             connection_manager.disconnect_edge_node(node_id)
 
     return app

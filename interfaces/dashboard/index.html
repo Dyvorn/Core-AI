@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C.O.R.E. AI :: Sovereign Mesh Master Dashboard</title>
+  <meta name="description" content="Central Sovereign Mesh Master Dashboard for Core AI. Real-time multi-device topology, live WebSocket telemetry, AI model management, and distributed goal dispatch.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+
+  <!-- Top Sovereign Navigation Bar -->
+  <header class="navbar glass-panel">
+    <div class="brand">
+      <div class="brand-icon">C</div>
+      <div class="brand-text">
+        <h1>Core AI <span class="brand-badge">Sovereign Mesh</span></h1>
+      </div>
+    </div>
+
+    <div class="nav-telemetry">
+      <div id="pulse-indicator" class="pulse-pill">
+        <div class="pulse-dot"></div>
+        <span id="pulse-text">CONNECTING MESH...</span>
+      </div>
+
+      <div class="stat-pill">
+        LAN IP: <strong id="nav-lan-ip">127.0.0.1:8000</strong>
+      </div>
+
+      <div class="stat-pill">
+        Host: <strong id="nav-platform">Core Host</strong>
+      </div>
+
+      <div class="stat-pill">
+        DB: <strong id="nav-db-size">0 KB</strong>
+      </div>
+
+      <div class="stat-pill">
+        Operator: <strong id="nav-operator">Dyvorn</strong>
+      </div>
+
+      <button id="btn-open-models" class="btn-primary" aria-label="Configure AI Models">
+        ⚡ Model Roles
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Surface -->
+  <main class="dashboard-container">
+
+    <!-- KPI Vitals Row -->
+    <section class="kpi-row" aria-label="System Vitals">
+      
+      <!-- Card 1: Connected Mesh Nodes -->
+      <div class="kpi-card glass-panel">
+        <div class="kpi-title">
+          <span>Mesh Topology</span>
+          <span style="color: var(--cyan-primary);">🌐</span>
+        </div>
+        <div class="kpi-value">
+          <span id="kpi-nodes-count">1</span>
+          <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">Active Devices</span>
+        </div>
+        <div class="kpi-subtext">Intercontinental Peer Mesh</div>
+      </div>
+
+      <!-- Card 2: Cognitive Planner -->
+      <div class="kpi-card glass-panel">
+        <div class="kpi-title">
+          <span>Cognitive Engine</span>
+          <span style="color: var(--purple-neural);">🧠</span>
+        </div>
+        <div class="kpi-value" style="font-size: 18px; color: var(--cyan-primary);">
+          <span id="kpi-active-model">heuristic</span>
+        </div>
+        <div class="kpi-subtext">Dynamic DAG Planner</div>
+      </div>
+
+      <!-- Card 3: Host Memory & Vitals -->
+      <div class="kpi-card glass-panel">
+        <div class="kpi-title">
+          <span>Host System RAM</span>
+          <span style="color: var(--emerald-live);">⚡</span>
+        </div>
+        <div class="kpi-value">
+          <span id="kpi-ram-usage">0%</span>
+          <span id="kpi-proc-rss" style="font-size: 13px; color: var(--emerald-live); font-weight: 500;">-- MB RSS</span>
+        </div>
+        <div id="kpi-ram-sub" class="kpi-subtext">Calculating memory...</div>
+      </div>
+
+      <!-- Card 4: Spatial Zone & Audio -->
+      <div class="kpi-card glass-panel">
+        <div class="kpi-title">
+          <span>Spatial Anchor</span>
+          <span style="color: var(--amber-warn);">📍</span>
+        </div>
+        <div class="kpi-value">
+          <span id="kpi-zones-count">1 Zone</span>
+        </div>
+        <div class="kpi-subtext">Zero-Hardcoding Spatial Grid</div>
+      </div>
+
+    </section>
+
+    <!-- Main Two-Column Split -->
+    <section class="mesh-layout">
+
+      <!-- Column 1: Connected Devices Matrix -->
+      <div class="glass-panel" style="overflow: hidden;">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>📡 Connected Mesh Topology & Devices</span>
+            <span class="badge">Multi-Device Feed</span>
+          </div>
+        </div>
+        <div id="devices-grid" class="devices-body">
+          <div style="color: var(--text-muted); font-family: var(--font-mono); padding: 24px;">Loading registered devices...</div>
+        </div>
+      </div>
+
+      <!-- Column 2: Live Real-Time Multi-Device Event Stream -->
+      <div class="glass-panel events-body" style="overflow: hidden;">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>⚡ Omni-Mesh Real-Time Event Stream</span>
+            <span class="badge" style="background: rgba(0, 230, 153, 0.1); color: var(--emerald-live);">WebSocket Live</span>
+          </div>
+        </div>
+
+        <div class="events-filter-bar">
+          <button class="filter-chip active" data-filter="all">All Events</button>
+          <button class="filter-chip" data-filter="edge">Edge Nodes</button>
+          <button class="filter-chip" data-filter="tool">Tool Calls</button>
+          <button class="filter-chip" data-filter="voice">Voice & HUD</button>
+          <button class="filter-chip" data-filter="system">System</button>
+        </div>
+
+        <div id="events-stream" class="events-stream">
+          <div style="color: var(--text-dim); text-align: center; padding: 24px; font-family: var(--font-mono);">Waiting for incoming mesh traffic...</div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Bottom Command & Goal Runner -->
+    <section class="glass-panel command-runner">
+      <form id="command-form" class="command-input-row">
+        <span class="prompt-prefix">CORE &gt;</span>
+        <input 
+          type="text" 
+          id="command-input" 
+          class="command-input" 
+          placeholder="Dispatch any goal across the mesh (e.g. 'inspect lan', 'whats pulling most ram', 'whats the temp')..."
+          autocomplete="off"
+        />
+        <button type="submit" id="command-submit-btn" class="btn-primary">
+          DISPATCH
+        </button>
+      </form>
+
+      <div id="output-drawer" class="output-drawer">
+        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.05em;">Execution Result</div>
+        <div id="output-spoken" class="output-spoken">--</div>
+        <div id="output-steps"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- AI Model Selection Modal -->
+  <div id="model-modal" class="modal-backdrop">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>⚡ Dedicated AI Model Role Selector</h3>
+        <button id="modal-close-btn" class="modal-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
+          Assign models to specific cognitive roles across your sovereign system. Changes persist in SQLite instantly.
+        </p>
+
+        <!-- Role 1: Planner -->
+        <div class="role-select-group">
+          <label class="role-label" for="select-planner">Primary Cognitive Planner (DAG Decomposition)</label>
+          <select id="select-planner" class="model-dropdown">
+            <option value="ollama/qwen3.5:2b">ollama/qwen3.5:2b (Local Low-Latency)</option>
+            <option value="ollama/llama3">ollama/llama3 (Local Heavy Reasoning)</option>
+            <option value="ollama/qwen2.5-coder">ollama/qwen2.5-coder (Local Code Synthesis)</option>
+            <option value="gemini/gemini-2.5-flash">gemini/gemini-2.5-flash (Google High-Speed Cloud)</option>
+            <option value="gemini/gemini-2.5-pro">gemini/gemini-2.5-pro (Google Deep Reasoning Cloud)</option>
+            <option value="openai/gpt-4o-mini">openai/gpt-4o-mini (OpenAI Fast Cloud)</option>
+            <option value="anthropic/claude-3-5-sonnet-20241022">anthropic/claude-3-5-sonnet (Anthropic Cloud)</option>
+            <option value="groq/llama-3.3-70b-versatile">groq/llama-3.3-70b-versatile (Groq Ultra-Fast Cloud)</option>
+          </select>
+        </div>
+
+        <!-- Role 2: Deep Reasoning -->
+        <div class="role-select-group">
+          <label class="role-label" for="select-deep">Deep Reasoning & Complex Planning</label>
+          <select id="select-deep" class="model-dropdown">
+            <option value="gemini/gemini-2.5-pro">gemini/gemini-2.5-pro (Google Cloud)</option>
+            <option value="anthropic/claude-3-5-sonnet-20241022">anthropic/claude-3-5-sonnet (Anthropic Cloud)</option>
+            <option value="openai/gpt-4o">openai/gpt-4o (OpenAI Cloud)</option>
+            <option value="ollama/llama3">ollama/llama3 (Local Ollama)</option>
+            <option value="deepseek/deepseek-reasoner">deepseek/deepseek-reasoner (DeepSeek Cloud)</option>
+          </select>
+        </div>
+
+        <!-- Role 3: Fallback Model -->
+        <div class="role-select-group">
+          <label class="role-label" for="select-fallback">Autonomous Fallback Model (If Primary is Offline)</label>
+          <select id="select-fallback" class="model-dropdown">
+            <option value="ollama/qwen3.5:2b">ollama/qwen3.5:2b (Local Ollama)</option>
+            <option value="ollama/llama3">ollama/llama3 (Local Ollama)</option>
+            <option value="gemini/gemini-2.5-flash">gemini/gemini-2.5-flash (Google Cloud)</option>
+            <option value="openai/gpt-4o-mini">openai/gpt-4o-mini (OpenAI Cloud)</option>
+          </select>
+        </div>
+
+        <!-- Role 4: Fast Local -->
+        <div class="role-select-group">
+          <label class="role-label" for="select-fast">Fast Local Model (Zero Latency Silicon)</label>
+          <select id="select-fast" class="model-dropdown">
+            <option value="ollama/qwen3.5:2b">ollama/qwen3.5:2b (Local)</option>
+            <option value="ollama/qwen2.5-coder">ollama/qwen2.5-coder (Local)</option>
+            <option value="gemini/gemini-2.5-flash">gemini/gemini-2.5-flash (Cloud Fast)</option>
+          </select>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button id="modal-cancel-btn" class="filter-chip">Cancel</button>
+        <button id="modal-save-btn" class="btn-primary">Apply & Save Preferences</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/dashboard.js"></script>
+</body>
+</html>
