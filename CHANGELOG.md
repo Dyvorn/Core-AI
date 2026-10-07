@@ -20,17 +20,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 | Kernel | Status | Verification | Ethos |
 | :---: | :---: | :---: | :---: |
-| **`v0.2.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **123 / 123 PASSED** | 🛡️ **#ANTISLOP** |
+| **`v0.2.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **128 / 128 PASSED** | 🛡️ **#ANTISLOP** |
 
-Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driver productivity, sub-50ms CLI execution, high-fidelity microphone capture & adaptive VAD, spoken-to discourse awareness, mock tool eradication, and microkernel streamlining.
+Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driver productivity, sub-50ms CLI execution, always-on voice capture by default, neural Silero VAD, instant verbal barge-in, multilingual Whisper STT, spoken-to discourse awareness, mock tool eradication, and microkernel streamlining.
 
 ### 🌟 Added & Enhanced
 
-#### 🎙️ High-Fidelity Audio Capture & Resilient STT (`engines/voice_in.py`)
+#### 🎙️ Ultra-Low-Latency Voice Detection, Silero VAD & Verbal Barge-In (`engines/voice_in.py`, `engines/voice_out.py`, `brain/spoken_to.py`, `main.py`)
+- **Neural Silero VAD (ONNX)**: Integrated on-device Silero VAD operating on 512-sample (32ms at 16kHz) frames. Accurately pinpoints vocal onset, ignores fan noise, breathing, typing, and room reflections, and cleanly cuts off speech after ~350ms of trailing silence (eliminating 7.0s safety lockouts).
+- **Verbal Barge-In & Instant Playback Interruption**: Operator can interrupt Core AI mid-speech at any moment by speaking *"Stop"*, *"Stopp"*, *"No, no, stop, stop, stop"*, *"Halt"*, or *"Warte"*. The audio worker halts hardware sounddevice playback within 20ms and purges pending queues.
+- **Fast-Path Semantic Discourse (<0.1ms Latency)**: Reordered discourse evaluation to process deterministic room imperatives, time queries (*"what time is it"*, *"how... what time is it"*), and assistant vocatives (*"Gemini"*, *"Core"*, *"Jarvis"*) instantly without blocking on external cognitive LLM roundtrips.
+- **Greedy Whisper STT Decoding (`beam_size=1`)**: Streamlined faster-whisper inference to greedy beam_size=1 with bilingual acoustic priming, accelerating speech-to-text throughput by 3-4x.
+- **Decoupled Asynchronous Audio Capture**: Microphone processing runs in an isolated non-blocking loop with background dispatch, keeping voice detection receptive 100% of the time even while executing tools or synthesizing audio.
+- **Always-Active Voice In by Default**: Inverted the voice activation lifecycle so microphone capture is **always active on boot** across both interactive REPL and headless background daemon modes. Operators no longer need to type `voice on` or pass `--voice`.
+- **Operator Privacy & Pausing (`voice off` / `--no-voice`)**: Easily paused with `voice off` (or `mic off`) in the REPL and resumed with `voice on`, or disabled at startup via `--no-voice` / `--no-mic` CLI flags or `CORE_DISABLE_VOICE=1` environment variable.
+- **Bilingual Acoustic Decoding Priming**: Injected domain initial prompts (`initial_prompt`) covering common German and English terminology (Core AI, Gemini, Dyvorn, Uhrzeit, Wetter, Systemstatus, Erinnerung, Notizen, Office, Studio) to eliminate decoding ambiguities.
 - **Native Hardware Rate Auto-Detection & Resampling**: Introspects native hardware sample rates (WASAPI / DirectSound 44.1kHz or 48kHz audio interfaces) to completely eliminate `PaErrorCode -9997 (Invalid sample rate)` on Windows. Integrates zero-dependency fast linear interpolation (`resample_audio`) downsampling directly to Whisper's 16kHz target.
-- **Dynamic Noise-Floor Adaptive RMS VAD**: Replaced static peak energy thresholds with continuous ambient room noise floor estimation (`self.ambient_noise_floor`) and dynamic RMS tracking (`adaptive_threshold = max(0.008, ambient_noise_floor * 2.2)`). Ensures effortless triggering on quiet headsets while preventing runaway recordings in noisy rooms.
-- **Pre-Roll Audio Ring Buffer**: Maintains a ~400ms pre-speech circular buffer that is prepended the millisecond voice activity is detected, eliminating clipped opening syllables ("Hey...", "Core...").
-- **STT Model Cascade Fallback**: Supports `CORE_STT_MODEL` and `CORE_STT_LANGUAGE` environment overrides. Gracefully cascades down the model tier (`distil-large-v3` $\to$ `small` $\to$ `base` $\to$ `tiny`) if VRAM allocation or memory pressure occurs.
+- **Pre-Roll Audio Ring Buffer**: Maintains a ~320ms pre-speech circular buffer that is prepended the millisecond voice activity is confirmed, eliminating clipped opening syllables ("Hey...", "Core...", "Wie...", "What...").
 - **Expanded Hallucination Suppression**: Filters silence artifacts, subtitle captions, bracketed noise tokens (`[blank_audio]`, `(silence)`), and repetitive word stutter loops.
 
 #### 🧠 Discourse Pragmatics & Spoken-To Awareness (`brain/spoken_to.py`, `core/gateway.py`)

@@ -1,3 +1,4 @@
+import os
 import re
 import json
 import time
@@ -35,7 +36,7 @@ def strip_conversational_fillers(text: str) -> str:
     """Strips conversational pleasantries, modal verbs, and leading particles to extract the raw command."""
     clean = text.strip()
     filler_pattern = re.compile(
-        r"^(?:bitte|sag mal|kannst du bitte|kannst du|würdest du|zeig mir mal|zeig mir|zeig uns mal|zeig uns|zeig|show me|please|tell me|den|die|das|the)\s+",
+        r"^(?:bitte|sag mal|kannst du bitte|kannst du|würdest du|zeig mir mal|zeig mir|zeig uns mal|zeig uns|zeig|show me|please|tell me|den|die|das|the|how\s+about|how|can you|could you|would you)\s+",
         re.IGNORECASE
     )
     for _ in range(5):
@@ -81,7 +82,7 @@ class SpokenToReasoning:
         identifiers = {self.assistant_name.lower(), f"{self.assistant_name.lower()} ai"}
         # Include common AI handles if configured
         profile = self.state_manager.get_user_profile()
-        extra_aliases = profile.preferences.get("assistant_aliases", ["core", "core ai", "jarvis", "computer"])
+        extra_aliases = profile.preferences.get("assistant_aliases", ["core", "core ai", "jarvis", "computer", "gemini"])
         for alias in extra_aliases:
             identifiers.add(alias.lower())
         return list(identifiers)
@@ -93,9 +94,10 @@ class SpokenToReasoning:
 
     def evaluate(self, utterance: str, profile: Optional[UserProfile] = None) -> SpokenToDecision:
         """
-        Main cognitive evaluation method.
-        Dispatches to LLM reasoning if an active model is reachable,
-        or uses dynamic semantic discourse analysis.
+        Main cognitive evaluation method:
+        Prioritizes dynamic semantic discourse analysis (<0.1ms latency) for instant
+        voice responsiveness (Gemini Live standard). Uses LLM only as a fallback
+        for ambiguous bystander statements when an AI model is configured.
         """
         text = utterance.strip()
         if not text:
@@ -109,7 +111,15 @@ class SpokenToReasoning:
         current_profile = profile or self.state_manager.get_user_profile()
         active_model = self.planner.get_active_model() if self.planner else None
 
-        # 1. Cognitive LLM Evaluation when available
+        # 1. Fast Dynamic Semantic Discourse Analyzer (<0.1ms latency)
+        # Evaluates direct vocatives, greetings, explicit tool actions, and interruptions immediately
+        decision = self._semantic_discourse_analysis(text, current_profile)
+        if decision.should_respond or decision.action_type == "interrupt" or decision.discourse_role in (DiscourseRole.DEMONSTRATED, DiscourseRole.REFERENCED):
+            if decision.should_respond:
+                self.record_interaction(decision.discourse_role)
+            return decision
+
+        # 2. Cognitive LLM Evaluation only for ambiguous bystander utterances
         if active_model:
             try:
                 llm_decision = self._llm_evaluate(text, active_model, current_profile)
@@ -118,12 +128,8 @@ class SpokenToReasoning:
                         self.record_interaction(llm_decision.discourse_role)
                     return llm_decision
             except Exception as e:
-                logger.warning(f"LLM Spoken-To evaluation failed ({e}), using dynamic semantic engine.")
+                logger.debug(f"Cognitive LLM Spoken-To evaluation bypassed ({e}).")
 
-        # 2. Dynamic Semantic Discourse Analyzer
-        decision = self._semantic_discourse_analysis(text, current_profile)
-        if decision.should_respond:
-            self.record_interaction(decision.discourse_role)
         return decision
 
     def _semantic_discourse_analysis(self, text: str, profile: UserProfile) -> SpokenToDecision:
@@ -141,6 +147,24 @@ class SpokenToReasoning:
         has_assistant_mention = any(
             re.search(rf"\b{re.escape(name)}\b", text_lower) for name in assistant_names
         )
+
+        # -------------------------------------------------------------
+        # 0. Immediate Verbal Interrupt / Stop Directive
+        # e.g., "Stop", "Stopp", "Halt", "Cancel", "No no stop", "Warte"
+        # -------------------------------------------------------------
+        interrupt_match = re.search(
+            r"^(?:no[,\s]+|nein[,\s]+|hey[,\s]+)*(?:stop|stopp|halt|cancel|abbrechen|warte|wait|quiet|leise|ruhe|hör auf|shut up|pause)\b",
+            text_lower
+        )
+        if interrupt_match:
+            return SpokenToDecision(
+                discourse_role=DiscourseRole.ADDRESSED,
+                should_respond=False,
+                action_type="interrupt",
+                clean_command="stop",
+                confidence=1.0,
+                rationale="Operator issued immediate stop or audio interrupt command."
+            )
 
         # -------------------------------------------------------------
         # A. Detect DEMONSTRATION / SHOWCASE Discourse Posture
@@ -272,8 +296,9 @@ class SpokenToReasoning:
         # Pattern 3: Standalone directive command containing explicit tool actions
         # (e.g., "Wie spät ist es", "Systemstatus anzeigen", "Berechne 25 * 4", "Erinnere mich in 5 Min", "Watch RAM")
         explicit_action_triggers = [
-            # Time & Math
-            "wie spät", "uhrzeit", "what time", "berechne", "calculate", "rechnen",
+            # Time & Math (supports "what time", "what time is it", "how what time is it", "tell me the time")
+            "wie spät", "uhrzeit", "what time", "what's the time", "whats the time", "time is it", "current time",
+            "tell me the time", "tell me what time", "berechne", "calculate", "rechnen",
             # Proactive Reminders & Timers
             "remind me", "erinnere mich", "stell einen timer", "set a timer", "timer auf", "timer stellen",
             "timer in", "countdown", "alarm", "stoppuhr", "timer abbrechen", "cancel timer",
@@ -298,8 +323,27 @@ class SpokenToReasoning:
                 should_respond=True,
                 action_type="command",
                 clean_command=cleaned_standalone,
-                confidence=0.89,
+                confidence=0.92,
                 rationale="Direct tool query, proactive action, or presence update with explicit invocation keywords."
+            )
+
+        # Pattern 4: Direct conversational inquiry patterns ("can you do that", "kannst du das machen", "tell me about...")
+        conversational_inquiries = [
+            "can you", "could you", "would you", "will you",
+            "kannst du", "könntest du", "würdest du",
+            "tell me", "sag mir", "explain", "erkläre", "erklär mir",
+            "how do i", "how can i", "wie kann ich", "wie mache ich"
+        ]
+        is_human_side_talk = bool(re.search(r"\b(du mir|mir mal|das wasser|reichen|geben|pass me|hand me)\b", text_lower))
+        if any(text_lower.startswith(q) for q in conversational_inquiries) and not is_human_side_talk:
+            cleaned_inquiry = strip_conversational_fillers(text)
+            return SpokenToDecision(
+                discourse_role=DiscourseRole.ADDRESSED,
+                should_respond=True,
+                action_type="command",
+                clean_command=cleaned_inquiry or text,
+                confidence=0.91,
+                rationale="Direct conversational request or inquiry directed at assistant."
             )
 
         # -------------------------------------------------------------

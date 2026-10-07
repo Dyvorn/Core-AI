@@ -39,7 +39,7 @@ def test_voice_in_resampling():
     # 44100 Hz to 16000 Hz
     orig_44k = np.ones(4410, dtype=np.float32)
     resampled_from_44 = resample_audio(orig_44k, orig_sr=44100, target_sr=16000)
-    expected_len = int(round(4410 * 16000 / 44100))
+    expected_len = round(4410 * 16000 / 44100)
     assert len(resampled_from_44) == expected_len
 
     # Same rate returns original
@@ -230,3 +230,114 @@ def test_end_to_end_voice_loop(tmp_path):
 
     finally:
         bus.stop_listening()
+
+
+def test_voice_model_multilingual_guard(monkeypatch):
+    """Verify VoiceInEngine defaults to multilingual 'small' and upgrades English-only distil-large-v3."""
+    with patch("engines.voice_in.WhisperModel") as mock_whisper:
+        mock_whisper.return_value = MagicMock()
+        
+        # 1. Default model size is small
+        engine_default = VoiceInEngine(device="cpu")
+        assert engine_default.model_size == "small"
+
+        # 2. English-only distil model is upgraded to small when language is not 'en'
+        engine_distil = VoiceInEngine(model_size="distil-large-v3", language=None, device="cpu")
+        assert engine_distil.model_size == "small"
+
+        # 3. Explicit English can keep distil-large-v3
+        engine_en = VoiceInEngine(model_size="distil-large-v3", language="en", device="cpu")
+        assert engine_en.model_size == "distil-large-v3"
+
+
+def test_cli_voice_arguments_always_active(monkeypatch):
+    """Verify CLI defaults voice to active (no_voice=False) and supports --no-voice / --no-mic."""
+    import sys
+    from main import parse_args
+
+    # Default CLI invocation: voice active by default, model small
+    monkeypatch.setattr(sys, "argv", ["main.py"])
+    args_default = parse_args()
+    assert args_default.no_voice is False
+    assert args_default.model_size == "small"
+
+    # Inverted flag: user explicitly passes --no-voice
+    monkeypatch.setattr(sys, "argv", ["main.py", "--no-voice"])
+    args_disabled = parse_args()
+    assert args_disabled.no_voice is True
+
+    # Inverted flag alias: user passes --no-mic
+    monkeypatch.setattr(sys, "argv", ["main.py", "--no-mic"])
+    args_mic_off = parse_args()
+    assert args_mic_off.no_voice is True
+
+
+def test_voice_out_interruption():
+    """Verify VoiceOutEngine.interrupt() halts active playback, drains queue, and resets speech state."""
+    voice_out = VoiceOutEngine(default_voice="auto")
+    try:
+        # Enqueue multiple phrases
+        voice_out.synthesize_and_play("First long sentence to synthesize and speak.", blocking=False)
+        voice_out.synthesize_and_play("Second sentence in queue.", blocking=False)
+        voice_out.synthesize_and_play("Third sentence in queue.", blocking=False)
+
+        # Trigger immediate interrupt
+        interrupted = voice_out.interrupt()
+        assert voice_out._interrupted.is_set()
+        assert voice_out.speech_queue.empty()
+        assert voice_out.is_speaking is False
+    finally:
+        voice_out.stop()
+
+
+def test_voice_in_barge_in_and_interrupt():
+    """Verify VoiceInEngine intercepts verbal interrupt keywords and halts VoiceOut playback."""
+    voice_out = VoiceOutEngine(default_voice="auto")
+    try:
+        from engines.voice_in import INTERRUPT_PATTERN
+        assert INTERRUPT_PATTERN.search("stop")
+        assert INTERRUPT_PATTERN.search("stopp")
+        assert INTERRUPT_PATTERN.search("No, no, stop, stop, stop, stop, stop")
+        assert INTERRUPT_PATTERN.search("halt")
+        assert INTERRUPT_PATTERN.search("cancel")
+        assert INTERRUPT_PATTERN.search("abbrechen")
+        assert INTERRUPT_PATTERN.search("warte")
+
+        # Simulate voice_in detecting interrupt utterance while speech is queued
+        voice_out.synthesize_and_play("Speaking something long...", blocking=False)
+        was_halted = voice_out.interrupt()
+        assert was_halted is True
+        assert not voice_out.is_speaking
+        assert voice_out.speech_queue.empty()
+    finally:
+        voice_out.stop()
+
+
+def test_spoken_to_zero_latency_fast_path():
+    """Verify Spoken-To engine returns in sub-millisecond time for time queries, interrupts, and hesitation."""
+    from brain.spoken_to import SpokenToReasoning, DiscourseRole
+    spoken = SpokenToReasoning()
+    profile = UserProfile(preferred_name="Dyvorn")
+
+    # 1. Verbal interrupt
+    dec_stop = spoken.evaluate("No, no, stop, stop, stop, stop, stop", profile=profile)
+    assert dec_stop.action_type == "interrupt"
+    assert dec_stop.should_respond is False
+
+    # 2. Time query with hesitation
+    dec_time = spoken.evaluate("how... what time is it?", profile=profile)
+    assert dec_time.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_time.should_respond is True
+    assert dec_time.action_type == "command"
+
+    # 3. German time query
+    dec_de = spoken.evaluate("Wie spät ist es?", profile=profile)
+    assert dec_de.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_de.should_respond is True
+
+    # 4. Gemini alias query
+    dec_gemini = spoken.evaluate("Gemini, can you tell me what time it is?", profile=profile)
+    assert dec_gemini.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_gemini.should_respond is True
+    assert dec_gemini.action_type == "command"
+

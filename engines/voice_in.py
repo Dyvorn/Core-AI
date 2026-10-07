@@ -28,6 +28,11 @@ HALLUCINATION_PATTERNS = [
     r"^(\b\w+\b)(?:\s+\1){3,}[\.\!\?]?$",  # Word repeated 4+ times (e.g. "yeah yeah yeah yeah")
 ]
 
+INTERRUPT_PATTERN = re.compile(
+    r"^(?:no[,\s]+|nein[,\s]+|hey[,\s]+|warte[,\s]+)*(?:stop|stopp|halt|cancel|abbrechen|warte|wait|quiet|leise|ruhe|hör auf|shut up|pause)\b",
+    re.IGNORECASE
+)
+
 
 def resample_audio(chunk: np.ndarray, orig_sr: int, target_sr: int = 16000) -> np.ndarray:
     """
@@ -38,7 +43,7 @@ def resample_audio(chunk: np.ndarray, orig_sr: int, target_sr: int = 16000) -> n
         return chunk.astype(np.float32)
 
     duration = len(chunk) / float(orig_sr)
-    target_length = int(round(duration * target_sr))
+    target_length = round(duration * target_sr)
     if target_length <= 0:
         return np.array([], dtype=np.float32)
 
@@ -49,13 +54,13 @@ def resample_audio(chunk: np.ndarray, orig_sr: int, target_sr: int = 16000) -> n
 
 class VoiceInEngine:
     """
-    High-Performance Voice Capture, Dynamic VAD, and Speech-to-Text (STT) Engine:
+    High-Performance Voice Capture, Silero VAD, and Speech-to-Text (STT) Engine:
+    - Neural Silero VAD (ONNX) for sub-400ms speech offset detection and noise rejection
     - Auto-detects native hardware sample rate (WASAPI / DirectSound 44.1/48kHz) with fast resampling
-    - Dynamic RMS energy calculation with adaptive ambient noise floor tracking
-    - Pre-roll audio buffer preserving the onset of speech ('Hey Core...')
-    - Resilient STT model loading with automatic cascade fallback (large -> small -> base -> tiny)
+    - Ultra-low latency Faster-Whisper decoding (beam_size=1 greedy mode)
+    - Full speech barge-in and verbal interruption support ("Stop", "No no stop", "Stopp")
     - Whisper hallucination and ambient noise suppression
-    - Direct integration with Core AI EventBus, Discourse Engine, and Gateway
+    - Decoupled asynchronous callback dispatch preserving non-blocking mic capture
     """
 
     def __init__(
@@ -65,28 +70,37 @@ class VoiceInEngine:
         compute_type: str = "default",
         input_device: Optional[Any] = None,
         sample_rate: int = 16000,
-        silence_threshold: float = 0.018,
-        silence_duration_chunks: int = 8,
-        language: Optional[str] = None
+        silence_threshold: float = 0.015,
+        silence_duration_chunks: int = 5,
+        language: Optional[str] = None,
+        show_meter: bool = False,
+        voice_out: Optional[Any] = None
     ):
         # Allow environment override for model and language
         env_model = os.getenv("CORE_STT_MODEL")
         env_lang = os.getenv("CORE_STT_LANGUAGE")
 
-        self.model_size = model_size or env_model or "distil-large-v3"
+        # Default model size (configurable, default small/base)
+        self.model_size = model_size or env_model or "small"
         self.language = language or env_lang or None
         self.requested_device = device
         self.requested_compute = compute_type
         self.input_device = input_device if input_device is not None else os.getenv("CORE_MIC_DEVICE")
         self.sample_rate = sample_rate  # Target Whisper rate (16000 Hz)
         self.hw_samplerate = sample_rate  # Will be set to actual hardware rate upon opening stream
+        self.show_meter = show_meter or (os.getenv("CORE_VOICE_METER", "0").lower() in ("1", "true"))
+
+        # Interruption and voice output linkage
+        self.voice_out = voice_out
+        self.on_interrupt: Optional[Callable[[str], None]] = None
 
         # VAD & Energy parameters
         self.silence_threshold = silence_threshold
         self.min_speech_threshold = 0.008
         self.ambient_noise_floor = 0.005  # Adaptive baseline, updated during quiet intervals
-        self.silence_duration_chunks = silence_duration_chunks
-        self.pre_roll_chunks = 4  # Keep ~400ms pre-speech audio to prevent clipping first syllable
+        self.silence_duration_chunks = silence_duration_chunks  # Trailing silence frames (~350ms)
+        self.max_speech_chunks = 200  # Safety cutoff (~6.5s) to prevent infinite accumulation
+        self.pre_roll_chunks = 10  # Pre-roll ~320ms to capture opening syllables cleanly
 
         # State tracking
         self.is_recording = False
@@ -95,9 +109,24 @@ class VoiceInEngine:
         self.state_callback: Optional[Callable[[str], None]] = None
         self.current_state = "idle"  # idle, listening, recording, transcribing
 
+        # Neural Silero VAD initialization
+        self.vad_model = None
+        try:
+            from faster_whisper.vad import get_vad_model
+            self.vad_model = get_vad_model()
+            logger.info("Silero VAD model loaded for neural voice activity detection.")
+        except Exception as vad_err:
+            logger.warning(f"Silero VAD model unavailable ({vad_err}). Falling back to adaptive energy VAD.")
+            self.vad_model = None
+
         # Auto-configure optimal device and compute
         self.device, self.compute_type = self._determine_hardware(device, compute_type)
         self.model = self._load_model_with_fallback(self.model_size, self.device, self.compute_type)
+
+    def register_voice_out(self, voice_out: Any, on_interrupt: Optional[Callable[[str], None]] = None):
+        """Wires VoiceOutEngine to enable instant speech interruption and barge-in."""
+        self.voice_out = voice_out
+        self.on_interrupt = on_interrupt
 
     def _determine_hardware(self, req_device: str, req_compute: str) -> tuple[str, str]:
         """Auto-detects whether CUDA is genuinely available to avoid runtime cuBLAS errors."""
@@ -121,6 +150,12 @@ class VoiceInEngine:
 
     def _load_model_with_fallback(self, requested_model: str, device: str, compute_type: str) -> Optional[WhisperModel]:
         """Attempts loading requested whisper model; falls back gracefully down the model tier if OOM/unavailable."""
+        # distil-large-v3 and distil models are strictly English-only.
+        # If language is not explicitly set to 'en', upgrade to multilingual 'small'
+        if ("distil" in requested_model.lower()) and self.language != "en":
+            logger.info("Notice: 'distil-large-v3' is English-only. Upgrading to multilingual 'small' model for fluent German and English speech.")
+            requested_model = "small"
+
         cascade = [requested_model]
         for fallback in ["small", "base", "tiny"]:
             if fallback not in cascade:
@@ -316,101 +351,180 @@ class VoiceInEngine:
 
         logger.info("VoiceInEngine listening stream stopped.")
 
+    def _dispatch_callback(self, text: str):
+        """Dispatches speech callback asynchronously so audio capture loop never blocks."""
+        if self.callback:
+            threading.Thread(target=self._run_callback_safe, args=(text,), daemon=True).start()
+
+    def _run_callback_safe(self, text: str):
+        try:
+            if self.callback:
+                self.callback(text)
+        except Exception as cb_err:
+            logger.error(f"Error in speech callback: {cb_err}", exc_info=True)
+
     def _process_audio(self):
         pre_roll = collections.deque(maxlen=self.pre_roll_chunks)
         buffer = []
-        silence_chunks = 0
+        silence_frames = 0
         is_speech_active = False
+        frame_accumulator = []
+        FRAME_SIZE = 512  # 32ms at 16kHz for Silero VAD and fast energy checks
 
         while self.is_recording:
             try:
-                chunk = self.audio_queue.get(timeout=0.1)
+                raw_chunk = self.audio_queue.get(timeout=0.1)
+                if len(raw_chunk) == 0:
+                    continue
 
-                # Compute RMS and peak energy metrics
-                rms = float(np.sqrt(np.mean(chunk**2))) if len(chunk) > 0 else 0.0
-                peak = float(np.max(np.abs(chunk))) if len(chunk) > 0 else 0.0
+                frame_accumulator.extend(raw_chunk)
 
-                # Adaptive threshold based on moving room noise floor
-                adaptive_threshold = max(self.min_speech_threshold, self.ambient_noise_floor * 2.2)
+                # Process in 512-sample (32ms) frames
+                while len(frame_accumulator) >= FRAME_SIZE and self.is_recording:
+                    frame = np.array(frame_accumulator[:FRAME_SIZE], dtype=np.float32)
+                    frame_accumulator = frame_accumulator[FRAME_SIZE:]
 
-                if not is_speech_active:
-                    pre_roll.append(chunk)
-                    # Smoothly update ambient noise floor during quiet intervals
-                    self.ambient_noise_floor = 0.95 * self.ambient_noise_floor + 0.05 * rms
+                    rms = float(np.sqrt(np.mean(frame**2))) if len(frame) > 0 else 0.0
+                    peak = float(np.max(np.abs(frame))) if len(frame) > 0 else 0.0
 
-                bars = int(min(rms / 0.05, 1.0) * 10)
-                meter = "█" * bars + "░" * (10 - bars)
+                    # Dynamic thresholds for fallback energy VAD
+                    start_threshold = max(self.min_speech_threshold, self.ambient_noise_floor * 2.2)
+                    sustain_threshold = max(self.min_speech_threshold * 0.75, self.ambient_noise_floor * 1.35)
 
-                # Trigger speech activation if RMS exceeds adaptive threshold or peak is distinctly above silence threshold
-                if rms >= adaptive_threshold or peak >= self.silence_threshold:
+                    is_bot_speaking = bool(self.voice_out and getattr(self.voice_out, "is_speaking", False))
+
+                    # 1. Neural Silero VAD speech probability evaluation
+                    is_speech = False
+                    is_sustain = False
+                    if self.vad_model is not None:
+                        try:
+                            speech_prob = float(self.vad_model(frame)[0])
+                            # During bot speech, require slightly higher confidence to reject acoustic bleed
+                            speech_gate = 0.55 if is_bot_speaking else 0.45
+                            sustain_gate = 0.35 if is_bot_speaking else 0.25
+                            is_speech = (speech_prob >= speech_gate)
+                            is_sustain = (speech_prob >= sustain_gate)
+                        except Exception as vad_e:
+                            logger.debug(f"Silero VAD inference exception ({vad_e}), using RMS")
+                            is_speech = (rms >= start_threshold or (rms >= self.min_speech_threshold and peak >= self.silence_threshold * 1.6))
+                            is_sustain = (rms >= sustain_threshold)
+                    else:
+                        is_speech = (rms >= start_threshold or (rms >= self.min_speech_threshold and peak >= self.silence_threshold * 1.6))
+                        is_sustain = (rms >= sustain_threshold)
+
                     if not is_speech_active:
-                        is_speech_active = True
-                        self._set_state("recording")
-                        # Prepend pre-roll buffer so onset syllables ("Hey", "Core") are fully captured
-                        buffer = list(pre_roll)
-                    buffer.append(chunk)
-                    silence_chunks = 0
-                else:
-                    if is_speech_active:
-                        buffer.append(chunk)
-                        silence_chunks += 1
+                        pre_roll.append(frame)
+                        self.ambient_noise_floor = 0.95 * self.ambient_noise_floor + 0.05 * rms
+                        self.ambient_noise_floor = max(0.001, min(self.ambient_noise_floor, 0.03))
 
-                # Dynamic terminal meter display
-                status_text = f"🗣️ RECORDING ({len(buffer)})" if is_speech_active else "👂 LISTENING..."
-                sys.stdout.write(f"\r[🎙️ MIC] [{meter}] rms: {rms:.4f} (noise: {self.ambient_noise_floor:.4f}) | {status_text:<30}")
-                sys.stdout.flush()
-
-                # Trigger transcription once silence threshold is reached after active speech
-                if is_speech_active and silence_chunks >= self.silence_duration_chunks and len(buffer) >= 6:
-                    sys.stdout.write("\r" + " " * 80 + "\r")
-                    sys.stdout.flush()
-
-                    audio_data = np.concatenate(buffer).flatten()
-                    duration_sec = len(audio_data) / self.sample_rate
-                    buffer = []
-                    silence_chunks = 0
-                    is_speech_active = False
-                    pre_roll.clear()
-                    self._set_state("transcribing")
-
-                    # Process audio if speech was at least ~250ms
-                    if self.model and len(audio_data) >= int(self.sample_rate * 0.25):
-                        print(f"\n[⏳ VAD] Speech ended ({duration_sec:.1f}s). Transcribing with faster-whisper...")
-                        text = self.transcribe_audio_array(audio_data, language=self.language)
-
-                        if text and not self.is_hallucination(text):
-                            print(f"[📝 STT] Result: \"{text}\"")
-                            if self.callback:
-                                try:
-                                    self.callback(text)
-                                except Exception as cb_err:
-                                    logger.error(f"Error in speech callback: {cb_err}", exc_info=True)
+                        if is_speech:
+                            is_speech_active = True
+                            self._set_state("recording")
+                            buffer = list(pre_roll)
+                            buffer.append(frame)
+                            silence_frames = 0
+                    else:
+                        buffer.append(frame)
+                        if is_sustain:
+                            silence_frames = 0
                         else:
-                            print(f"[📝 STT] (Filtered ambient noise/hallucination: '{text}')")
+                            silence_frames += 1
 
-                    # Drain old queue items accumulated during transcription
-                    with self.audio_queue.mutex:
-                        self.audio_queue.queue.clear()
+                    # Dynamic terminal meter display (only if show_meter is enabled)
+                    if self.show_meter:
+                        bars = int(min(rms / 0.05, 1.0) * 10)
+                        meter = "█" * bars + "░" * (10 - bars)
+                        status_text = f"🗣️ RECORDING ({len(buffer)})" if is_speech_active else "👂 LISTENING..."
+                        sys.stdout.write(f"\r[🎙️ MIC] [{meter}] rms: {rms:.4f} (noise: {self.ambient_noise_floor:.4f}) | {status_text:<30}")
+                        sys.stdout.flush()
 
-                    self._set_state("listening")
+                    # Trigger transcription: ~350ms of trailing silence (11 frames * 32ms) OR max speech frames (~6.4s)
+                    silence_cutoff_frames = 11 if self.vad_model is not None else max(5, self.silence_duration_chunks * 2)
+                    speech_cutoff = (silence_frames >= silence_cutoff_frames) or (len(buffer) >= self.max_speech_chunks)
+
+                    if is_speech_active and speech_cutoff and len(buffer) >= 8:
+                        if self.show_meter:
+                            sys.stdout.write("\r" + " " * 80 + "\r")
+                            sys.stdout.flush()
+
+                        audio_data = np.concatenate(buffer).flatten()
+                        duration_sec = len(audio_data) / float(self.sample_rate)
+                        buffer = []
+                        silence_frames = 0
+                        is_speech_active = False
+                        pre_roll.clear()
+                        self._set_state("transcribing")
+
+                        # Transcribe with Whisper (beam_size=1 greedy decoding)
+                        if self.model and len(audio_data) >= int(self.sample_rate * 0.25):
+                            print(f"\n[⏳ VAD] Speech ended ({duration_sec:.1f}s). Transcribing with faster-whisper ({self.model_size})...")
+                            text = self.transcribe_audio_array(audio_data, language=self.language, beam_size=1)
+                            clean_text = text.strip()
+
+                            if clean_text and not self.is_hallucination(clean_text):
+                                is_interrupt = bool(INTERRUPT_PATTERN.search(clean_text.lower()))
+                                is_currently_speaking = bool(self.voice_out and getattr(self.voice_out, "is_speaking", False))
+
+                                if is_interrupt:
+                                    if self.voice_out:
+                                        self.voice_out.interrupt()
+                                    if self.on_interrupt:
+                                        try:
+                                            self.on_interrupt(clean_text)
+                                        except Exception as ie:
+                                            logger.debug(f"Error in on_interrupt: {ie}")
+                                    print(f"\n[🛑 INTERRUPTED] Playback halted by operator: \"{clean_text}\"")
+
+                                    # Check for trailing directive after interrupt phrase (e.g. "Stop, wie spät ist es?")
+                                    trailing_cmd = INTERRUPT_PATTERN.sub("", clean_text).strip(" ,.!?")
+                                    if trailing_cmd and len(trailing_cmd) > 2:
+                                        self._dispatch_callback(trailing_cmd)
+                                else:
+                                    if is_currently_speaking:
+                                        if self.voice_out:
+                                            self.voice_out.interrupt()
+                                        print(f"\n[🛑 BARGE-IN] Interrupted playback for new command: \"{clean_text}\"")
+
+                                    print(f"[📝 STT] Result: \"{clean_text}\"")
+                                    self._dispatch_callback(clean_text)
+                            else:
+                                if clean_text:
+                                    print(f"[📝 STT] (Filtered ambient noise/hallucination: '{clean_text}')")
+
+                        # Drain pending raw chunks accumulated during transcription
+                        with self.audio_queue.mutex:
+                            self.audio_queue.queue.clear()
+                        frame_accumulator.clear()
+
+                        self._set_state("listening")
 
             except queue.Empty:
                 continue
             except Exception as e:
                 logger.error(f"Error during audio processing: {e}", exc_info=True)
 
-    def transcribe_audio_array(self, audio_data: np.ndarray, language: Optional[str] = None) -> str:
+    def transcribe_audio_array(self, audio_data: np.ndarray, language: Optional[str] = None, beam_size: int = 1) -> str:
         """Direct transcription of float32 16kHz audio array using Faster-Whisper."""
         if not self.model or len(audio_data) == 0:
             return ""
         try:
+            target_lang = language or self.language
+            initial_prompt = (
+                "Core AI, Gemini, Hey Core, Dyvorn, Studio, Office, Kitchen, Living Room. "
+                "Deutsch und Englisch: Wie spät ist es, Uhrzeit, stop, halt, abbrechen, Wetter, Systemstatus, Erinnerung, Notizen, Licht, Lautstärke."
+            )
             segments, info = self.model.transcribe(
                 audio_data,
-                beam_size=5,
-                language=language or self.language,
-                vad_filter=True,
-                initial_prompt="Core AI, Hey Core, Dyvorn, Studio, Office, Kitchen, Living Room"
+                beam_size=beam_size,
+                temperature=0.0,
+                best_of=1,
+                language=target_lang,
+                vad_filter=False,  # High-precision Silero VAD was already applied in capture loop
+                initial_prompt=initial_prompt
             )
+            detected_lang = getattr(info, "language", "unknown")
+            lang_prob = getattr(info, "language_probability", 1.0)
+            logger.debug(f"Detected speech language '{detected_lang}' (probability: {lang_prob:.2f})")
             return " ".join([seg.text for seg in segments]).strip()
         except Exception as e:
             logger.error(f"Whisper transcription error: {e}")

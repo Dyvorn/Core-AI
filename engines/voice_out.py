@@ -58,12 +58,50 @@ class VoiceOutEngine:
         # Sequential playback worker thread
         self.speech_queue = queue.Queue()
         self._is_running = True
-        self.is_speaking = False
+        self.is_speaking: bool = False
+        self._interrupted = threading.Event()
+        self.currently_speaking_text: Optional[str] = None
         self.playback_thread = threading.Thread(target=self._playback_worker, daemon=True)
         self.playback_thread.start()
 
         # Optional bus reference for speech lifecycle events
         self.bus: Optional[EventBus] = None
+
+    def interrupt(self) -> bool:
+        """
+        Immediately halts active audio playback, drains queued speech,
+        and notifies subscribers that speech was interrupted.
+        Returns True if active speech or queued speech was cancelled.
+        """
+        was_speaking = self.is_speaking or not self.speech_queue.empty()
+        self._interrupted.set()
+
+        # Drain pending speech queue
+        while not self.speech_queue.empty():
+            try:
+                item = self.speech_queue.get_nowait()
+                if item and item.get("done_event"):
+                    item["done_event"].set()
+                self.speech_queue.task_done()
+            except Exception:
+                break
+
+        # Stop audio hardware playback immediately
+        try:
+            sd.stop()
+        except Exception as e:
+            logger.debug(f"Error calling sd.stop(): {e}")
+
+        self.is_speaking = False
+        self.currently_speaking_text = None
+        self._notify_speech_state(False, "interrupted")
+        if was_speaking:
+            logger.info("VoiceOut playback interrupted by operator.")
+        return was_speaking
+
+    def stop_speaking(self) -> bool:
+        """Alias for interrupt()"""
+        return self.interrupt()
 
     def list_output_devices(self) -> List[Dict[str, Any]]:
         """Lists all audio output devices available on the host system."""
@@ -115,6 +153,8 @@ class VoiceOutEngine:
         audio_buffer = bytearray()
 
         async for chunk in communicate.stream():
+            if self._interrupted.is_set():
+                raise asyncio.CancelledError("TTS synthesis cancelled by operator interrupt")
             if chunk["type"] == "audio":
                 audio_buffer.extend(chunk["data"])
 
@@ -142,15 +182,17 @@ class VoiceOutEngine:
         text: str,
         voice: Optional[str] = None,
         device: Optional[Any] = None,
-        blocking: bool = True
+        blocking: bool = False
     ):
         """
         Enqueues text for synthesis and playback.
-        If blocking=True (default for direct calls), waits until this specific sentence finishes playing.
+        Default is non-blocking (blocking=False) for fluid voice interactions.
+        If blocking=True, waits until this specific sentence finishes or is interrupted.
         """
         if not text or not text.strip():
             return
 
+        self._interrupted.clear()
         done_event = threading.Event() if blocking else None
         item = {
             "text": text.strip(),
@@ -161,41 +203,66 @@ class VoiceOutEngine:
         self.speech_queue.put(item)
 
         if blocking and done_event:
-            done_event.wait()
+            import time
+            while not done_event.is_set() and not self._interrupted.is_set():
+                done_event.wait(timeout=0.05)
 
     def _playback_worker(self):
-        """Worker thread processing speech items sequentially."""
+        """Worker thread processing speech items sequentially with interrupt support."""
+        import time
         while self._is_running:
             try:
-                item = self.speech_queue.get(timeout=0.2)
+                item = self.speech_queue.get(timeout=0.1)
                 if item is None:
                     break
 
+                self._interrupted.clear()
                 text = item["text"]
                 voice = self.select_voice(text, item["voice"])
                 target_device = item["device"]
                 done_event = item["done_event"]
 
                 self.is_speaking = True
+                self.currently_speaking_text = text
                 self._notify_speech_state(True, text)
                 logger.info(f"Synthesizing speech with voice '{voice}': '{text[:60]}...'")
 
                 played_successfully = False
 
+                if self._interrupted.is_set():
+                    self.is_speaking = False
+                    self.currently_speaking_text = None
+                    if done_event:
+                        done_event.set()
+                    self.speech_queue.task_done()
+                    continue
+
                 # 1. Primary: Edge Neural TTS
                 try:
-                    # Run async synthesis
                     audio_data, sample_rate = asyncio.run(self._synthesize_edge_tts(text, voice))
-                    
-                    # Play through sounddevice
-                    sd.play(audio_data, samplerate=sample_rate, device=target_device)
-                    sd.wait()
-                    played_successfully = True
+
+                    if not self._interrupted.is_set():
+                        sd.play(audio_data, samplerate=sample_rate, device=target_device)
+
+                        # Duration-based polling with 15ms intervals for instant interruption
+                        duration_sec = len(audio_data) / float(sample_rate)
+                        start_time = time.time()
+
+                        while (time.time() - start_time) < (duration_sec + 0.1):
+                            if self._interrupted.is_set() or not self._is_running:
+                                sd.stop()
+                                break
+                            time.sleep(0.015)
+
+                        played_successfully = not self._interrupted.is_set()
+                except asyncio.CancelledError:
+                    logger.info("Speech synthesis cancelled due to operator interrupt.")
                 except Exception as e:
-                    logger.warning(f"Edge-TTS synthesis or playback failed ({e}). Falling back to pyttsx3...")
+                    if not self._interrupted.is_set():
+                        logger.warning(f"Edge-TTS synthesis or playback failed ({e}). Falling back to pyttsx3...")
 
                 # 2. Offline Fallback: pyttsx3
-                if not played_successfully:
+                if not played_successfully and not self._interrupted.is_set():
                     try:
                         self._fallback_pyttsx3(text)
                         played_successfully = True
@@ -203,6 +270,7 @@ class VoiceOutEngine:
                         logger.error(f"Offline fallback also failed: {e2}")
 
                 self.is_speaking = False
+                self.currently_speaking_text = None
                 self._notify_speech_state(False, text)
 
                 if done_event:
@@ -215,6 +283,7 @@ class VoiceOutEngine:
             except Exception as e:
                 logger.error(f"Unexpected error in TTS playback worker: {e}", exc_info=True)
                 self.is_speaking = False
+                self.currently_speaking_text = None
 
     def _notify_speech_state(self, is_speaking: bool, text: str):
         """Optionally publishes speech lifecycle events onto the EventBus."""

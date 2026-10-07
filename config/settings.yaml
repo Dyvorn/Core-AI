@@ -12,7 +12,7 @@ models:
   planner: "ollama/qwen3.5:2b" # Standard lokales model für einfache tasks
   fallback_planner: "gemini/gemini-2.5-flash"
   deep_reasoning: "gemini/gemini-3.1-pro" # Für komplexe tasks
-  stt_model: "distil-whisper/distil-large-v3"
+  stt_model: "small"
   tts_voice: "default_voice" # Platzhalter für kokoro voice oder piper
 
 audio:

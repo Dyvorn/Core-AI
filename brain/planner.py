@@ -299,8 +299,16 @@ class Planner:
                 depends_on=[]
             ))
 
-        # Pattern: Pure Time query ("wie spät ist es", "what time is it")
-        elif any(k in goal_lower for k in ["wie spät", "spät", "spaet", "uhrzeit", "uhr", "what time", "current time", "time is it", "wie sp"]):
+        # Pattern: Stop / Halt / Audio Interruption directive
+        elif (
+            goal_lower in ["stop", "stopp", "halt", "cancel", "abbrechen", "stop audio", "stop playback", "stop talking", "be quiet", "shut up"]
+            or (any(goal_lower.startswith(f"{s} ") for s in ["stop", "stopp", "halt"]) and not any(k in goal_lower for k in ["reminder", "timer", "watcher", "rule", "music", "process"]))
+        ):
+            is_de = any(c in goal_lower for c in ["stopp", "abbrechen", "halt"])
+            context["direct_response"] = "Aktion angehalten." if is_de else "Action stopped."
+
+        # Pattern: Pure Time query ("wie spät ist es", "what time is it", "how, what time is it")
+        elif any(k in goal_lower for k in ["wie spät", "spät", "spaet", "uhrzeit", "uhr", "what time", "current time", "time is it", "the time", "wie sp"]):
             steps.append(PipelineStep(
                 id="get_time_step",
                 name="Fetch Current Time",
@@ -976,9 +984,10 @@ Do NOT output any markdown formatting or commentary outside the JSON.
         # 2. System Status & Diagnostics
         if "get_system_status" in step_outputs:
             sys_info = step_outputs["get_system_status"]
-            os_name = sys_info.get("os", "System")
-            arch = sys_info.get("architecture", "")
-            py_ver = sys_info.get("python_version", "")
+            sys_dict = sys_info if isinstance(sys_info, dict) else {}
+            os_name = sys_dict.get("os", "System")
+            arch = sys_dict.get("architecture", "")
+            py_ver = sys_dict.get("python_version", "")
             time_val = step_outputs.get("get_time", "")
             time_str = f" um {time_val} Uhr" if time_val else ""
             if language == "de":

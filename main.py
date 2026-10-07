@@ -135,7 +135,7 @@ def print_help():
     print(f"  {GREEN}spoken <text>{RESET}             - Test Spoken-To Reasoning classification on any phrase")
     print(f"  {GREEN}audio{RESET}                     - Inspect connected mics, audio interfaces & zone routing")
     print(f"  {GREEN}handoff <zone>{RESET}            - Transition spatial anchor & auto-route audio to new zone")
-    print(f"  {GREEN}voice on / voice off{RESET}       - Toggle background microphone listening")
+    print(f"  {GREEN}voice off / voice on{RESET}       - Pause or resume always-on microphone listening")
     print(f"  {GREEN}status{RESET}                    - Inspect system health, platform architecture & model status")
     print(f"  {GREEN}account{RESET}                   - View Sovereign Operator Account identity, space & credentials")
     print(f"  {GREEN}account edit{RESET}              - Re-run interactive Sovereign Account setup wizard")
@@ -440,11 +440,12 @@ def parse_args():
     parser.add_argument("--no-anim", "--fast", action="store_true", help="Skip 3D boot animation for instant start (default)")
     parser.add_argument("--anim", action="store_true", help="Play 3D holographic boot animation")
     parser.add_argument("--logo", action="store_true", help="Run interactive 3D logo animation and exit")
-    parser.add_argument("--voice", action="store_true", help="Enable full continuous voice loop (Mic STT + Speaker TTS)")
-    parser.add_argument("--voice-in", action="store_true", help="Enable background microphone listening only")
+    parser.add_argument("--no-voice", "--no-mic", "--disable-voice", dest="no_voice", action="store_true", help="Disable automatic microphone listening on startup (voice is active by default)")
+    parser.add_argument("--voice", action="store_true", help="Explicitly enable full continuous voice loop (active by default)")
+    parser.add_argument("--voice-in", action="store_true", help="Explicitly enable background microphone listening (active by default)")
     parser.add_argument("--no-tts", action="store_true", help="Disable audio speech output")
     parser.add_argument("--headless", "--server-only", dest="headless", action="store_true", help="Run in headless server mode without interactive REPL")
-    parser.add_argument("--model-size", default="distil-large-v3", help="faster-whisper model size (distil-large-v3, base, small, tiny)")
+    parser.add_argument("--model-size", default="small", help="faster-whisper model size (small, base, tiny, distil-large-v3)")
     parser.add_argument("--device", default=None, help="Audio input/output device index or name substring")
     parser.add_argument("--host", default=None, help="Gateway host binding (defaults to CORE_HOST or 0.0.0.0)")
     parser.add_argument("--port", type=int, default=None, help="Gateway port (defaults to CORE_PORT or 8000)")
@@ -474,10 +475,69 @@ def run_interactive_repl(
 
     print_banner(active_name, active_zone, port)
 
+    def get_prompt() -> str:
+        mic_ind = f" {GREEN}[MIC:ON]{RESET}" if (voice_in and voice_in.is_recording) else f" {YELLOW}[MIC:OFF]{RESET}"
+        return f"{CYAN}Core{RESET} [{GREEN}{active_name}{RESET}@{YELLOW}{active_zone}{RESET}{mic_ind}] {BRIGHT}>{RESET} "
+
+    def on_speech(text: str):
+        nonlocal active_zone
+        print(f"\n{MAGENTA}[SPEECH DETECTED]{RESET} \"{text}\"")
+        prof = state.get_user_profile()
+        dec = spoken_to.evaluate(text, profile=prof)
+        print(f"  {CYAN}[Spoken-To Decision]{RESET} Role: {dec.discourse_role.value} | Action: {dec.action_type}")
+
+        # Direct interrupt handling
+        if dec.action_type == "interrupt":
+            if voice_out:
+                voice_out.interrupt()
+            print(f"  {YELLOW}↳ Playback stopped by operator.{RESET}\n")
+            print(get_prompt(), end="", flush=True)
+            return
+
+        if not dec.should_respond:
+            print(f"  {YELLOW}↳ Silently ignored (ambient / not addressed to Core AI){RESET}\n")
+            print(get_prompt(), end="", flush=True)
+            return
+
+        # Halt any ongoing speech before answering new request
+        if voice_out and voice_out.is_speaking:
+            voice_out.interrupt()
+
+        if dec.discourse_role == DiscourseRole.DEMONSTRATED and dec.autonomous_response:
+            print(f"{CYAN}Core AI [Showcase]:{RESET} {dec.autonomous_response}\n")
+            if voice_out:
+                voice_out.synthesize_and_play(dec.autonomous_response, blocking=False)
+            print(get_prompt(), end="", flush=True)
+            return
+        target_cmd = dec.clean_command or text
+        plan = planner.plan_problem(target_cmd, context={"zone": active_zone, "operator": active_name})
+        finished = asyncio.run(engine.execute_pipeline(plan))
+        for s in finished.steps:
+            if s.tool_name == "relocate_operator" and s.status == "completed" and isinstance(s.output, dict):
+                new_z = s.output.get("zone")
+                if new_z:
+                    active_zone = new_z
+        spoken = planner.formulate_spoken_response(finished, profile=prof)
+        print(f"{CYAN}Core AI:{RESET} {spoken}\n")
+        if voice_out:
+            voice_out.synthesize_and_play(spoken, blocking=False)
+        print(get_prompt(), end="", flush=True)
+
+    # Wire voice_in and voice_out for instant barge-in / interruption
+    if voice_in and voice_out:
+        voice_in.register_voice_out(voice_out)
+
+    # Always-on voice: start listening immediately if voice_in engine was initialized
+    if voice_in and not voice_in.is_recording:
+        try:
+            voice_in.start_listening(callback=on_speech)
+            print(f"{GREEN}[OK] Always-on voice capture active! Speak anytime (type 'voice off' to pause).{RESET}\n")
+        except Exception as e:
+            print(f"{YELLOW}[!] Notice: Could not start microphone stream ({e}). Continuing in text mode.{RESET}\n")
+
     while not shutdown_event.is_set():
         try:
-            mic_ind = f" {RED}[REC]{RESET}" if (voice_in and voice_in.is_recording) else ""
-            prompt = f"{CYAN}Core{RESET} [{GREEN}{active_name}{RESET}@{YELLOW}{active_zone}{RESET}{mic_ind}] {BRIGHT}>{RESET} "
+            prompt = get_prompt()
             try:
                 user_input = input(prompt).strip()
             except EOFError:
@@ -493,6 +553,13 @@ def run_interactive_repl(
                 print(f"\n{YELLOW}[*] Shutting down Core AI. Goodbye {active_name}!{RESET}")
                 shutdown_event.set()
                 break
+
+            elif clean_cmd in ["stop", "stopp", "pause", "halt", "cancel", "quiet", "leise", "shut up"]:
+                if voice_out and (voice_out.is_speaking or not voice_out.speech_queue.empty()):
+                    voice_out.interrupt()
+                    print(f"{YELLOW}[*] Voice output halted.{RESET}\n")
+                else:
+                    print(f"{YELLOW}[*] No active speech playback to stop.{RESET}\n")
 
             elif cmd_lower == "help":
                 print_help()
@@ -511,7 +578,7 @@ def run_interactive_repl(
                 print(f"  Active Zones: {len(state.list_zones())}")
                 print(f"  Devices:      {len(state.list_all_devices())}")
                 print(f"  Voice Out:    {GREEN}Online (Edge Neural TTS + pyttsx3){RESET}" if voice_out else f"  Voice Out:    {YELLOW}Disabled{RESET}")
-                print(f"  Voice In:     {GREEN}Active (Listening){RESET}" if (voice_in and voice_in.is_recording) else f"  Voice In:     {YELLOW}Standby (type 'voice on'){RESET}")
+                print(f"  Voice In:     {GREEN}Active (Listening - Always-On){RESET}" if (voice_in and voice_in.is_recording) else f"  Voice In:     {YELLOW}Paused (type 'voice on'){RESET}")
                 print(f"  Gateway:      {GREEN}http://localhost:{port}{RESET}")
                 print()
 
@@ -549,54 +616,29 @@ def run_interactive_repl(
                 else:
                     print(f"{YELLOW}[!] Voice Out is currently disabled (--no-tts).{RESET}")
 
-            elif cmd_lower == "voice on":
+            elif cmd_lower in ["voice on", "voice resume", "mic on"]:
                 if voice_in and voice_in.is_recording:
-                    print(f"{YELLOW}[!] Voice capture is already listening.{RESET}")
+                    print(f"{YELLOW}[!] Voice capture is already active and listening.{RESET}\n")
                 else:
-                    print(f"{YELLOW}[*] Initializing VoiceInEngine (faster-whisper)...{RESET}")
-                    try:
-                        voice_in = VoiceInEngine(model_size="distil-large-v3")
-                        def on_speech(text: str):
-                            nonlocal active_zone
-                            print(f"\n{MAGENTA}[SPEECH DETECTED]{RESET} \"{text}\"")
-                            prof = state.get_user_profile()
-                            dec = spoken_to.evaluate(text, profile=prof)
-                            print(f"  {CYAN}[Spoken-To Decision]{RESET} Role: {dec.discourse_role.value} | Action: {dec.action_type}")
-                            if not dec.should_respond:
-                                print(f"  {YELLOW}↳ Silently ignored (ambient / not addressed to Core AI){RESET}\n")
-                                print(prompt, end="", flush=True)
-                                return
-                            if dec.discourse_role == DiscourseRole.DEMONSTRATED and dec.autonomous_response:
-                                print(f"{CYAN}Core AI [Showcase]:{RESET} {dec.autonomous_response}\n")
-                                if voice_out:
-                                    voice_out.synthesize_and_play(dec.autonomous_response)
-                                print(prompt, end="", flush=True)
-                                return
-                            target_cmd = dec.clean_command or text
-                            plan = planner.plan_problem(target_cmd, context={"zone": active_zone, "operator": active_name})
-                            finished = asyncio.run(engine.execute_pipeline(plan))
-                            for s in finished.steps:
-                                if s.tool_name == "relocate_operator" and s.status == "completed" and isinstance(s.output, dict):
-                                    new_z = s.output.get("zone")
-                                    if new_z:
-                                        active_zone = new_z
-                            spoken = planner.formulate_spoken_response(finished, profile=prof)
-                            print(f"{CYAN}Core AI:{RESET} {spoken}\n")
-                            if voice_out:
-                                voice_out.synthesize_and_play(spoken)
-                            print(prompt, end="", flush=True)
+                    if voice_in is None:
+                        print(f"{YELLOW}[*] Initializing VoiceInEngine (faster-whisper 'small')...{RESET}")
+                        try:
+                            voice_in = VoiceInEngine(model_size="small")
+                        except Exception as e:
+                            print(f"{RED}[ERROR] Failed to initialize voice capture: {e}{RESET}\n")
+                    if voice_in:
+                        try:
+                            voice_in.start_listening(callback=on_speech)
+                            print(f"{GREEN}[OK] Voice capture online! Always-on microphone listening.{RESET}\n")
+                        except Exception as e:
+                            print(f"{RED}[ERROR] Failed to start voice capture: {e}{RESET}\n")
 
-                        voice_in.start_listening(callback=on_speech)
-                        print(f"{GREEN}[OK] Voice capture online! Speak into your microphone anytime.{RESET}")
-                    except Exception as e:
-                        print(f"{RED}[ERROR] Failed to start voice capture: {e}{RESET}")
-
-            elif cmd_lower == "voice off":
+            elif cmd_lower in ["voice off", "voice pause", "mic off"]:
                 if voice_in and voice_in.is_recording:
                     voice_in.stop_listening()
-                    print(f"{YELLOW}[*] Voice capture stopped.{RESET}")
+                    print(f"{YELLOW}[*] Voice capture paused. Type 'voice on' to resume listening.{RESET}\n")
                 else:
-                    print(f"{YELLOW}[!] Voice capture was not active.{RESET}")
+                    print(f"{YELLOW}[!] Voice capture is already inactive.{RESET}\n")
 
             elif cmd_lower.startswith("spoken ") or cmd_lower.startswith("test-spoken "):
                 test_utterance = user_input.split(maxsplit=1)[1].strip()
@@ -1222,9 +1264,19 @@ def main():
             current_profile = state.get_user_profile()
 
             decision = spoken_to.evaluate(event.text, profile=current_profile)
+            if decision.action_type == "interrupt":
+                logger.info(f"[Spoken-To] Verbal interrupt intercepted: '{event.text}'")
+                if voice_out:
+                    voice_out.interrupt()
+                broadcast_voice_state("idle", {"zone": effective_zone, "interrupted": True})
+                return
+
             if not decision.should_respond:
                 logger.info(f"[Spoken-To] Silently ignored: '{event.text}'")
                 return
+
+            if voice_out and voice_out.is_speaking:
+                voice_out.interrupt()
 
             if decision.discourse_role == DiscourseRole.DEMONSTRATED and decision.autonomous_response:
                 logger.info(f"[Spoken-To Showcase Chime-In]: '{decision.autonomous_response}'")
@@ -1271,24 +1323,37 @@ def main():
     bus.start_listening()
     proactive.start()
 
-    # Voice In Engine
+    # Voice In Engine: Always active by default on startup (can be disabled via --no-voice / --no-mic or CORE_DISABLE_VOICE=1)
+    voice_in_disabled = (
+        args.no_voice
+        or os.getenv("CORE_DISABLE_VOICE", "0").lower() in ("1", "true", "yes")
+        or os.getenv("CORE_NO_VOICE", "0").lower() in ("1", "true", "yes")
+    )
     voice_in: Optional[VoiceInEngine] = None
-    if args.voice or args.voice_in:
+    if not voice_in_disabled:
         try:
-            logger.info(f"Starting VoiceInEngine with model '{args.model_size}'...")
+            logger.info(f"Initializing VoiceInEngine (always-on mic) with model '{args.model_size}'...")
             voice_in = VoiceInEngine(
                 model_size=args.model_size,
-                input_device=args.device
+                input_device=args.device,
+                voice_out=voice_out
             )
-            voice_in.bridge_to_event_bus(
-                bus=bus,
-                zone=primary_zone,
-                device_type="mic",
-                state_callback=lambda st: broadcast_voice_state(st, {"zone": primary_zone})
-            )
-            logger.info(f"Voice capture active in zone: '{primary_zone}'.")
+            if voice_out:
+                voice_in.register_voice_out(voice_out)
+            if args.headless:
+                # In headless server mode, connect mic directly into event bus loop
+                voice_in.bridge_to_event_bus(
+                    bus=bus,
+                    zone=primary_zone,
+                    device_type="mic",
+                    state_callback=lambda st: broadcast_voice_state(st, {"zone": primary_zone})
+                )
+                logger.info(f"Voice capture active (always-on) in zone: '{primary_zone}'.")
+            else:
+                logger.info(f"Voice capture engine ready for interactive REPL in zone: '{primary_zone}'.")
         except Exception as e:
-            logger.error(f"Failed to start VoiceInEngine ({e}). Continuing in terminal mode.")
+            logger.warning(f"VoiceInEngine auto-initialization skipped ({e}). Continuing in terminal mode.")
+            voice_in = None
 
     # Background Universal Gateway Server
     host = args.host or os.getenv("CORE_HOST", "0.0.0.0")
