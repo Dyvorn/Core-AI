@@ -31,6 +31,21 @@ class SpokenToDecision(BaseModel):
     rationale: str = ""
 
 
+def strip_conversational_fillers(text: str) -> str:
+    """Strips conversational pleasantries, modal verbs, and leading particles to extract the raw command."""
+    clean = text.strip()
+    filler_pattern = re.compile(
+        r"^(?:bitte|sag mal|kannst du bitte|kannst du|würdest du|zeig mir mal|zeig mir|zeig uns mal|zeig uns|zeig|show me|please|tell me|den|die|das|the)\s+",
+        re.IGNORECASE
+    )
+    for _ in range(5):
+        stripped = filler_pattern.sub("", clean).strip()
+        if stripped == clean:
+            break
+        clean = stripped
+    return clean
+
+
 class SpokenToReasoning:
     """
     Spoken-To Reasoning Engine:
@@ -134,16 +149,19 @@ class SpokenToReasoning:
         # -------------------------------------------------------------
         showcase_markers_de = [
             "ich zeig dir", "ich zeige dir", "schau mal", "guck mal", "sieh mal",
-            "das ist core", "das hier ist core", "kann dir mal zeigen", "führ mal vor", "demonstrier"
+            "das ist core", "das hier ist core", "kann dir mal zeigen", "führ mal vor", "demonstrier",
+            "pass mal auf was core kann", "schau mal was core kann", "guck dir das an", "zeig mal was core",
+            "hier siehst du core"
         ]
         showcase_markers_en = [
             "let me show you", "look at this", "this is core", "watch this", "check this out",
-            "show what you can do", "show them", "demonstrate"
+            "show what you can do", "show them", "demonstrate", "look what core can do",
+            "watch what core can do", "look how core works"
         ]
 
         is_demonstrating = any(marker in text_lower for marker in (showcase_markers_de + showcase_markers_en))
 
-        if is_demonstrating and (has_assistant_mention or any(w in text_lower for w in ["das ist", "this is", "schau", "look"])):
+        if is_demonstrating and (has_assistant_mention or any(w in text_lower for w in ["das ist", "this is", "schau", "look", "zeig"])):
             # Formulate autonomous contextual response dynamically based on live system state
             autonomous_speech = self._synthesize_showcase_intervention(text, profile)
             return SpokenToDecision(
@@ -151,7 +169,7 @@ class SpokenToReasoning:
                 should_respond=True,
                 action_type="chime_in",
                 autonomous_response=autonomous_speech,
-                confidence=0.92,
+                confidence=0.94,
                 rationale="Operator is actively presenting/demonstrating the system to a third party."
             )
 
@@ -161,10 +179,10 @@ class SpokenToReasoning:
         # -------------------------------------------------------------
         has_descriptive_past = False
         descriptive_patterns = [
-            r"\b(habe|hatte|haben|hab)\b.*\b(gebaut|programmiert|entwickelt|eingerichtet|gemacht|getestet)\b",
-            r"\b(basiert auf|läuft mit|funktioniert mit|ist gebaut aus)\b",
-            r"\b(i|we)\b.*\b(built|coded|programmed|created|made|tested|developed)\b",
-            r"\b(runs on|is based on|works with)\b"
+            r"\b(habe|hatte|haben|hab|hast du|haben wir)\b.*\b(gebaut|programmiert|entwickelt|eingerichtet|gemacht|getestet|aufgesetzt|installiert)\b",
+            r"\b(basiert auf|läuft mit|funktioniert mit|ist gebaut aus|wurde von|wurde entwickelt|architektur von)\b",
+            r"\b(i|we|you)\b.*\b(built|coded|programmed|created|made|tested|developed|designed|configured|installed)\b",
+            r"\b(runs on|is based on|works with|was built|was created|architecture of)\b"
         ]
         for dp in descriptive_patterns:
             if re.search(dp, text_lower):
@@ -176,7 +194,7 @@ class SpokenToReasoning:
                 discourse_role=DiscourseRole.REFERENCED,
                 should_respond=False,
                 action_type="silent",
-                confidence=0.92,
+                confidence=0.93,
                 rationale="Operator is discussing or explaining Core AI in the third person without addressing it."
             )
 
@@ -189,9 +207,11 @@ class SpokenToReasoning:
             vocative_pattern = rf"^(?:hey|hallo|hi|yo|okay|ok|sag mal)?\s*{re.escape(name)}(?:[\s,:\.!?]+(.*))?$"
             match = re.search(vocative_pattern, text_lower, re.IGNORECASE)
             if match:
-                clean_cmd = (match.group(1) or "").strip()
+                raw_cmd = (match.group(1) or "").strip()
+                clean_cmd = strip_conversational_fillers(raw_cmd)
+
                 if not clean_cmd:
-                    is_de = any(w in text_lower for w in ["hallo", "sag mal", "guten"])
+                    is_de = any(w in text_lower for w in ["hallo", "sag mal", "guten", "moin", "servus"])
                     greeting_reply = (
                         f"Hallo {operator_name}! Bereit und online. Was steht an?"
                         if is_de
@@ -238,33 +258,48 @@ class SpokenToReasoning:
 
         # Pattern 2: Natural follow-up question if in active window
         if is_in_follow_up_window:
-            question_words = r"\b(wie|was|wo|wann|warum|wer|berechne|schalte|what|how|when|why|who|calculate|turn)\b"
+            question_words = r"\b(wie|was|wo|wann|warum|wer|berechne|schalte|what|how|when|why|who|calculate|turn|show|display)\b"
             if re.search(question_words, text_lower) and not re.search(r"\b(du mir|mir mal)\b", text_lower):
                 return SpokenToDecision(
                     discourse_role=DiscourseRole.ADDRESSED,
                     should_respond=True,
                     action_type="command",
                     clean_command=text,
-                    confidence=0.85,
+                    confidence=0.86,
                     rationale="Operator follow-up within active conversational window."
                 )
 
         # Pattern 3: Standalone directive command containing explicit tool actions
-        # (e.g., "Wie spät ist es", "Systemstatus anzeigen", "Berechne 25 * 4", "I'm in the office rn")
+        # (e.g., "Wie spät ist es", "Systemstatus anzeigen", "Berechne 25 * 4", "Erinnere mich in 5 Min", "Watch RAM")
         explicit_action_triggers = [
-            "wie spät", "uhrzeit", "systemstatus", "system status", "berechne",
-            "what time", "calculate", "system overview",
+            # Time & Math
+            "wie spät", "uhrzeit", "what time", "berechne", "calculate", "rechnen",
+            # Proactive Reminders & Timers
+            "remind me", "erinnere mich", "stell einen timer", "set a timer", "timer auf", "timer stellen",
+            "timer in", "countdown", "alarm", "stoppuhr", "timer abbrechen", "cancel timer",
+            # System, Git & Hardware Monitors
+            "systemstatus", "system status", "system overview", "git status", "git diff", "watch ram",
+            "ram watcher", "wie viel ram", "speicherverbrauch", "ram auslastung", "cpu auslastung",
+            # Scratchpad & Notes
+            "save note", "take a note", "notiere", "merke dir", "schreib auf", "notiz speichern",
+            "meine notizen", "my notes", "scratchpad", "zeige notizen", "show notes",
+            # Clipboard
+            "what's on my clipboard", "in the clipboard", "in der zwischenablage", "clipboard", "zwischenablage",
+            # Spatial Presence & Relocation
             "i'm in", "i am in", "i'm at", "i am at", "now in", "now at", "moved to", "relocate to",
-            "ich bin im", "ich bin in der", "bin jetzt im", "jetzt im büro", "ab jetzt im"
+            "ich bin im", "ich bin in der", "bin jetzt im", "jetzt im büro", "ab jetzt im", "umziehen ins",
+            # Audio & Volume
+            "lautstärke", "volume", "stumm schalten", "mute", "ton aus", "lauter", "leiser", "stop audio"
         ]
         if any(trig in text_lower for trig in explicit_action_triggers):
+            cleaned_standalone = strip_conversational_fillers(text)
             return SpokenToDecision(
                 discourse_role=DiscourseRole.ADDRESSED,
                 should_respond=True,
                 action_type="command",
-                clean_command=text,
-                confidence=0.88,
-                rationale="Direct tool query or presence update with explicit invocation keywords."
+                clean_command=cleaned_standalone,
+                confidence=0.89,
+                rationale="Direct tool query, proactive action, or presence update with explicit invocation keywords."
             )
 
         # -------------------------------------------------------------
@@ -275,7 +310,7 @@ class SpokenToReasoning:
             discourse_role=DiscourseRole.BYSTANDER,
             should_respond=False,
             action_type="silent",
-            confidence=0.80,
+            confidence=0.82,
             rationale="Ambient background speech without directive or assistant address."
         )
 

@@ -701,6 +701,102 @@ class StateManager:
         finally:
             conn.close()
 
+    def deactivate_proactive_rule(self, rule_id: str):
+        """Marks a proactive rule as inactive (useful for one-shot countdowns and reminders)."""
+        conn = self._get_connection()
+        try:
+            conn.execute('''
+                UPDATE proactive_rules
+                SET is_active = 0
+                WHERE rule_id = ?
+            ''', (rule_id,))
+            conn.commit()
+            logger.info(f"Deactivated proactive rule {rule_id[:8]}")
+        finally:
+            conn.close()
+
+    def delete_proactive_rule(self, rule_id_or_name: str) -> bool:
+        """Permanently deletes a proactive rule or reminder by ID or matching name."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute('''
+                DELETE FROM proactive_rules
+                WHERE rule_id = ? OR LOWER(name) = LOWER(?) OR LOWER(name) LIKE ?
+            ''', (rule_id_or_name, rule_id_or_name, f"%{rule_id_or_name.lower()}%"))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    def get_all_proactive_rules(self) -> List[ProactiveTriggerRule]:
+        """Returns all configured proactive rules, including inactive ones."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT * FROM proactive_rules ORDER BY is_active DESC, name ASC")
+            rules = []
+            for row in cursor.fetchall():
+                data = dict(row)
+                data["trigger_condition"] = json.loads(data["trigger_condition"]) if data.get("trigger_condition") else {}
+                data["is_active"] = bool(data["is_active"])
+                if data.get("last_triggered_at") and isinstance(data["last_triggered_at"], str):
+                    data["last_triggered_at"] = datetime.fromisoformat(data["last_triggered_at"])
+                rules.append(ProactiveTriggerRule(**data))
+            return rules
+        finally:
+            conn.close()
+
+    # --- Generic Persistent Key-Value & Notes Memory ---
+    def set_kv(self, key: str, value: Any):
+        """Persists an arbitrary JSON-serializable value to SQLite kv_state table."""
+        conn = self._get_connection()
+        try:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            conn.execute('''
+                INSERT OR REPLACE INTO kv_state (key, value, updated_at)
+                VALUES (?, ?, ?)
+            ''', (key, json.dumps(value), now_iso))
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_kv(self, key: str, default: Any = None) -> Any:
+        """Retrieves an arbitrary value from kv_state table."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT value FROM kv_state WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            if row and row[0]:
+                return json.loads(row[0])
+            return default
+        finally:
+            conn.close()
+
+    def list_kv(self, prefix: Optional[str] = None) -> Dict[str, Any]:
+        """Lists key-value pairs matching an optional prefix."""
+        conn = self._get_connection()
+        try:
+            if prefix:
+                cursor = conn.execute("SELECT key, value FROM kv_state WHERE key LIKE ?", (f"{prefix}%",))
+            else:
+                cursor = conn.execute("SELECT key, value FROM kv_state")
+            out = {}
+            for row in cursor.fetchall():
+                out[row[0]] = json.loads(row[1]) if row[1] else None
+            return out
+        finally:
+            conn.close()
+
+    def delete_kv(self, key: str) -> bool:
+        """Deletes a key from kv_state."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("DELETE FROM kv_state WHERE key = ?", (key,))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+
     # --- Dynamic Spatial Audio Routes ---
     def get_audio_route(self, zone_id: str) -> Optional[AudioRouteRecord]:
         """Fetches the active audio hardware routing record for an arbitrary spatial zone."""

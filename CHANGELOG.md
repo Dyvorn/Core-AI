@@ -20,11 +20,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 | Kernel | Status | Verification | Ethos |
 | :---: | :---: | :---: | :---: |
-| **`v0.2.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **112 / 112 PASSED** | 🛡️ **#ANTISLOP** |
+| **`v0.2.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **123 / 123 PASSED** | 🛡️ **#ANTISLOP** |
 
-Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driver productivity, sub-50ms CLI execution, mock tool eradication, and microkernel streamlining.
+Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driver productivity, sub-50ms CLI execution, high-fidelity microphone capture & adaptive VAD, spoken-to discourse awareness, mock tool eradication, and microkernel streamlining.
 
 ### 🌟 Added & Enhanced
+
+#### 🎙️ High-Fidelity Audio Capture & Resilient STT (`engines/voice_in.py`)
+- **Native Hardware Rate Auto-Detection & Resampling**: Introspects native hardware sample rates (WASAPI / DirectSound 44.1kHz or 48kHz audio interfaces) to completely eliminate `PaErrorCode -9997 (Invalid sample rate)` on Windows. Integrates zero-dependency fast linear interpolation (`resample_audio`) downsampling directly to Whisper's 16kHz target.
+- **Dynamic Noise-Floor Adaptive RMS VAD**: Replaced static peak energy thresholds with continuous ambient room noise floor estimation (`self.ambient_noise_floor`) and dynamic RMS tracking (`adaptive_threshold = max(0.008, ambient_noise_floor * 2.2)`). Ensures effortless triggering on quiet headsets while preventing runaway recordings in noisy rooms.
+- **Pre-Roll Audio Ring Buffer**: Maintains a ~400ms pre-speech circular buffer that is prepended the millisecond voice activity is detected, eliminating clipped opening syllables ("Hey...", "Core...").
+- **STT Model Cascade Fallback**: Supports `CORE_STT_MODEL` and `CORE_STT_LANGUAGE` environment overrides. Gracefully cascades down the model tier (`distil-large-v3` $\to$ `small` $\to$ `base` $\to$ `tiny`) if VRAM allocation or memory pressure occurs.
+- **Expanded Hallucination Suppression**: Filters silence artifacts, subtitle captions, bracketed noise tokens (`[blank_audio]`, `(silence)`), and repetitive word stutter loops.
+
+#### 🧠 Discourse Pragmatics & Spoken-To Awareness (`brain/spoken_to.py`, `core/gateway.py`)
+- **Four-Role Discourse Classification Engine**: Dynamically discerns operator communicative intention between `ADDRESSED` (direct commands or natural imperatives), `DEMONSTRATED` (showing off Core AI to guests/friends), `REFERENCED` (third-person discussion/development talk $\to$ stays silent), and `BYSTANDER` (ambient dialogue between humans $\to$ stays silent).
+- **Wake-Word-Free Room Directives**: Natural room-level imperatives are automatically recognized as `ADDRESSED` without requiring "Hey Core": reminders (`"erinnere mich in 5 Minuten..."`), timers (`"set a timer for 10 minutes"`), hardware monitoring (`"watch ram"`, `"git status"`), notes (`"save note..."`), clipboard (`"what's on my clipboard"`), and presence (`"ich bin jetzt im büro"`).
+- **Intelligent Conversational Filler Stripping**: Normalizes spoken commands by recursively peeling leading particles (`"Core, bitte zeig mir den git status"` $\to$ `"git status"`).
+- **REST Discourse Gateway Endpoint**: Added `POST /api/v1/voice/spoken_to` allowing Smart Mirrors, mobile satellites, and remote web clients to query the discourse engine remotely.
 
 #### ⚡ Instant-Dispatch Zero-Overhead CLI (`interfaces/cli/client.py`, `core.bat`, `core.sh`)
 - **Sub-50ms One-Shot Execution**: One-shot CLI goals (`core "<goal>"`) bypass all heavy Python module warmups (`torch`, `whisper`, `fastapi`, `uvicorn`) by dispatching directly to the running 24/7 background daemon over a persistent loopback socket.
@@ -32,7 +45,22 @@ Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driv
 - **Seamless Local Fallback**: Automatically and transparently falls back to in-process microkernel execution if the background daemon is not running.
 - **Raw JSON Scripting Output**: Added `--json` and `--quiet` flags to support piping and external shell automation.
 
-#### ⚡ Windows IPv6 Loopback Latency Elimination (`interfaces/cli/client.py`)
+#### 🧠 Proactive Autonomous Agency & Reminders (`tools/native/proactive_tools.py`, `brain/proactive.py`)
+- **Natural Language Countdown Reminders**: Schedule autonomous alerts directly via voice or CLI (`core "remind me in 10 minutes to review code"` / `"erinnere mich in 5 minuten an kaffee"`).
+- **Instant Deterministic Dispatch**: Bypasses LLM reasoning latency entirely; routine reminder scheduling executes sub-millisecond with instant spoken audio / terminal confirmation.
+- **Background Autonomous Firing & Auto-Deactivation**: The 24/7 `ProactiveDaemon` continuously tracks countdown timers, fires notifications via TTS and HUD card broadcasts upon expiry, and cleanly deactivates one-shot rules in SQLite.
+- **Rule Management & Substring Cancellation**: Query active reminders (`core "list reminders"`) and cancel them on-the-fly (`core "cancel reminder review code"`) with fuzzy substring matching in `StateManager`.
+- **Proactive Hardware Vitals Watcher**: Setup background supervisors (`core "watch my ram"`) to monitor host health and alert operator when RAM exceeds thresholds.
+
+#### 🛠️ Daily Driver Developer Tools & Scratch Notes (`tools/native/dev_tools.py`, `brain/planner.py`)
+- **Instant Git Repository Status**: Query project branch, working tree cleanliness, modified file counts, and latest commit (`core "git status"`) with zero cold-start delay.
+- **Persistent Scratch Notes & Recall**: Fast CRUD operations for operator notes stored persistently in SQLite (`core "save note <title>: <content>"`, `core "my notes"`, `core "read note <title>"`, `core "delete note <title>"`).
+- **Desktop Clipboard Integration**: Read and populate system clipboard dynamically (`core "what's in my clipboard"`, `core "copy <text> to clipboard"`).
+
+#### 🚀 Zero-Delay Terminal Launch (`main.py`)
+- **Instant Interactive REPL Boot**: Terminal starts instantaneously (<5ms) by defaulting animation to skipped and eliminating artificial micro-delays. 3D holographic boot animation is preserved via explicit `--anim` flag or `anim` terminal command.
+
+#### ⚡ Windows IPv6 Loopback Latency Elimination (`interfaces/cli/client.py`, `main.py`)
 - Standardized local HTTP loopback targeting to `127.0.0.1` instead of `localhost`, eliminating Windows IPv6 (`::1`) DNS resolution timeouts and cutting socket latency from 2,240ms down to 60ms.
 
 ### 🛡️ #ANTISLOP & Bloat Removal
@@ -46,7 +74,7 @@ Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driv
 - **Dynamic Tool Artifact Cleanup**: Removed ephemeral test generation residue (`tools/dynamic/hash_string.py`).
 
 ### 🧪 Automated Verification
-- **112 / 112 Tests Passing**: Added comprehensive test coverage for client daemon dispatch, fallback handling, and test-local fixtures (`tests/test_fast_cli.py`).
+- **118 / 118 Tests Passing**: Comprehensive test coverage across all subsystems including proactive countdown evaluation, hardware supervision, git inspection, notes persistence, and planner routing (`tests/test_proactive_and_dev_tools.py`).
 
 ---
 

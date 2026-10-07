@@ -26,6 +26,27 @@ def test_voice_in_hardware_detection():
     assert isinstance(devices, list)
 
 
+def test_voice_in_resampling():
+    """Verify fast linear audio resampling accurately converts sample rates to 16kHz."""
+    from engines.voice_in import resample_audio
+
+    # 48000 Hz to 16000 Hz (3x downsampling)
+    orig_48k = np.ones(4800, dtype=np.float32)
+    resampled_16k = resample_audio(orig_48k, orig_sr=48000, target_sr=16000)
+    assert len(resampled_16k) == 1600
+    assert resampled_16k.dtype == np.float32
+
+    # 44100 Hz to 16000 Hz
+    orig_44k = np.ones(4410, dtype=np.float32)
+    resampled_from_44 = resample_audio(orig_44k, orig_sr=44100, target_sr=16000)
+    expected_len = int(round(4410 * 16000 / 44100))
+    assert len(resampled_from_44) == expected_len
+
+    # Same rate returns original
+    same_rate = resample_audio(orig_48k, orig_sr=48000, target_sr=48000)
+    assert len(same_rate) == len(orig_48k)
+
+
 def test_voice_in_hallucination_suppression():
     """Verify whisper hallucination filter catches noise artifacts and allows valid speech."""
     engine = VoiceInEngine(model_size="tiny")
@@ -37,15 +58,21 @@ def test_voice_in_hallucination_suppression():
     assert engine.is_hallucination("you")
     assert engine.is_hallucination("[music]")
     assert engine.is_hallucination("(applause)")
+    assert engine.is_hallucination("[blank_audio]")
+    assert engine.is_hallucination("(silence)")
+    assert engine.is_hallucination("subtitles by opensubtitles")
     assert engine.is_hallucination("thank you for watching")
     assert engine.is_hallucination("vielen dank fürs zuschauen")
     assert engine.is_hallucination("aaaaaa")
+    assert engine.is_hallucination("yeah yeah yeah yeah")
 
     # Legitimate operator speech that must NOT be filtered
     assert not engine.is_hallucination("wie spät ist es")
     assert not engine.is_hallucination("system status")
     assert not engine.is_hallucination("calculate 12 * 8")
     assert not engine.is_hallucination("schalte das licht an")
+    assert not engine.is_hallucination("remind me in 5 minutes")
+    assert not engine.is_hallucination("watch ram")
 
 
 def test_voice_out_language_detection():

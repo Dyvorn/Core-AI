@@ -112,7 +112,9 @@ class Planner:
         routine_tools = {
             "get_time", "calculate_math", "media_control", "launch_application",
             "lock_workstation", "take_screenshot", "open_youtube", "open_path_in_explorer",
-            "relocate_operator"
+            "relocate_operator", "get_clipboard_text", "set_clipboard_text",
+            "create_reminder", "create_vitals_watcher", "list_active_rules",
+            "cancel_proactive_rule", "get_git_status", "manage_notes"
         }
         is_routine_action = (
             len(heuristic_plan.steps) == 1 and
@@ -281,7 +283,7 @@ class Planner:
             steps.append(PipelineStep(id="lock_step", name="Lock Workstation", tool_name="lock_workstation", arguments={}, depends_on=[]))
 
         # Pattern: System diagnostics (Parallel execution of time + system status)
-        elif any(k in goal_lower for k in ["status", "system", "overview", "diagnos", "gesundheit", "wie geht"]):
+        elif any(k in goal_lower for k in ["status", "system", "overview", "diagnos", "gesundheit", "wie geht"]) and not any(k in goal_lower for k in ["git"]):
             steps.append(PipelineStep(
                 id="get_time_step",
                 name="Fetch Current Time",
@@ -481,6 +483,148 @@ class Planner:
                 arguments={"target_zone": raw_zone},
                 depends_on=[]
             ))
+
+        # Pattern: Countdown Reminders ("remind me in 5 minutes to stretch", "erinnere mich in 10 sekunden an tee")
+        elif any(k in goal_lower for k in ["remind me", "reminder", "erinnere mich", "erinnerung"]):
+            if any(k in goal_lower for k in ["list", "show", "active", "welche", "zeige", "alle"]) and any(k in goal_lower for k in ["remind", "erinner"]):
+                steps.append(PipelineStep(
+                    id="list_reminders_step",
+                    name="List Active Reminders",
+                    tool_name="list_active_rules",
+                    arguments={},
+                    depends_on=[]
+                ))
+            elif any(k in goal_lower for k in ["cancel", "delete", "remove", "lösche", "entferne"]) and any(k in goal_lower for k in ["remind", "erinner"]):
+                cancel_target = re.sub(r".*?\b(?:cancel|delete|remove|lösche|entferne)\s+(?:the\s+)?(?:reminder|erinnerung)?\s*(?:for|about|an|zu)?\s*", "", goal, flags=re.IGNORECASE).strip(" .!?") or "reminder"
+                steps.append(PipelineStep(
+                    id="cancel_reminder_step",
+                    name=f"Cancel Reminder '{cancel_target}'",
+                    tool_name="cancel_proactive_rule",
+                    arguments={"name_or_id": cancel_target},
+                    depends_on=[]
+                ))
+            else:
+                dur_match = re.search(r"\bin\s+(\d+(?:\.\d+)?)\s*(s|sec|secs|second|seconds|sekunde|sekunden|m|min|mins|minute|minutes|minuten|h|hr|hrs|hour|hours|stunde|stunden)\b", goal_lower)
+                seconds = 0.0
+                minutes = 0.0
+                hours = 0.0
+                if dur_match:
+                    val = float(dur_match.group(1))
+                    unit = dur_match.group(2).lower()
+                    if unit in ["s", "sec", "secs", "second", "seconds", "sekunde", "sekunden"]:
+                        seconds = val
+                    elif unit in ["h", "hr", "hrs", "hour", "hours", "stunde", "stunden"]:
+                        hours = val
+                    else:
+                        minutes = val
+                else:
+                    minutes = 5.0
+                
+                clean_rem = goal
+                clean_rem = re.sub(r"^(?:please\s+|bitte\s+)?(?:remind me|erinnere mich|set a reminder|reminder)\s*", "", clean_rem, flags=re.IGNORECASE)
+                clean_rem = re.sub(r"\bin\s+\d+(?:\.\d+)?\s*(?:s|sec|secs|second|seconds|sekunde|sekunden|m|min|mins|minute|minutes|minuten|h|hr|hrs|hour|hours|stunde|stunden)\b", "", clean_rem, flags=re.IGNORECASE)
+                clean_rem = re.sub(r"^(?:to|about|an|daran\s+dass|for|dass)\s+", "", clean_rem.strip(), flags=re.IGNORECASE).strip(" .!?")
+                if not clean_rem:
+                    clean_rem = "Notification"
+
+                steps.append(PipelineStep(
+                    id="reminder_step",
+                    name=f"Schedule Reminder: {clean_rem}",
+                    tool_name="create_reminder",
+                    arguments={
+                        "reminder_text": clean_rem,
+                        "seconds": seconds,
+                        "minutes": minutes,
+                        "hours": hours
+                    },
+                    depends_on=[]
+                ))
+
+        # Pattern: Proactive Hardware Supervisor / Vitals Watcher
+        elif any(k in goal_lower for k in ["watch ram", "watch my ram", "alert me if ram", "überwache ram", "warn mich wenn ram", "watch memory"]):
+            pct_match = re.search(r"(\d+(?:\.\d+)?)\s*%", goal)
+            threshold = float(pct_match.group(1)) if pct_match else 85.0
+            steps.append(PipelineStep(
+                id="vitals_watcher_step",
+                name=f"Create Hardware Watcher (RAM > {threshold}%)",
+                tool_name="create_vitals_watcher",
+                arguments={"metric": "ram", "threshold_percent": threshold},
+                depends_on=[]
+            ))
+
+        # Pattern: Git Repository & Branch Status
+        elif any(k in goal_lower for k in ["git status", "git branch", "check git", "git zustand", "git stand", "git changes", "git state"]):
+            steps.append(PipelineStep(
+                id="git_status_step",
+                name="Inspect Git Repository State",
+                tool_name="get_git_status",
+                arguments={},
+                depends_on=[]
+            ))
+
+        # Pattern: Persistent Scratch Notes & Recall
+        elif any(k in goal_lower for k in ["note", "notes", "notiz", "notizen", "merke dir"]):
+            if any(k in goal_lower for k in ["list", "show all", "my notes", "meine notizen", "alle notizen", "zeige notizen"]) or goal_lower in ["notes", "notizen"]:
+                steps.append(PipelineStep(
+                    id="list_notes_step",
+                    name="List Operator Notes",
+                    tool_name="manage_notes",
+                    arguments={"action": "list"},
+                    depends_on=[]
+                ))
+            elif any(k in goal_lower for k in ["delete note", "remove note", "lösche notiz", "entferne notiz"]):
+                del_title = re.sub(r".*?\b(?:delete note|remove note|lösche notiz|entferne notiz)\s+", "", goal, flags=re.IGNORECASE).strip(" .!?")
+                steps.append(PipelineStep(
+                    id="delete_note_step",
+                    name=f"Delete Note '{del_title}'",
+                    tool_name="manage_notes",
+                    arguments={"action": "delete", "title": del_title},
+                    depends_on=[]
+                ))
+            elif any(k in goal_lower for k in ["read note", "show note", "get note", "lies notiz", "zeige notiz"]):
+                get_title = re.sub(r".*?\b(?:read note|show note|get note|lies notiz|zeige notiz)\s+", "", goal, flags=re.IGNORECASE).strip(" .!?")
+                steps.append(PipelineStep(
+                    id="get_note_step",
+                    name=f"Read Note '{get_title}'",
+                    tool_name="manage_notes",
+                    arguments={"action": "get", "title": get_title},
+                    depends_on=[]
+                ))
+            else:
+                raw_note = re.sub(r"^(?:please\s+|bitte\s+)?(?:save note|note down|add note|notiere|merke dir|note:?)\s*", "", goal, flags=re.IGNORECASE).strip()
+                if ":" in raw_note:
+                    t_part, c_part = [p.strip() for p in raw_note.split(":", 1)]
+                else:
+                    t_part = raw_note[:25].strip()
+                    c_part = raw_note
+                steps.append(PipelineStep(
+                    id="save_note_step",
+                    name=f"Save Note '{t_part}'",
+                    tool_name="manage_notes",
+                    arguments={"action": "save", "title": t_part, "content": c_part},
+                    depends_on=[]
+                ))
+
+        # Pattern: System Clipboard Read / Write
+        elif any(k in goal_lower for k in ["clipboard", "zwischenablage"]):
+            if any(k in goal_lower for k in ["copy", "set", "kopiere", "schreibe"]):
+                copy_text = re.sub(r".*?\b(?:copy|set|kopiere)\s+(?:to clipboard\s+)?(?:['\"])?", "", goal, flags=re.IGNORECASE).rstrip("'\" .!?")
+                copy_text = re.sub(r"\s+to clipboard\b", "", copy_text, flags=re.IGNORECASE).strip()
+                steps.append(PipelineStep(
+                    id="set_clipboard_step",
+                    name="Copy Text to Clipboard",
+                    tool_name="set_clipboard_text",
+                    arguments={"text": copy_text},
+                    depends_on=[]
+                ))
+            else:
+                steps.append(PipelineStep(
+                    id="get_clipboard_step",
+                    name="Read System Clipboard",
+                    tool_name="get_clipboard_text",
+                    arguments={},
+                    depends_on=[]
+                ))
 
         # Pattern: Pure conversational greetings (no command or question attached)
         elif raw_goal_clean in [
@@ -783,7 +927,9 @@ Do NOT output any markdown formatting or commentary outside the JSON.
         routine_deterministic_tools = {
             "get_time", "calculate_math", "media_control", "launch_application",
             "open_path_in_explorer", "lock_workstation", "take_screenshot",
-            "relocate_operator", "open_youtube"
+            "relocate_operator", "open_youtube", "get_clipboard_text", "set_clipboard_text",
+            "create_reminder", "create_vitals_watcher", "list_active_rules",
+            "cancel_proactive_rule", "get_git_status", "manage_notes"
         }
         is_pure_routine = bool(step_outputs) and all(t in routine_deterministic_tools for t in step_outputs.keys())
 
@@ -1046,6 +1192,74 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                 ram_str = f"RAM: {ram.get('used_gb', '?')}GB von {ram.get('total_gb', '?')}GB" if ram else ""
                 info = ", ".join(filter(None, [cpu_str, ram_str]))
                 return f"Hardware-Status ({name}): {info}" if language == "de" else f"System hardware metrics for {name}: {info}"
+
+        # 16. Proactive Reminders & Supervisor Rules
+        if "create_reminder" in step_outputs:
+            rem_res = step_outputs["create_reminder"]
+            msg = rem_res.get("message") if isinstance(rem_res, dict) else str(rem_res)
+            return f"Erinnerung gestellt, {name}: {msg}" if language == "de" else f"Reminder set, {name}: {msg}"
+
+        if "list_active_rules" in step_outputs:
+            lar_res = step_outputs["list_active_rules"]
+            rules = lar_res.get("rules", []) if isinstance(lar_res, dict) else []
+            count = len(rules)
+            if count == 0:
+                return f"Du hast aktuell keine aktiven Erinnerungen oder Überwachungsregeln, {name}." if language == "de" else f"You have no active reminders or supervisor rules, {name}."
+            items_str = ", ".join(r.get("name", "Regel") for r in rules[:3])
+            return f"Du hast {count} aktive Regel(n): {items_str}, {name}." if language == "de" else f"You have {count} active rule(s): {items_str}, {name}."
+
+        if "cancel_proactive_rule" in step_outputs:
+            c_res = step_outputs["cancel_proactive_rule"]
+            msg = c_res.get("message") if isinstance(c_res, dict) else str(c_res)
+            return f"{msg}, {name}."
+
+        if "create_vitals_watcher" in step_outputs:
+            vw_res = step_outputs["create_vitals_watcher"]
+            msg = vw_res.get("message") if isinstance(vw_res, dict) else str(vw_res)
+            return f"Überwachung aktiv, {name}: {msg}" if language == "de" else f"Supervisor active, {name}: {msg}"
+
+        # 17. Git Status
+        if "get_git_status" in step_outputs:
+            g_res = step_outputs["get_git_status"]
+            if isinstance(g_res, dict) and g_res.get("status") == "success":
+                branch = g_res.get("branch", "main")
+                summary = g_res.get("summary", "")
+                is_clean = g_res.get("is_clean", True)
+                if language == "de":
+                    return f"Git auf Branch '{branch}': {'Arbeitsbaum ist sauber.' if is_clean else summary} ({name})"
+                else:
+                    return f"Git repository on branch '{branch}': {summary} ({name})"
+            elif isinstance(g_res, dict) and g_res.get("message"):
+                return str(g_res["message"])
+
+        # 18. Scratch Notes
+        if "manage_notes" in step_outputs:
+            n_res = step_outputs["manage_notes"]
+            if isinstance(n_res, dict):
+                if "notes" in n_res:
+                    count = n_res.get("count", 0)
+                    titles = ", ".join(n.get("title", "") for n in n_res.get("notes", [])[:3])
+                    if count == 0:
+                        return f"Du hast keine Notizen gespeichert, {name}." if language == "de" else f"You have no notes saved, {name}."
+                    return f"Du hast {count} Notizen gespeichert ({titles}), {name}." if language == "de" else f"You have {count} note(s) saved ({titles}), {name}."
+                elif n_res.get("content"):
+                    t = n_res.get("title", "Notiz")
+                    c = n_res.get("content", "")
+                    return f"Notiz '{t}': {c}, {name}." if language == "de" else f"Note '{t}': {c}, {name}."
+                elif n_res.get("message"):
+                    return f"{n_res['message']}, {name}."
+
+        # 19. Clipboard Read / Write
+        if "get_clipboard_text" in step_outputs:
+            cb_res = step_outputs["get_clipboard_text"]
+            clip_text = cb_res.get("clipboard_text", "") if isinstance(cb_res, dict) else ""
+            preview = (clip_text[:100] + "...") if len(clip_text) > 100 else clip_text
+            if not clip_text:
+                return f"Die Zwischenablage ist leer, {name}." if language == "de" else f"Clipboard is empty, {name}."
+            return f"In deiner Zwischenablage steht: \"{preview}\", {name}." if language == "de" else f"Your clipboard contains: \"{preview}\", {name}."
+
+        if "set_clipboard_text" in step_outputs:
+            return f"Text wurde in die Zwischenablage kopiert, {name}." if language == "de" else f"Copied to clipboard, {name}."
 
         # Fallback if no specific step outputs were generated (unregistered tool capability)
         if not step_outputs:

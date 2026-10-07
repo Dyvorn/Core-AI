@@ -125,6 +125,10 @@ class ModelPreferenceUpdateRequest(BaseModel):
     role: str
     model_name: str
 
+class SpokenToEvaluateRequest(BaseModel):
+    utterance: str
+    zone: Optional[str] = None
+
 
 def create_gateway_app(
     state_manager: StateManager,
@@ -132,13 +136,18 @@ def create_gateway_app(
     planner: Planner,
     pipeline_engine: PipelineEngine,
     bus: EventBus,
-    remote_dispatcher: Optional[Any] = None
+    remote_dispatcher: Optional[Any] = None,
+    spoken_to: Optional[Any] = None
 ) -> FastAPI:
     """Factory creating the configured FastAPI Gateway Application."""
 
     if remote_dispatcher is None:
         from tools.remote_dispatcher import RemoteToolDispatcher
         remote_dispatcher = RemoteToolDispatcher(registry=registry)
+
+    if spoken_to is None:
+        from brain.spoken_to import SpokenToReasoning
+        spoken_to = SpokenToReasoning(state_manager=state_manager, registry=registry, planner=planner)
 
     audio_router = SpatialAudioRouter(state_manager=state_manager)
     spatial_handoff = SpatialHandoffEngine(
@@ -499,6 +508,13 @@ def create_gateway_app(
             reason=reason
         )
         return event
+
+    @app.post("/api/v1/voice/spoken_to")
+    def evaluate_spoken_to(req: SpokenToEvaluateRequest):
+        """Discourse Reasoning Engine: Evaluates pragmatic discourse role for an utterance."""
+        profile = state_manager.get_user_profile()
+        decision = spoken_to.evaluate(req.utterance, profile=profile)
+        return decision.model_dump()
 
     @app.get("/api/v1/logs")
 

@@ -12,7 +12,7 @@
 ```
 
 ```text
-[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.2.0-alpha ]  [ TESTS: 112/112 PASSED (100%) ]
+[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.2.0-alpha ]  [ TESTS: 123/123 PASSED (100%) ]
 [ LICENSE: AGPL-3.0-ONLY ]   [ ARCHITECTURE: ASYNC-DAG ] [ ETHOS: #ANTISLOP ]
 ```
 
@@ -281,6 +281,20 @@ Core AI enforces three immutable security tiers:
   7. **Audited Shell Execution**: `run_shell_command` runs terminal commands safe-listed through `SafetyGate`.
   8. **Autonomous Tool Self-Generation**: If a specialized calculation, data transformer, or parser is missing from the catalog, Core AI's planner synthesizes the tool code on the fly via `DynamicGenerator`, validates its AST against forbidden imports, executes it in a sandboxed scope, and persists it to `tools/dynamic/` for instant execution.
 
+### 9. High-Fidelity Microphone Capture & Spoken-To Discourse Awareness
+- **File References**: [engines/voice_in.py](engines/voice_in.py), [brain/spoken_to.py](brain/spoken_to.py), & [core/gateway.py](core/gateway.py)
+- **Universal Hardware Compatibility**: Auto-detects native hardware sample rates (WASAPI / DirectSound 44.1kHz or 48kHz studio audio interfaces) to completely eliminate `PaErrorCode -9997 (Invalid sample rate)` on Windows. Integrates zero-dependency fast linear interpolation `resample_audio` downsampling directly to Whisper's 16kHz stream.
+- **Dynamic Noise-Floor Adaptive RMS VAD**: Replaced static peak energy thresholds with continuous ambient room noise floor estimation (`self.ambient_noise_floor`) and dynamic RMS tracking (`adaptive_threshold = max(0.008, ambient_noise_floor * 2.2)`). Effortlessly triggers on quiet headsets while preventing runaway infinite recordings in noisy rooms.
+- **Pre-Roll Audio Ring Buffer**: Maintains a ~400ms pre-speech circular buffer prepended the millisecond voice activity is detected, eliminating clipped opening syllables ("Hey...", "Core...").
+- **STT Model Cascade Fallback**: Supports `CORE_STT_MODEL` and `CORE_STT_LANGUAGE` env overrides. Automatically cascades down model tiers (`distil-large-v3` $\to$ `small` $\to$ `base` $\to$ `tiny`) if VRAM allocation or memory pressure occurs.
+- **Four-Role Discourse Pragmatics Engine**: Core AI understands natural social context before speaking:
+  - `ADDRESSED` ── Operator directly commands Core AI or gives natural room imperatives (reminders, git, notes, ram) ──► **Executes Pipeline**
+  - `DEMONSTRATED` ── Operator showcases Core AI to guests/friends ──► **Chimes In Autonomously**
+  - `REFERENCED` ── Operator talks *about* Core AI in 3rd person / past tense ──► **Stays Politely Silent**
+  - `BYSTANDER` ── Ambient background conversation between humans ──► **Completely Ignored**
+- **Wake-Word-Free Directives & Filler Stripping**: Seamlessly recognizes room imperatives (`"erinnere mich in 5 Min..."`, `"watch ram"`, `"git status"`) without wake words, and recursively peels conversational particles (`"Core, bitte zeig mir den git status"` $\to$ `"git status"`).
+- **REST Discourse Gateway Endpoint**: Added `POST /api/v1/voice/spoken_to` allowing Smart Mirrors, mobile satellites, and remote web clients to query the discourse engine remotely.
+
 ---
 
 ## Repository Structure
@@ -295,6 +309,7 @@ Core AI/
 |   +-- proactive.py            # Proactive background watcher & conditional trigger daemon
 |   +-- safety.py               # Harm-free unstoppable agency & safety gate
 |   +-- spatial_handoff.py      # Cross-zone spatial handoff & dynamic audio stream migration
+|   +-- spoken_to.py            # Discourse pragmatic intentionality classifier (4 roles)
 +-- config/                     # Configuration & Environment
 |   +-- nodes.yaml              # Multi-device topology (rooms, outdoor, car, bike, glasses)
 |   +-- settings.yaml           # Model endpoints, logging paths, audio & bus settings
@@ -669,15 +684,29 @@ Inside the terminal shell (`Core [Operator@zone] > `), type any natural language
 Core AI is designed to run 24/7 as a dependable sovereign daemon on your main machine while offering instant CLI goal execution and zero-downtime evolutionary updates:
 
 - **Desktop**: Double-click `CoreAI.bat` on your Desktop to open the Sovereign Terminal.
-- **One-Shot Goal Execution (Direct from Terminal)**:
+- **One-Shot Goal Execution & Proactive Helpers (Direct from Terminal)**:
   Execute tasks directly without entering the interactive shell. Dispatches to the 24/7 background daemon in < 50ms via zero-import client, or executes local in-process microkernel if the daemon is offline:
   ```bash
   # Windows
   .\core.bat "what time is it"
+  .\core.bat "remind me in 15 minutes to take a break"
+  .\core.bat "list reminders"
+  .\core.bat "cancel reminder take a break"
+  .\core.bat "watch my ram"
+  .\core.bat "git status"
+  .\core.bat "save note sprint_goal: Alpha 0.2 polish and proactive engine"
+  .\core.bat "my notes"
   .\core.bat solve "check system status and calculate 42 * 1337"
 
   # Linux / macOS
   ./core.sh "what time is it"
+  ./core.sh "remind me in 15 minutes to take a break"
+  ./core.sh "list reminders"
+  ./core.sh "cancel reminder take a break"
+  ./core.sh "watch my ram"
+  ./core.sh "git status"
+  ./core.sh "save note sprint_goal: Alpha 0.2 polish and proactive engine"
+  ./core.sh "my notes"
   ./core.sh solve "check system status and calculate 42 * 1337"
   ```
 
@@ -696,7 +725,7 @@ Core AI is designed to run 24/7 as a dependable sovereign daemon on your main ma
   .\core.bat run         # Launch interactive REPL terminal
   .\core.bat backup      # Snapshot SQLite database and config/.env into backups/
   .\core.bat update      # Git pull with pre-backup state snapshot and automated rollback test guard
-  .\core.bat test        # Run full pytest test suite (112/112 tests passed)
+  .\core.bat test        # Run full pytest test suite (118/118 tests passed)
   .\core.bat setup       # Re-run interactive bootstrap wizard
   .\core.bat uninstall   # Clean zero-residue uninstallation
 

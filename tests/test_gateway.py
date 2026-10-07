@@ -163,3 +163,26 @@ def test_gateway_get_execution_logs(gateway_client):
     assert any("Unit test executed" in l["message"] for l in logs)
 
 
+def test_gateway_spoken_to_endpoint(gateway_client):
+    """Verify external edge devices can query the Spoken-To Discourse Engine via REST."""
+    client, state = gateway_client
+
+    # 1. Direct command
+    res1 = client.post("/api/v1/voice/spoken_to", json={"utterance": "Hey Core, wie spät ist es?"})
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert data1["discourse_role"] == "addressed"
+    assert data1["should_respond"] is True
+    assert data1["action_type"] == "command"
+    assert "wie spät" in data1["clean_command"]
+
+    # 2. Ambient discussion about Core (stay silent)
+    res2 = client.post("/api/v1/voice/spoken_to", json={"utterance": "Ich habe Core AI gestern gebaut"})
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["discourse_role"] == "referenced"
+    assert data2["should_respond"] is False
+    assert data2["action_type"] == "silent"
+
+
+

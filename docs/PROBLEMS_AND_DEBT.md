@@ -80,6 +80,18 @@
 - **Root Cause**: Early testing prototype code remained in native tools catalog.
 - **Fix Applied**: Purged `tools/native/home_assistant.py` and removed hardcoded planner assumptions in `brain/planner.py`. Smart home service planning now dynamically verifies tool presence in `ToolRegistry` rather than fabricating steps.
 
+### Issue #012: General Status Query Interception of Git Status `[RESOLVED]`
+- **Found**: 2026-10-07 during developer tool integration testing.
+- **Symptom**: Calling `core "git status"` triggered general system status (time + OS status) instead of `get_git_status`.
+- **Root Cause**: The regex pattern for system diagnostics matched the substring `"status"` before the git pattern was evaluated.
+- **Fix Applied**: Added exclusion of `"git"` in the system diagnostics pattern in `brain/planner.py` and routed git queries to `get_git_status` deterministically.
+
+### Issue #013: Strict Exact String Matching in Proactive Rule Deletion `[RESOLVED]`
+- **Found**: 2026-10-07 during reminder cancellation testing.
+- **Symptom**: `cancel_proactive_rule("Hardware Watcher")` returned error when the rule name was `"Hardware Watcher (RAM > 90.0%)"`.
+- **Root Cause**: `StateManager.delete_proactive_rule` only checked `LOWER(name) = LOWER(?)` exact equivalence.
+- **Fix Applied**: Added `OR LOWER(name) LIKE ?` with wildcard substring matching in `core/state.py` to allow forgiving, natural cancellations.
+
 ---
 
 ## 2. Watchlist & Architectural Debt to Address in Future Phases
@@ -92,10 +104,14 @@
   3. Built automatic tool lifecycle cleanup: when an edge node disconnects, its proxy tools are cleanly unregistered from the catalog, preventing phantom/ghost tools.
   4. Verified with automated tests in `tests/test_remote_dispatcher.py` and `tests/test_server_upgrades.py`.
 
-### Debt #102: Proactive Daemon & State Trigger Engine `[OPEN]`
-- **Context**: Autonomous behavior like *"I get a call from it while riding to work saying you forgot that, but don't worry, I handled it for you"*.
-- **Current State**: System operates reactively on incoming events (`TextEvent`, `AudioEvent`).
-- **Needed**: A background proactive reasoning loop / cron watcher that inspects `StateManager` state changes (e.g. user left home zone while kitchen window is open) and automatically instantiates a `PipelinePlan` and outgoing notification/call.
+### Debt #102: Proactive Daemon & State Trigger Engine `[RESOLVED]`
+- **Context**: Autonomous proactive agency, scheduled countdown reminders, and hardware supervising.
+- **Resolution**:
+  1. Built and integrated `ProactiveDaemon` in `brain/proactive.py` running continuous ambient loop inspecting countdown timers, hardware vitals (`ram_percent_gt`), spatial state, and roaming devices.
+  2. Implemented native tools `create_reminder`, `create_vitals_watcher`, `list_active_rules`, and `cancel_proactive_rule` in `tools/native/proactive_tools.py`.
+  3. Configured automatic one-shot rule deactivation upon firing to eliminate repetitive reminder alerts.
+  4. Connected deterministic heuristic routing and spoken synthesis in `brain/planner.py`.
+  5. Verified with 100% automated test coverage in `tests/test_proactive_and_dev_tools.py` and `tests/test_proactive.py`.
 
 ### Debt #103: Dynamic Tool Sandboxing Security Isolation `[OPEN]`
 - **Context**: Generated tools currently run via Python's `exec()` with AST checking.

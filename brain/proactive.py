@@ -97,10 +97,14 @@ class ProactiveDaemon:
                 if elapsed < rule.cooldown_seconds:
                     continue
 
-            should_fire = self._check_condition(rule.trigger_condition)
+            should_fire = self._check_condition(rule.trigger_condition, rule.condition_type, now)
             if should_fire:
                 logger.info(f"[Proactive Jarvis Trigger] Condition met for rule '{rule.name}'! Initiating goal: '{rule.action_goal}'")
                 self.state_manager.update_rule_last_triggered(rule.rule_id)
+
+                # Automatically deactivate one-shot reminders and countdowns
+                if rule.condition_type == "countdown" or rule.trigger_condition.get("one_shot", False):
+                    self.state_manager.deactivate_proactive_rule(rule.rule_id)
 
                 # Plan and execute autonomous solution
                 plan = self.planner.plan_problem(rule.action_goal, context={"trigger_rule": rule.rule_id, "priority": rule.priority})
@@ -130,14 +134,52 @@ class ProactiveDaemon:
                 )
                 await connection_manager.broadcast_event("HUD_CARD", card.model_dump())
 
-    def _check_condition(self, condition: Dict[str, Any]) -> bool:
+    def _check_condition(self, condition: Dict[str, Any], condition_type: str = "state_change", now: Optional[datetime] = None) -> bool:
         """
-        Evaluates condition dictionary.
+        Evaluates condition dictionary against real-time spatial, temporal, and system state.
         Supports:
+        - 'countdown': { 'target_timestamp_utc': ISO/timestamp }
+        - 'vitals': { 'ram_percent_gt': 85.0 }
+        - 'periodic': fires on recurring interval
         - 'require_state': { 'room_id': {'key': 'expected_val'} }
         - 'require_device_zone': { 'device_id': 'expected_zone' }
         """
-        # 1. Check required room/spatial state
+        curr_now = now or datetime.now(timezone.utc)
+
+        # 1. Countdown / Scheduled Reminders
+        if condition_type == "countdown" or "target_timestamp_utc" in condition:
+            target_raw = condition.get("target_timestamp_utc")
+            if target_raw:
+                try:
+                    if isinstance(target_raw, (int, float)):
+                        target_dt = datetime.fromtimestamp(target_raw, timezone.utc)
+                    else:
+                        target_dt = datetime.fromisoformat(str(target_raw).replace("Z", "+00:00"))
+                    if curr_now < target_dt:
+                        return False
+                except Exception as e:
+                    logger.warning(f"Invalid timestamp in countdown condition ({target_raw}): {e}")
+                    return False
+
+        # 2. Host Hardware & System Vitals Thresholds (e.g. RAM > 85%)
+        if condition_type == "vitals" or "ram_percent_gt" in condition or "ram_percent_lt" in condition:
+            try:
+                from core.service import get_host_vitals
+                vitals = get_host_vitals()
+                ram_used = vitals.get("ram_used_percent", 0.0)
+                if "ram_percent_gt" in condition and ram_used < float(condition["ram_percent_gt"]):
+                    return False
+                if "ram_percent_lt" in condition and ram_used > float(condition["ram_percent_lt"]):
+                    return False
+            except Exception as e:
+                logger.warning(f"Could not inspect host vitals for rule: {e}")
+                return False
+
+        # 3. Periodic recurring interval
+        if condition_type == "periodic":
+            return True
+
+        # 4. Check required room/spatial state
         if "require_state" in condition:
             for room_id, expected_kv in condition["require_state"].items():
                 actual_state = self.state_manager.get_room_state(room_id) or {}
@@ -145,7 +187,7 @@ class ProactiveDaemon:
                     if actual_state.get(k) != v:
                         return False
 
-        # 2. Check roaming device zone
+        # 5. Check roaming device zone
         if "require_device_zone" in condition:
             for device_id, expected_zone in condition["require_device_zone"].items():
                 device_rec = self.state_manager.get_device_record(device_id)

@@ -137,3 +137,79 @@ def test_direct_greeting_conversational(spoken_engine):
     assert dec_core.action_type == "chime_in"
     assert "Dyvorn" in dec_core.autonomous_response
 
+
+def test_standalone_proactive_and_dev_triggers(spoken_engine):
+    """Verify ambient commands without wake words (reminders, git, notes, ram) are treated as ADDRESSED commands."""
+    prof = UserProfile(preferred_name="Dyvorn")
+
+    # Reminders and timers
+    dec_remind = spoken_engine.evaluate("Erinnere mich in 5 Minuten an den Kaffee", profile=prof)
+    assert dec_remind.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_remind.should_respond is True
+    assert dec_remind.action_type == "command"
+
+    dec_timer = spoken_engine.evaluate("set a timer for 10 minutes", profile=prof)
+    assert dec_timer.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_timer.should_respond is True
+
+    # Git and hardware monitoring
+    dec_git = spoken_engine.evaluate("git status", profile=prof)
+    assert dec_git.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_git.should_respond is True
+    assert dec_git.clean_command == "git status"
+
+    dec_ram = spoken_engine.evaluate("watch ram", profile=prof)
+    assert dec_ram.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_ram.should_respond is True
+    assert dec_ram.clean_command == "watch ram"
+
+    # Notes and scratchpad
+    dec_note = spoken_engine.evaluate("save note review alpha release", profile=prof)
+    assert dec_note.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_note.should_respond is True
+
+    # Clipboard
+    dec_clip = spoken_engine.evaluate("what's on my clipboard", profile=prof)
+    assert dec_clip.discourse_role == DiscourseRole.ADDRESSED
+    assert dec_clip.should_respond is True
+
+
+def test_filler_stripping_clean_command(spoken_engine):
+    """Verify vocative address cleanly strips leading conversational fillers like 'bitte' or 'kannst du bitte'."""
+    prof = UserProfile(preferred_name="Dyvorn")
+    dec = spoken_engine.evaluate("Core, bitte zeig mir den git status", profile=prof)
+    assert dec.discourse_role == DiscourseRole.ADDRESSED
+    assert dec.should_respond is True
+    assert dec.clean_command == "git status"
+
+    dec2 = spoken_engine.evaluate("Hey Core, kannst du bitte wie spät ist es sagen?", profile=prof)
+    assert dec2.discourse_role == DiscourseRole.ADDRESSED
+    assert dec2.should_respond is True
+    assert "wie spät" in dec2.clean_command
+
+
+def test_expanded_showcase_and_referenced(spoken_engine):
+    """Verify expanded showcase markers and third-person architectural references."""
+    prof = UserProfile(preferred_name="Dyvorn")
+
+    # Showcase
+    dec_show = spoken_engine.evaluate("Schau mal was Core kann", profile=prof)
+    assert dec_show.discourse_role == DiscourseRole.DEMONSTRATED
+    assert dec_show.should_respond is True
+    assert dec_show.action_type == "chime_in"
+
+    dec_show_en = spoken_engine.evaluate("Watch what Core can do", profile=prof)
+    assert dec_show_en.discourse_role == DiscourseRole.DEMONSTRATED
+    assert dec_show_en.should_respond is True
+
+    # Referenced (talked about)
+    dec_ref = spoken_engine.evaluate("Core AI runs on Python locally", profile=prof)
+    assert dec_ref.discourse_role == DiscourseRole.REFERENCED
+    assert dec_ref.should_respond is False
+    assert dec_ref.action_type == "silent"
+
+    dec_ref_de = spoken_engine.evaluate("Wir haben Core AI gestern aufgesetzt", profile=prof)
+    assert dec_ref_de.discourse_role == DiscourseRole.REFERENCED
+    assert dec_ref_de.should_respond is False
+
+

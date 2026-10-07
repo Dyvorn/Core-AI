@@ -53,6 +53,18 @@ from tools.native.process_tools import (
     lock_workstation, lock_workstation_schema
 )
 from tools.native.shell_tools import run_shell_command, run_shell_command_schema
+from tools.native.proactive_tools import (
+    create_reminder, create_reminder_schema,
+    create_vitals_watcher, create_vitals_watcher_schema,
+    list_active_rules, list_active_rules_schema,
+    cancel_proactive_rule, cancel_proactive_rule_schema,
+    set_state_manager as set_proactive_sm
+)
+from tools.native.dev_tools import (
+    get_git_status, get_git_status_schema,
+    manage_notes, manage_notes_schema,
+    set_state_manager as set_dev_sm
+)
 from tools.remote_dispatcher import RemoteToolDispatcher
 from brain.dynamic_generator import DynamicGenerator
 from brain.pipeline_engine import PipelineEngine
@@ -82,7 +94,7 @@ try:
 except ImportError:
     CYAN = GREEN = YELLOW = RED = MAGENTA = BRIGHT = RESET = ""
 
-def play_boot_sequence(skip_anim: bool = False):
+def play_boot_sequence(skip_anim: bool = True):
     if not skip_anim:
         try:
             from core.animation import play_boot_animation
@@ -103,7 +115,6 @@ def play_boot_sequence(skip_anim: bool = False):
         "Spawning Universal Gateway (REST & WebSocket Mesh)"
     ]
     for step in steps:
-        time.sleep(0.06)
         print(f"  [+] {step:<54} [{GREEN}OK{RESET}]")
     print(f"{CYAN}-----------------------------------------------------------------------{RESET}\n")
 
@@ -405,6 +416,19 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
         }
     })
 
+    # Proactive Supervision & Reminder Tools
+    if state:
+        set_proactive_sm(state)
+        set_dev_sm(state)
+    registry.register_tool("create_reminder", create_reminder, create_reminder_schema)
+    registry.register_tool("create_vitals_watcher", create_vitals_watcher, create_vitals_watcher_schema)
+    registry.register_tool("list_active_rules", list_active_rules, list_active_rules_schema)
+    registry.register_tool("cancel_proactive_rule", cancel_proactive_rule, cancel_proactive_rule_schema)
+
+    # Developer & Scratch Productivity Tools
+    registry.register_tool("get_git_status", get_git_status, get_git_status_schema)
+    registry.register_tool("manage_notes", manage_notes, manage_notes_schema)
+
     registry.discover_dynamic_tools()
     return registry
 
@@ -413,8 +437,9 @@ def parse_args():
     parser.add_argument("goal", nargs="*", default=None, help="Optional one-shot goal to execute and exit")
     parser.add_argument("--solve", "-s", default=None, help="Explicit one-shot goal to execute and exit")
     parser.add_argument("--heuristic", action="store_true", help="Force deterministic heuristic planner (fast offline mode)")
-    parser.add_argument("--no-anim", "--fast", action="store_true", help="Skip 3D boot animation for instant start")
-    parser.add_argument("--logo", "--anim", action="store_true", help="Run interactive 3D logo animation and exit")
+    parser.add_argument("--no-anim", "--fast", action="store_true", help="Skip 3D boot animation for instant start (default)")
+    parser.add_argument("--anim", action="store_true", help="Play 3D holographic boot animation")
+    parser.add_argument("--logo", action="store_true", help="Run interactive 3D logo animation and exit")
     parser.add_argument("--voice", action="store_true", help="Enable full continuous voice loop (Mic STT + Speaker TTS)")
     parser.add_argument("--voice-in", action="store_true", help="Enable background microphone listening only")
     parser.add_argument("--no-tts", action="store_true", help="Disable audio speech output")
@@ -1043,7 +1068,7 @@ def main():
             import urllib.request
             import json
             try:
-                url = f"http://localhost:{target_port}/api/v1/pipeline/solve_sync"
+                url = f"http://127.0.0.1:{target_port}/api/v1/pipeline/solve_sync"
                 req_data = json.dumps({"goal": target_goal}).encode("utf-8")
                 req = urllib.request.Request(
                     url,
@@ -1085,7 +1110,8 @@ def main():
         sys.exit(0 if finished.status == "completed" else 1)
 
     if not args.headless:
-        play_boot_sequence(skip_anim=getattr(args, "no_anim", False))
+        should_skip_anim = not getattr(args, "anim", False)
+        play_boot_sequence(skip_anim=should_skip_anim)
 
     logger.info("Initializing Core AI Microkernel with Universal Gateway, Proactive Engine & Model Router...")
 
@@ -1168,7 +1194,8 @@ def main():
         planner=planner,
         pipeline_engine=engine,
         bus=bus,
-        remote_dispatcher=remote_dispatcher
+        remote_dispatcher=remote_dispatcher,
+        spoken_to=spoken_to
     )
 
     # Voice state broadcast helper
