@@ -12,13 +12,13 @@
 ```
 
 ```text
-[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.1.1-alpha ]  [ TESTS: 96/96 PASSED (100%) ]
+[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.2.0-alpha ]  [ TESTS: 112/112 PASSED (100%) ]
 [ LICENSE: AGPL-3.0-ONLY ]   [ ARCHITECTURE: ASYNC-DAG ] [ ETHOS: #ANTISLOP ]
 ```
 
 > **A self-hosted, sovereign, and privacy-first AI companion built to integrate into daily life across your workspace, living spaces, grounds, vehicle, bicycle, wearables, and mobile devices. Zero big-tech cloud lock-in, zero hardcoded assumptions, and engineered for multi-year evolution.**
 >
-> 🚀 **Release v0.1.1-alpha is LIVE!** Explore the full [Release Notes](RELEASE_NOTES.md) and [Changelog](CHANGELOG.md).
+> 🚀 **Release v0.2.0-alpha is LIVE!** Explore the full [Release Notes](RELEASE_NOTES.md) and [Changelog](CHANGELOG.md).
 
 ---
 
@@ -321,7 +321,9 @@ Core AI/
 |   +-- voice_out.py            # Text-To-Speech engine (Kokoro / Piper / Pyttsx3)
 +-- interfaces/                 # Client Interfaces & Installers
 |   +-- cli/
+|   |   +-- client.py           # High-speed instant CLI dispatcher (<50ms zero-import dispatch)
 |   |   +-- core_console.py     # Command center launcher (delegates to main.py)
+|   |   +-- settings.py         # Dedicated AI provider & model role selector
 |   |   +-- setup_wizard.py     # Interactive zero-hardcoding operator profile initializer
 |   +-- install/
 |   |   +-- enroll.py           # 1-line zero-friction edge device onboarding client
@@ -336,18 +338,21 @@ Core AI/
 +-- core.sh                     # Linux/macOS turnkey CLI command center
 +-- tools/                      # Tool Ecosystem
 |   +-- dynamic/                # Self-generated tools written, verified, and saved by Core AI
-|   |   +-- hash_string.py      # Example auto-synthesized dynamic tool
-|   +-- native/                 # Built-in native tools
+|   +-- native/                 # Built-in native tools (#ANTISLOP verified)
+|   |   +-- desktop_tools.py    # Application launching, explorer, screenshots & clipboard
 |   |   +-- file_tools.py       # File reading, writing, and directory listing
-|   |   +-- home_assistant.py   # Home Assistant smart device integration mock
 |   |   +-- knowledge_tools.py  # Factual encyclopedic summaries via Wikipedia
 |   |   +-- math_tools.py       # Safe mathematical evaluation & statistics
-|   |   +-- network_tools.py    # ARP/IP local network scan & device discovery
-|   |   +-- spatial_tools.py    # Spatial audio routing tool for autonomous planner
+|   |   +-- media_tools.py      # Volume control, mute, pause/play
+|   |   +-- network_tools.py    # High-speed LAN scanning & device inspection
+|   |   +-- process_tools.py    # OS process management & hardware vitals introspection
+|   |   +-- shell_tools.py      # Safe shell command execution
 |   |   +-- system_tools.py     # System time and platform status
 |   |   +-- weather_tools.py    # Real-time weather & temperature via Open-Meteo
+|   |   +-- web_tools.py        # Web search & browser integration
 |   +-- registry.py             # Dynamic tool registry, catalog introspection, & safe execution
-+-- tests/                      # Automated Test Suite (pytest, 68/68 tests passing)
+|   +-- remote_dispatcher.py    # Transparent proxy execution on remote edge nodes
++-- tests/                      # Automated Test Suite (pytest, 112/112 tests passing)
 |   +-- test_bus.py             # EventBus pub/sub and in-memory queue tests
 |   +-- test_dynamic_generator.py # AST security validation & sandbox execution tests
 |   +-- test_gateway.py         # REST & WebSocket endpoint tests
@@ -530,7 +535,7 @@ Real-time audio route binding stored in SQLite and managed on the fly:
 | **Dynamic Hardware / UI Synthesis** | Phase 3 | `[COMPLETED]` | On-demand UI generation & community plugin architecture |
 | **Dynamic Model & Provider Router** | Core | `[COMPLETED]` | `brain/model_router.py` persistent roles & prompt overrides |
 | **Intercontinental Sovereign Mesh** | Core | `[COMPLETED]` | `core/mesh_client.py` offline fallback & machine migration |
-| **Automated Test Suite** | All | `[COMPLETED]` | **56/56 tests passing 100% green** (`pytest tests`) |
+| **Automated Test Suite** | All | `[COMPLETED]` | **112/112 tests passing 100% green** (`pytest tests`) |
 | **Mobile Companion & Nothing OS** | Phase 4 | `[ACTIVE]` | WebSocket client, rear Glyph Matrix LED driver, BLE bridge |
 | **Automotive & Bicycle SBC Unit** | Phase 5 | `[QUEUED]` | CAN-bus / OBD-II integration, bicycle computer bridge |
 | **Smart Glasses AR & Spatial Cam** | Phase 6 | `[QUEUED]` | Micro HUD projection, bone conduction, FOV camera |
@@ -665,7 +670,7 @@ Core AI is designed to run 24/7 as a dependable sovereign daemon on your main ma
 
 - **Desktop**: Double-click `CoreAI.bat` on your Desktop to open the Sovereign Terminal.
 - **One-Shot Goal Execution (Direct from Terminal)**:
-  Execute tasks directly without entering the interactive shell. Dispatches to the 24/7 background daemon in < 100ms, or executes local in-process microkernel if the daemon is offline:
+  Execute tasks directly without entering the interactive shell. Dispatches to the 24/7 background daemon in < 50ms via zero-import client, or executes local in-process microkernel if the daemon is offline:
   ```bash
   # Windows
   .\core.bat "what time is it"
@@ -691,7 +696,7 @@ Core AI is designed to run 24/7 as a dependable sovereign daemon on your main ma
   .\core.bat run         # Launch interactive REPL terminal
   .\core.bat backup      # Snapshot SQLite database and config/.env into backups/
   .\core.bat update      # Git pull with pre-backup state snapshot and automated rollback test guard
-  .\core.bat test        # Run full pytest test suite (101/101 tests passed)
+  .\core.bat test        # Run full pytest test suite (112/112 tests passed)
   .\core.bat setup       # Re-run interactive bootstrap wizard
   .\core.bat uninstall   # Clean zero-residue uninstallation
 

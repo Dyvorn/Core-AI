@@ -415,8 +415,8 @@ class Planner:
                     depends_on=[]
                 ))
 
-        # Pattern: Home assistant device control
-        elif any(k in goal_lower for k in ["turn on", "turn off", "schalte", "licht", "light", "lampe"]):
+        # Pattern: Home assistant device control (only if tool registered)
+        elif self.registry and self.registry.has_tool("home_assistant_call") and any(k in goal_lower for k in ["turn on", "turn off", "schalte", "licht", "light", "lampe"]):
             entity = "light.living_room"
             action = "turn_on" if any(k in goal_lower for k in ["on", "an", "ein"]) else "turn_off"
             steps.append(PipelineStep(

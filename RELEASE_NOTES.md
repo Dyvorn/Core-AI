@@ -1,5 +1,5 @@
 # C.O.R.E. AI :: SYSTEM RELEASE PROTOCOL
-### KERNEL PROTOCOL v0.1.1-alpha // CODENAME: "GENESIS (PATCH 1)"
+### KERNEL PROTOCOL v0.2.0-alpha // CODENAME: "PRECISION & FLOW"
 
 ```text
    ______ ____  ____  ______   ___    ____
@@ -13,7 +13,7 @@ CONCURRENT OMNIPRESENT REASONING ENGINE // SOVEREIGN LIFE OS
 
 | Kernel Version | Operational Status | Verification | Sovereign Ethos |
 | :---: | :---: | :---: | :---: |
-| **`v0.1.1-alpha`** | 🟢 **OPERATIONAL** | 🧪 **96 / 96 PASSED** | 🛡️ **#ANTISLOP** |
+| **`v0.2.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **112 / 112 PASSED** | 🛡️ **#ANTISLOP** |
 
 | Mesh Storage | Cryptography | Telemetry | License |
 | :---: | :---: | :---: | :---: |

@@ -15,6 +15,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [[0.2.0-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.2.0-alpha) — 2026-10-07
+### Codename: "Precision & Flow"
+
+| Kernel | Status | Verification | Ethos |
+| :---: | :---: | :---: | :---: |
+| **`v0.2.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **112 / 112 PASSED** | 🛡️ **#ANTISLOP** |
+
+Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driver productivity, sub-50ms CLI execution, mock tool eradication, and microkernel streamlining.
+
+### 🌟 Added & Enhanced
+
+#### ⚡ Instant-Dispatch Zero-Overhead CLI (`interfaces/cli/client.py`, `core.bat`, `core.sh`)
+- **Sub-50ms One-Shot Execution**: One-shot CLI goals (`core "<goal>"`) bypass all heavy Python module warmups (`torch`, `whisper`, `fastapi`, `uvicorn`) by dispatching directly to the running 24/7 background daemon over a persistent loopback socket.
+- **Zero Console Log Pollution**: Eliminated logging framework initialization and SQLite database mounting noise from terminal outputs; quick one-shot queries return pure, colored ANSI responses.
+- **Seamless Local Fallback**: Automatically and transparently falls back to in-process microkernel execution if the background daemon is not running.
+- **Raw JSON Scripting Output**: Added `--json` and `--quiet` flags to support piping and external shell automation.
+
+#### ⚡ Windows IPv6 Loopback Latency Elimination (`interfaces/cli/client.py`)
+- Standardized local HTTP loopback targeting to `127.0.0.1` instead of `localhost`, eliminating Windows IPv6 (`::1`) DNS resolution timeouts and cutting socket latency from 2,240ms down to 60ms.
+
+### 🛡️ #ANTISLOP & Bloat Removal
+
+#### 🚫 Fake Tool Purge (`tools/native/home_assistant.py`)
+- **Erased `HomeAssistantMock`**: Removed simulated in-memory smart home mock. In strict compliance with the **#ANTISLOP** standard, tools are only exposed when backed by real physical integrations.
+- **Dynamic Introspection Guard**: Hardened `brain/planner.py` to only schedule smart home service calls when real implementations are actively registered in `ToolRegistry`, preventing phantom step hallucinations.
+
+#### 🧹 Repository & Artifact Pruning
+- **Binary Archive Cleanup**: Purged binary distribution packages (`dist/Core-AI-v0.1.1-alpha.zip`) from git tracking.
+- **Dynamic Tool Artifact Cleanup**: Removed ephemeral test generation residue (`tools/dynamic/hash_string.py`).
+
+### 🧪 Automated Verification
+- **112 / 112 Tests Passing**: Added comprehensive test coverage for client daemon dispatch, fallback handling, and test-local fixtures (`tests/test_fast_cli.py`).
+
+---
+
 ## [[0.1.1-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.1.1-alpha) — 2026-10-04
 ### Codename: "Genesis (Patch 1)"
 

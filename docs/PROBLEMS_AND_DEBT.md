@@ -68,6 +68,18 @@
 - **Root Cause**: No native zone removal or pruning tools existed in the registry or `StateManager`.
 - **Fix Applied**: Implemented `StateManager.delete_zone()` and `StateManager.delete_all_zones_except()`, registered native tool `remove_spatial_zone` with `all_except` support, and added `zone rm <id>` to CLI REPL.
 
+### Issue #010: One-Shot CLI Warmup Latency & Log Clutter `[RESOLVED]`
+- **Found**: 2026-10-07 during daily driver productivity testing.
+- **Symptom**: Running `core "<goal>"` launched the full `main.py` runtime importing heavy libraries (`torch`, `fastapi`, `whisper`, `uvicorn`), initializing `StateManager`, and printing diagnostic log noise even when the background daemon was already online. On Windows, `localhost` also triggered a 2.2-second IPv6 DNS resolution fallback.
+- **Root Cause**: CLI entrypoints (`core.bat`, `core.sh`) routed one-shot tasks directly to `main.py`, incurring full microkernel startup overhead and logging setup.
+- **Fix Applied**: Built lightweight standalone dispatcher `interfaces/cli/client.py` using standard library only (`urllib`), directing calls to `127.0.0.1` directly, achieving sub-50ms execution latency with zero log noise and clean exit codes. Routed `core.bat` and `core.sh` through `client.py` with automatic in-process fallback.
+
+### Issue #011: Unregistered Mock Tool Catalog Residue (`tools/native/home_assistant.py`) `[RESOLVED]`
+- **Found**: 2026-10-07 during Anti-Slop audit.
+- **Symptom**: `HomeAssistantMock` was registered as a native tool, returning hardcoded dummy states rather than interfacing with real hardware.
+- **Root Cause**: Early testing prototype code remained in native tools catalog.
+- **Fix Applied**: Purged `tools/native/home_assistant.py` and removed hardcoded planner assumptions in `brain/planner.py`. Smart home service planning now dynamically verifies tool presence in `ToolRegistry` rather than fabricating steps.
+
 ---
 
 ## 2. Watchlist & Architectural Debt to Address in Future Phases

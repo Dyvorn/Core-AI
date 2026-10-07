@@ -122,6 +122,6 @@ case "$COMMAND" in
         echo ""
         ;;
     *)
-        "$PYTHON" main.py "$@"
+        "$PYTHON" interfaces/cli/client.py "$@"
         ;;
 esac

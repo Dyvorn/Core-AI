@@ -32,7 +32,6 @@ from core.context import ContextManager
 from core.state import StateManager
 from tools.registry import ToolRegistry
 from tools.native.system_tools import get_time, time_schema, get_system_status
-from tools.native.home_assistant import HomeAssistantMock, ha_call_schema
 from tools.native.file_tools import read_text_file, read_file_schema, write_text_file, write_file_schema, list_dir_contents, list_dir_schema
 from tools.native.math_tools import calculate_math, calculate_math_schema, summarize_numbers, summarize_numbers_schema
 from tools.native.network_tools import scan_local_network, scan_local_network_schema, inspect_lan_device, inspect_lan_device_schema
@@ -111,7 +110,7 @@ def play_boot_sequence(skip_anim: bool = False):
 def print_banner(operator_name: str, zone: str, port: int):
     print(f"{CYAN}+=====================================================================+{RESET}")
     print(f"{CYAN}|{BRIGHT}   C.O.R.E. AI :: CONCURRENT OMNIPRESENT REASONING ENGINE            {RESET}{CYAN}|{RESET}")
-    print(f"{CYAN}|{RESET}   v0.1.1-alpha [Genesis Patch 1] - Sovereign Ubiquitous Life OS      {CYAN}|{RESET}")
+    print(f"{CYAN}|{RESET}   v0.2.0-alpha [Precision & Flow] - Sovereign Ubiquitous Life OS       {CYAN}|{RESET}")
     print(f"{CYAN}+=====================================================================+{RESET}")
     print(f"{CYAN}|{RESET}   Operator: {GREEN}{operator_name:<16}{RESET} Zone: {YELLOW}{zone:<16}{RESET} Status: {GREEN}ONLINE       {RESET}{CYAN}|{RESET}")
     print(f"{CYAN}|{RESET}   Gateway:  {CYAN}http://localhost:{port:<5}{RESET} API Docs: {CYAN}/docs{RESET} WebSocket: {CYAN}/ws/events{RESET}   {CYAN}|{RESET}")
@@ -204,11 +203,6 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
         "description": "Get current operating system, distribution, and hardware architecture status",
         "parameters": {"type": "object", "properties": {}}
     })
-    
-    ha_url = os.getenv("HA_URL", "http://localhost:8123")
-    ha_token = os.getenv("HA_TOKEN", "mock_token")
-    ha = HomeAssistantMock(ha_url, ha_token)
-    registry.register_tool("home_assistant_call", ha.call_service, ha_call_schema)
     
     registry.register_tool("read_text_file", read_text_file, read_file_schema)
     registry.register_tool("write_text_file", write_text_file, write_file_schema)

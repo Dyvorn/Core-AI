@@ -54,7 +54,7 @@ goto :eof
 goto :eof
 
 :quick_solve
-"%PYTHON%" main.py %*
+"%PYTHON%" interfaces\cli\client.py %*
 goto :eof
 
 :start_daemon

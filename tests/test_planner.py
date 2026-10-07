@@ -2,15 +2,29 @@ import os
 import pytest
 from tools.registry import ToolRegistry
 from tools.native.system_tools import get_time, time_schema, get_system_status
-from tools.native.home_assistant import HomeAssistantMock, ha_call_schema
 from brain.dynamic_generator import DynamicGenerator
 from brain.planner import Planner
 
 def test_planner_tool_introspection_and_planning(tmp_path):
     registry = ToolRegistry(dynamic_dir=str(tmp_path))
     registry.register_tool("get_time", get_time, time_schema)
-    ha = HomeAssistantMock("http://localhost:8123", "token")
-    registry.register_tool("home_assistant_call", ha.call_service, ha_call_schema)
+    
+    def dummy_ha_service(entity_id: str, action: str) -> dict:
+        return {"status": "success", "entity_id": entity_id, "state": "on" if action == "turn_on" else "off"}
+        
+    ha_schema = {
+        "name": "home_assistant_call",
+        "description": "Call a Home Assistant service on an entity",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entity_id": {"type": "string"},
+                "action": {"type": "string"}
+            },
+            "required": ["entity_id", "action"]
+        }
+    }
+    registry.register_tool("home_assistant_call", dummy_ha_service, ha_schema)
 
     planner = Planner(registry=registry, model_name="heuristic")
 

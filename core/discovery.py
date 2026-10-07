@@ -57,7 +57,7 @@ class LANBeacon:
         return {
             "magic": DISCOVERY_MAGIC_RESP,
             "service": "core_ai_gateway",
-            "version": "0.1.1-alpha",
+            "version": "0.2.0-alpha",
             "hostname": socket.gethostname(),
             "lan_ip": lan_ip,
             "port": self.service_port,

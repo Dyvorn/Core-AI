@@ -196,7 +196,7 @@ def create_gateway_app(
 
     app = FastAPI(
         title="Core AI Universal Gateway",
-        version="0.1.1-alpha",
+        version="0.2.0-alpha",
         description="C.O.R.E. (Concurrent Omnipresent Reasoning Engine) - Protocol-Agnostic Edge Gateway for Smart Mirrors, Vehicles, Phones, Glasses, and Homelab.",
         lifespan=lifespan
     )
@@ -230,8 +230,8 @@ def create_gateway_app(
         profile = state_manager.get_user_profile()
         return {
             "status": "online",
-            "version": "0.1.1-alpha",
-            "codename": "Genesis",
+            "version": "0.2.0-alpha",
+            "codename": "Precision & Flow",
             "acronym": "Concurrent Omnipresent Reasoning Engine",
             "active_user": profile.preferred_name,
             "platform": platform.system(),
