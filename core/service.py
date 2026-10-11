@@ -237,17 +237,20 @@ class ServiceManager:
                 pass
 
     def check_health(self, port: int = 8000, timeout: float = 1.0) -> Tuple[bool, Dict[str, Any]]:
-        """Checks if Gateway server answers on HTTP."""
-        url = f"http://localhost:{port}/api/v1/health"
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "CoreAI-ServiceManager"})
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                if resp.status == 200:
-                    import json
-                    return True, json.loads(resp.read().decode("utf-8"))
-                return False, {"error": f"HTTP {resp.status}"}
-        except Exception as e:
-            return False, {"error": str(e)}
+        """Checks if Gateway server answers on HTTP, including dynamic port fallbacks."""
+        for p in [port, port + 1]:
+            url = f"http://localhost:{p}/api/v1/health"
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "CoreAI-ServiceManager"})
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    if resp.status == 200:
+                        import json
+                        data = json.loads(resp.read().decode("utf-8"))
+                        data["_active_port"] = p
+                        return True, data
+            except Exception:
+                continue
+        return False, {"error": "unreachable"}
 
     @staticmethod
     def get_lan_ip() -> str:
@@ -391,9 +394,10 @@ class ServiceManager:
         from core.terminal import render_box
         daemon_str = f"{G}ONLINE (PID {info['pid']}){RST}" if running else f"{Y}OFFLINE{RST}"
         watchdog_str = f"{G}ONLINE (PID {info['watchdog_pid']}, Self-Healing){RST}" if info.get("watchdog_running") else f"{Y}STANDALONE (No Watchdog){RST}"
+        active_port = details.get("_active_port", port) if isinstance(details, dict) else port
         lan_ip = self.get_lan_ip()
-        lan_suffix = f" | LAN: http://{lan_ip}:{port}" if lan_ip and lan_ip != "127.0.0.1" else ""
-        gateway_str = f"{G}ONLINE (http://localhost:{port}{lan_suffix}){RST}" if gw_ok else f"{Y}OFFLINE{RST}"
+        lan_suffix = f" | LAN: http://{lan_ip}:{active_port}" if lan_ip and lan_ip != "127.0.0.1" else ""
+        gateway_str = f"{G}ONLINE (http://localhost:{active_port}{lan_suffix}){RST}" if gw_ok else f"{Y}OFFLINE{RST}"
 
         rows = [
             ("Daemon Process:", daemon_str),

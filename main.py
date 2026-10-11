@@ -1485,6 +1485,7 @@ def main():
     def is_port_in_use(h: str, p: int) -> bool:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind((h, p))
                 return False
             except OSError:
