@@ -7,6 +7,11 @@ import urllib.request
 import urllib.error
 from typing import Optional, Dict, Any
 
+# Ensure project root is on sys.path
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 # Standard ANSI colors for clean terminal output
 ESC = "\033"
 CYAN = f"{ESC}[36m"
@@ -30,13 +35,14 @@ def execute_via_daemon(
     host: str = "127.0.0.1",
     port: int = 8000,
     timeout: float = 60.0,
-    context: Optional[Dict[str, Any]] = None
+    context: Optional[Dict[str, Any]] = None,
+    base_url: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Sends one-shot goal directly to the 24/7 background microkernel daemon via HTTP POST.
+    Sends one-shot goal directly to the 24/7 background microkernel daemon or central mesh server via HTTP POST.
     Uses 127.0.0.1 directly to bypass Windows IPv6 localhost DNS resolution delays.
     """
-    url = f"http://{host}:{port}/api/v1/pipeline/solve_sync"
+    url = f"{base_url.rstrip('/')}/api/v1/pipeline/solve_sync" if base_url else f"http://{host}:{port}/api/v1/pipeline/solve_sync"
     payload = {
         "goal": goal,
         "context": context or {"channel": "fast_cli", "client": "client.py"}
@@ -58,7 +64,7 @@ def fallback_in_process(goal: str, port: int) -> int:
     python_bin = sys.executable
 
     print(f"{YELLOW}[*] Daemon offline. Launching in-process microkernel...{RESET}")
-    cmd = [python_bin, main_script, "--headless", "--port", str(port), "--solve", goal]
+    cmd = [python_bin, "-u", main_script, "--headless", "--port", str(port), "--solve", goal]
     try:
         return subprocess.call(cmd, cwd=root_dir)
     except Exception as e:
@@ -94,13 +100,24 @@ def main() -> int:
 
     # Normalize localhost to 127.0.0.1 to avoid Windows IPv6 DNS resolution latency
     target_host = "127.0.0.1" if args.host.lower() in ("localhost", "127.0.0.1") else args.host
+    server_base_url = None
+
+    # Auto-detect if this machine is configured as an edge node paired to a central server
+    try:
+        from core.mesh_client import MeshClient
+        mc = MeshClient()
+        if mc.role == "edge_node" and mc.main_server_url and args.host in ("127.0.0.1", "localhost", os.getenv("CORE_HOST", "127.0.0.1")):
+            server_base_url = mc.main_server_url
+    except Exception:
+        pass
 
     try:
         res = execute_via_daemon(
             goal=goal_text,
             host=target_host,
             port=args.port,
-            timeout=args.timeout
+            timeout=args.timeout,
+            base_url=server_base_url
         )
         if args.json:
             print(json.dumps(res, indent=2))

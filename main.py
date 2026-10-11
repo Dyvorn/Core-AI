@@ -1039,7 +1039,12 @@ def run_interactive_repl(
                     if mesh_res.get("execution_mode") == "remote_main_server":
                         res_data = mesh_res["result"]
                         print(f"{GREEN}[OK] Executed centrally on Main Server ({mesh_res['server_url']})!{RESET}")
-                        print(f"{CYAN}Core AI [Remote]:{RESET} {BRIGHT}{res_data.get('final_output') or 'Task complete.'}{RESET}\n")
+                        spoken = res_data.get("spoken_response") or res_data.get("final_output") or "Task complete."
+                        if isinstance(spoken, dict):
+                            spoken = spoken.get("message") or spoken.get("status") or str(spoken)
+                        print(f"{CYAN}Core AI [Remote]:{RESET} {BRIGHT}{spoken}{RESET}\n")
+                        if voice_out:
+                            voice_out.synthesize_and_play(str(spoken))
                         continue
                     else:
                         finished_plan, elapsed = mesh_res["result"]

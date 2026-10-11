@@ -120,7 +120,7 @@ class MeshClient:
                     method="POST"
                 )
 
-                with urllib.request.urlopen(req, timeout=10.0) as resp:
+                with urllib.request.urlopen(req, timeout=30.0) as resp:
                     if resp.status == 200:
                         result = json.loads(resp.read().decode("utf-8"))
                         return {
