@@ -87,6 +87,11 @@ def main() -> int:
         main_script = os.path.join(root_dir, "main.py")
         return subprocess.call([sys.executable, "-u", main_script], cwd=root_dir)
 
+    if goal_text.lower() in ("clean", "clean-setup", "factory-reset", "factory_reset"):
+        from interfaces.install.clean_setup import run_clean_setup
+        run_clean_setup(interactive=True)
+        return 0
+
     # Normalize localhost to 127.0.0.1 to avoid Windows IPv6 DNS resolution latency
     target_host = "127.0.0.1" if args.host.lower() in ("localhost", "127.0.0.1") else args.host
 

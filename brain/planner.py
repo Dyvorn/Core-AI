@@ -357,8 +357,8 @@ class Planner:
                 depends_on=[]
             ))
 
-        # Pattern: Clean Setup / Factory Reset / Wipe Runtime State ("delete everything but the files", "clean setup")
-        elif any(k in goal_lower for k in [
+        # Pattern: Clean Setup / Factory Reset / Wipe Runtime State ("clean", "clean setup", "delete everything but the files")
+        elif goal_lower in ["clean", "clean-setup", "factory-reset", "factory_reset", "clean server", "clean-slate"] or any(k in goal_lower for k in [
             "clean setup", "clean new setup", "delete everything but the files",
             "delete everything but files", "wipe everything but the files",
             "wipe everything but files", "factory reset", "factory-reset",
@@ -952,7 +952,7 @@ Do NOT output any markdown formatting or commentary outside the JSON.
             "open_path_in_explorer", "lock_workstation", "take_screenshot",
             "relocate_operator", "open_youtube", "get_clipboard_text", "set_clipboard_text",
             "create_reminder", "create_vitals_watcher", "list_active_rules",
-            "cancel_proactive_rule", "get_git_status", "manage_notes"
+            "cancel_proactive_rule", "get_git_status", "manage_notes", "factory_reset"
         }
         is_pure_routine = bool(step_outputs) and all(t in routine_deterministic_tools for t in step_outputs.keys())
 
@@ -987,6 +987,13 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                 logger.debug(f"LLM speech synthesis fallback to deterministic formatting: {e}")
 
         # Deterministic formatting fallbacks
+
+        # 0. Factory Reset / Clean Setup Response
+        if "factory_reset" in step_outputs:
+            fr_res = step_outputs["factory_reset"]
+            if isinstance(fr_res, dict):
+                return fr_res.get("message", "System wiped to clean Day-Zero state.")
+            return str(fr_res)
 
         # 1. Time response
         if "get_time" in step_outputs and "get_system_status" not in step_outputs:

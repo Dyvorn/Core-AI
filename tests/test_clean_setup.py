@@ -190,12 +190,15 @@ def test_planner_heuristic_routing_clean_setup():
     planner = Planner(registry=registry, model_name="heuristic")
 
     test_queries = [
+        "clean",
         "clean setup",
         "clean new setup",
         "delete everything but the files",
         "delete everything but files",
         "factory reset",
-        "factory-reset"
+        "factory-reset",
+        "clean server",
+        "clean-slate"
     ]
 
     for q in test_queries:
@@ -203,6 +206,16 @@ def test_planner_heuristic_routing_clean_setup():
         assert len(plan.steps) == 1, f"Failed for query '{q}'"
         assert plan.steps[0].tool_name == "factory_reset", f"Failed tool name for query '{q}'"
         assert plan.steps[0].arguments.get("confirm") is True
+        # Verify offline notice is not set
+        assert not plan.context.get("offline_ai_notice"), f"Offline notice set for '{q}'"
+
+    # Test deterministic synthesis
+    test_plan = planner.plan_problem("clean")
+    test_plan.steps[0].status = "completed"
+    test_plan.steps[0].output = {"status": "success", "message": "System wiped to clean Day-Zero state."}
+    test_plan.status = "completed"
+    spoken = planner.formulate_spoken_response(test_plan)
+    assert "System wiped to clean Day-Zero state." in spoken
 
 def test_print_clean_summary_card(capsys):
     fake_summary = {
