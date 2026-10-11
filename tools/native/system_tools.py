@@ -77,6 +77,63 @@ system_status_schema = {
     }
 }
 
+def inspect_system_resources(**kwargs) -> dict:
+    """
+    Returns real-time hardware vitals, memory consumption, CPU load, and disk capacity.
+    Cross-platform support for Windows, Linux, and macOS.
+    """
+    import shutil
+    res = {
+        "os": platform.system(),
+        "hostname": platform.node(),
+        "cpu_count": os.cpu_count() or 1,
+    }
+
+    # Load Averages (Unix)
+    if hasattr(os, "getloadavg"):
+        try:
+            load1, load5, load15 = os.getloadavg()
+            res["load_avg"] = {"1m": round(load1, 2), "5m": round(load5, 2), "15m": round(load15, 2)}
+        except Exception:
+            pass
+
+    # Disk usage
+    try:
+        path = "C:\\" if os.name == "nt" else "/"
+        total, used, free = shutil.disk_usage(path)
+        res["disk"] = {
+            "total_gb": round(total / (1024**3), 2),
+            "used_gb": round(used / (1024**3), 2),
+            "free_gb": round(free / (1024**3), 2),
+            "used_percent": round((used / total) * 100, 1)
+        }
+    except Exception:
+        pass
+
+    # Memory usage via psutil if present
+    try:
+        import psutil
+        vmem = psutil.virtual_memory()
+        res["memory"] = {
+            "total_gb": round(vmem.total / (1024**3), 2),
+            "available_gb": round(vmem.available / (1024**3), 2),
+            "used_percent": round(vmem.percent, 1)
+        }
+        res["cpu_percent"] = round(psutil.cpu_percent(interval=0.05), 1)
+    except Exception:
+        pass
+
+    return res
+
+system_resources_schema = {
+    "name": "inspect_system_resources",
+    "description": "Inspect CPU utilization, RAM usage, load average, and disk storage capacity",
+    "parameters": {
+        "type": "object",
+        "properties": {}
+    }
+}
+
 factory_reset_schema = {
     "name": "factory_reset",
     "description": "Clean-wipe all runtime database state, logs, credentials, and dynamic tools for a fresh Day-Zero server setup, preserving all installed code files and virtual environment",

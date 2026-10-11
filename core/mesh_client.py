@@ -81,6 +81,17 @@ class MeshClient:
         except Exception as e:
             return False, {"error": str(e)}
 
+    def ping_latency(self, timeout: float = 2.0) -> Tuple[bool, Dict[str, Any], float]:
+        """
+        Pings main server and measures round-trip latency in milliseconds.
+        Returns: (is_online, data_or_error, latency_ms)
+        """
+        import time
+        start = time.perf_counter()
+        is_online, data = self.ping_main_server(timeout=timeout)
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+        return is_online, data, round(elapsed_ms, 2)
+
     def execute_over_mesh(
         self,
         goal: str,
@@ -236,6 +247,13 @@ class MeshClient:
 
 def main():
     import sys
+    if sys.platform == "win32":
+        try:
+            if hasattr(sys.stdout, "reconfigure"):
+                sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     client = MeshClient()
     args = sys.argv[1:]
 
@@ -257,14 +275,28 @@ def main():
         print(f"{C}|{RST}   Server Status:    {status_str}")
         print(f"{C}|{RST}   Offline Buffer:   {len(client.offline_buffer)} items queued")
         if client.role == "edge_node" and not is_online:
-            print(f"{C}|{RST}   {Y}↳ Autonomous Local Fallback is ACTIVE (never locked out).{RST}")
+            print(f"{C}|{RST}   {Y}[>] Autonomous Local Fallback is ACTIVE (never locked out).{RST}")
         print(f"{C}+=====================================================================+{RST}\n")
         print("  Commands:")
         print("    core mesh scan                         (Scan LAN subnet for running Main Servers)")
+        print("    core mesh ping                         (Measure round-trip latency to Main Server)")
         print("    core mesh connect auto                 (Auto-discover and pair to first LAN Server)")
         print("    core mesh connect <http://host:port>   (Bind this machine as edge node to server)")
         print("    core mesh role <main_server|edge_node> (Set operational node role)")
         print("    core mesh disconnect                   (Revert to standalone main server)\n")
+
+    elif args[0] in ["ping", "latency"]:
+        print(f"\n{C}[*] Pinging Core AI Sovereign Mesh Server at {client.main_server_url}...{RST}")
+        is_online, data, latency = client.ping_latency(timeout=2.5)
+        if is_online:
+            print(f"{G}[+] Server Status: ONLINE (Latency: {latency:.2f} ms){RST}")
+            print(f"    Operator: {G}{data.get('active_user', 'Operator')}{RST} | Platform: {data.get('platform', 'N/A')} | Model: {C}{data.get('active_model', 'N/A')}{RST}")
+            nodes = data.get("connected_edge_nodes", [])
+            print(f"    Connected Edge Nodes: {len(nodes)} | Version: {data.get('version', '0.2.0-alpha')}\n")
+        else:
+            print(f"{R}[-] Server Status: UNREACHABLE ({data.get('error', 'offline')}){RST}")
+            print(f"    Latency Probe: {latency:.2f} ms")
+            print(f"    {Y}[>] Autonomous Local Fallback is ACTIVE (never locked out).{RST}\n")
 
     elif args[0] in ["scan", "discover"]:
         print(f"\n{C}[*] Scanning local network for active Core AI Sovereign Main Servers...{RST}")

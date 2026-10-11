@@ -20,11 +20,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 | Kernel | Status | Verification | Ethos |
 | :---: | :---: | :---: | :---: |
-| **`v0.2.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **128 / 128 PASSED** | 🛡️ **#ANTISLOP** |
+| **`v0.2.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **139 / 139 PASSED** | 🛡️ **#ANTISLOP** |
 
-Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driver productivity, sub-50ms CLI execution, always-on voice capture by default, neural Silero VAD, instant verbal barge-in, multilingual Whisper STT, spoken-to discourse awareness, mock tool eradication, and microkernel streamlining.
+Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driver productivity, sub-50ms CLI execution, always-on voice capture by default, neural Silero VAD, instant verbal barge-in, multilingual Whisper STT, spoken-to discourse awareness, mock tool eradication, asynchronous gateway event-loop offloading, system resource diagnostics, and microkernel streamlining.
 
 ### 🌟 Added & Enhanced
+
+#### 🌐 High-Concurrency Async Gateway Offloading (`core/gateway.py`, `main.py`)
+- **Event Loop Offloading via `asyncio.to_thread`**: Offloaded synchronous DAG planning (`planner.plan_problem`) and natural speech synthesis (`planner.formulate_spoken_response`) inside `/api/v1/pipeline` and `/api/v1/pipeline/solve_sync` to background thread pools. Prevents blocking FastAPI's async event loop when local models (Ollama) or external LLMs take seconds to plan.
+- **Dynamic Port Beacon Resolution**: Multi-instance port fallbacks dynamically broadcast active ports over UDP `LANBeacon` via `CORE_PORT` environment variables.
+
+#### 🛰️ Intercontinental Mesh Latency Diagnostic Probe (`core/mesh_client.py`, `interfaces/cli/client.py`, `core.bat`, `core.sh`)
+- **Latency Diagnostic Probe (`core mesh ping`)**: Added sub-millisecond round-trip time measurements against configured main servers, reporting round-trip latency (ms), host model provider, and connected edge nodes.
+- **Cross-Platform ANSI Safety**: Implemented Windows CP1252 safe formatting and `sys.stdout.reconfigure(encoding="utf-8")` to prevent terminal encoding crashes across Windows CMD, PowerShell, and Linux.
+
+#### 📊 Sovereign System Resource Inspector (`tools/native/system_tools.py`, `brain/planner.py`, `main.py`)
+- **Hardware Vitals Tooling (`inspect_system_resources`)**: Introspects logical CPU core count, load averages (Unix), total/free/used disk metrics, and physical memory utilization.
+- **Deterministic DAG Heuristic Routing**: Natural language queries (*"system vitals"*, *"hardware health"*, *"disk space"*, *"festplatte"*, *"ram usage"*, *"speicher frei"*) bypass LLM inference entirely and execute in <10ms with bilingual German and English spoken summaries.
+
+#### 🔖 System Version Protocol (`interfaces/cli/client.py`, `core.bat`, `core.sh`)
+- **Version Matrix Command (`core version` / `-v` / `--version`)**: Added instant ASCII matrix displaying system kernel version (`v0.2.0-alpha`), Git commit SHA, node operational role (`EDGE_NODE` / `MAIN_SERVER`), gateway server URL, and AGPL-3.0 sovereignty guarantee.
+
+#### 🐧 Detached Linux Daemon Persistence (`core/service.py`)
+- **Session Isolation (`setsid`)**: Added `start_new_session=True` on POSIX hosts ensuring background daemons started via `core start` over SSH survive terminal hangups (SIGHUP) indefinitely.
 
 #### 🧹 Clean Slate Server Reset & Zero-Residue Purge (`interfaces/install/clean_setup.py`, `core.bat`, `core.sh`, `main.py`)
 - **Zero-Residue Clean State Wipe (`core clean` / `core reset`)**: Operators can now wipe all local SQLite database records (`core_ai.db`, WAL, SHM), credentials (`config/.env`), execution audit trails (`logs/*`), backup snapshots (`backups/*`), dynamically generated tools (`tools/dynamic/*.py`), and bytecode caches with a single command to perform a pristine Day-Zero setup on their server.
@@ -86,7 +104,7 @@ Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driv
 - **Dynamic Tool Artifact Cleanup**: Removed ephemeral test generation residue (`tools/dynamic/hash_string.py`).
 
 ### 🧪 Automated Verification
-- **118 / 118 Tests Passing**: Comprehensive test coverage across all subsystems including proactive countdown evaluation, hardware supervision, git inspection, notes persistence, and planner routing (`tests/test_proactive_and_dev_tools.py`).
+- **139 / 139 Tests Passing**: Comprehensive test coverage across all subsystems including system resource diagnostics, intercontinental mesh latency, version protocol, proactive countdown evaluation, hardware supervision, git inspection, notes persistence, and planner routing (`tests/test_v020_release.py`).
 
 ---
 

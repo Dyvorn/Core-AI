@@ -114,7 +114,8 @@ class Planner:
             "lock_workstation", "take_screenshot", "open_youtube", "open_path_in_explorer",
             "relocate_operator", "get_clipboard_text", "set_clipboard_text",
             "create_reminder", "create_vitals_watcher", "list_active_rules",
-            "cancel_proactive_rule", "get_git_status", "manage_notes", "factory_reset"
+            "cancel_proactive_rule", "get_git_status", "manage_notes", "factory_reset",
+            "inspect_system_resources"
         }
         is_routine_action = (
             len(heuristic_plan.steps) == 1 and
@@ -282,8 +283,22 @@ class Planner:
         elif any(k in goal_lower for k in ["lock workstation", "lock screen", "lock pc", "bildschirm sperren"]):
             steps.append(PipelineStep(id="lock_step", name="Lock Workstation", tool_name="lock_workstation", arguments={}, depends_on=[]))
 
+        # Pattern: System Resources & Hardware Vitals Inspection ("system vitals", "hardware health", "disk space", "ram usage")
+        elif any(k in goal_lower for k in [
+            "system vitals", "hardware health", "resource usage", "system resources",
+            "disk space", "festplatte", "disk usage", "ram usage", "speicher frei",
+            "cpu usage", "system auslastung", "hardware status", "vitals"
+        ]):
+            steps.append(PipelineStep(
+                id="inspect_resources_step",
+                name="Inspect System Resources",
+                tool_name="inspect_system_resources",
+                arguments={},
+                depends_on=[]
+            ))
+
         # Pattern: System diagnostics (Parallel execution of time + system status)
-        elif any(k in goal_lower for k in ["status", "system", "overview", "diagnos", "gesundheit", "wie geht"]) and not any(k in goal_lower for k in ["git"]):
+        elif any(k in goal_lower for k in ["status", "system", "overview", "diagnos", "gesundheit", "wie geht"]) and not any(k in goal_lower for k in ["git", "vitals", "hardware", "resource", "festplatte", "speicher"]):
             steps.append(PipelineStep(
                 id="get_time_step",
                 name="Fetch Current Time",
@@ -1016,6 +1031,25 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                 return f"Das System läuft stabil auf {os_name} ({arch}) mit Python {py_ver}{time_str}, {name}."
             else:
                 return f"Core AI is operational on {os_name} {arch} running Python {py_ver}, {name}."
+
+        # 2.5 System Hardware Resources
+        if "inspect_system_resources" in step_outputs:
+            res_info = step_outputs["inspect_system_resources"]
+            if isinstance(res_info, dict):
+                parts = []
+                if "cpu_percent" in res_info:
+                    parts.append(f"CPU: {res_info['cpu_percent']}%")
+                if "memory" in res_info:
+                    mem = res_info["memory"]
+                    parts.append(f"RAM: {mem.get('used_percent', 0)}% ({mem.get('available_gb', 0)} GB frei)")
+                if "disk" in res_info:
+                    d = res_info["disk"]
+                    parts.append(f"Festplatte: {d.get('free_gb', 0)} GB frei ({d.get('used_percent', 0)}% belegt)")
+                if parts:
+                    if language == "de":
+                        return f"Hardwarestatus: {', '.join(parts)}, {name}."
+                    else:
+                        return f"System vitals: {', '.join(parts)}, {name}."
 
         # 3. Math calculation
         if "calculate_math" in step_outputs:

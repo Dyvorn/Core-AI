@@ -1,14 +1,14 @@
 # Core AI -- Session Handover & Action Plan
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 128/128 TESTS PASSED ] [ PYTHON: 3.13+ ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 139/139 TESTS PASSED ] [ PYTHON: 3.13+ ]
 [ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]      [ VERSION: v0.2.0-alpha ]
 ```
 
-- **Date**: October 7, 2026  
+- **Date**: October 11, 2026  
 - **Lead Architect**: Dyvorn (*aka Vyrn / Refined*)  
 - **Release**: `v0.2.0-alpha` (Codename: "Precision & Flow")  
-- **System Status**: All 128 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
+- **System Status**: All 139 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
 
 ---
 
@@ -111,10 +111,11 @@ All technical fat and legacy prototype mocks have been eliminated in strict adhe
 ## Automated Verification Status
 
 ```text
-============================= 128 passed in 38.12s =============================
+============================= 139 passed in 35.92s =============================
 - tests/test_account.py (3)
 - tests/test_animation.py (4)
 - tests/test_bus.py (1)
+- tests/test_clean_setup.py (6)
 - tests/test_daily_driver.py (4)
 - tests/test_desktop_and_os_tools.py (4)
 - tests/test_dynamic_generator.py (4)
@@ -137,6 +138,7 @@ All technical fat and legacy prototype mocks have been eliminated in strict adhe
 - tests/test_settings_and_dashboard.py (2)
 - tests/test_spatial_audio.py (5)
 - tests/test_spoken_to.py (12)
+- tests/test_v020_release.py (5)
 - tests/test_voice_pipeline.py (12)
 ```
 

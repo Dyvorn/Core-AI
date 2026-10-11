@@ -31,7 +31,12 @@ from core.schemas import TextEvent, CommandEvent, AdaptiveResponseEvent, TTSRequ
 from core.context import ContextManager
 from core.state import StateManager
 from tools.registry import ToolRegistry
-from tools.native.system_tools import get_time, time_schema, get_system_status, factory_reset, factory_reset_schema
+from tools.native.system_tools import (
+    get_time, time_schema,
+    get_system_status, system_status_schema,
+    inspect_system_resources, system_resources_schema,
+    factory_reset, factory_reset_schema
+)
 from tools.native.file_tools import read_text_file, read_file_schema, write_text_file, write_file_schema, list_dir_contents, list_dir_schema
 from tools.native.math_tools import calculate_math, calculate_math_schema, summarize_numbers, summarize_numbers_schema
 from tools.native.network_tools import scan_local_network, scan_local_network_schema, inspect_lan_device, inspect_lan_device_schema
@@ -208,13 +213,9 @@ class OperatorRelocator:
 def setup_tools(state: Optional[StateManager] = None, relocator: Optional[OperatorRelocator] = None) -> ToolRegistry:
     registry = ToolRegistry(dynamic_dir="tools/dynamic")
     
-    # Register Native Tools
     registry.register_tool("get_time", get_time, time_schema)
-    registry.register_tool("get_system_status", get_system_status, {
-        "name": "get_system_status",
-        "description": "Get current operating system, distribution, and hardware architecture status",
-        "parameters": {"type": "object", "properties": {}}
-    })
+    registry.register_tool("get_system_status", get_system_status, system_status_schema)
+    registry.register_tool("inspect_system_resources", inspect_system_resources, system_resources_schema)
     registry.register_tool("factory_reset", factory_reset, factory_reset_schema)
     
     registry.register_tool("read_text_file", read_text_file, read_file_schema)
@@ -1410,6 +1411,8 @@ def main():
             port = found_port
         else:
             logger.error(f"Port {requested_port} and all fallback ports are occupied.")
+
+    os.environ["CORE_PORT"] = str(port)
 
     shutdown_event = threading.Event()
 

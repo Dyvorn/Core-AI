@@ -37,6 +37,9 @@ case "$COMMAND" in
     scan)
         "$PYTHON" -m core.mesh_client scan
         ;;
+    version|-v|--version)
+        "$PYTHON" interfaces/cli/client.py version
+        ;;
     config|settings)
         shift
         "$PYTHON" interfaces/cli/settings.py "$@"
@@ -111,6 +114,7 @@ case "$COMMAND" in
         echo "    models      - Dedicated easy AI model selector (interactive picker & roles)"
         echo "    dashboard   - Launch dedicated Sovereign Mesh Master Dashboard in browser"
         echo "    scan        - Scan local network for active Sovereign Main Servers"
+        echo "    version     - Display kernel version, codename, node role, and commit"
         echo "    account     - View Sovereign Operator Account identity & security card"
         echo "    clean       - Clean server state wipe (delete DB, config, logs; keep files/venv)"
         echo "    reset       - Clean slate factory reset back to Day-Zero"

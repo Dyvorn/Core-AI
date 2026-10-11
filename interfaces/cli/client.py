@@ -98,6 +98,32 @@ def main() -> int:
         run_clean_setup(interactive=True)
         return 0
 
+    if goal_text.lower() in ("version", "--version", "-v"):
+        from core import __version__
+        from core.updater import CoreUpdater
+        updater = CoreUpdater()
+        commit = updater.get_current_commit() or "dev"
+        try:
+            from core.mesh_client import MeshClient
+            mc = MeshClient()
+            role_str = mc.role.upper()
+            server_str = mc.main_server_url
+        except Exception:
+            role_str = "STANDALONE"
+            server_str = "http://localhost:8000"
+
+        print(f"\n{CYAN}+=====================================================================+{RESET}")
+        print(f"{CYAN}|{BOLD}   C.O.R.E. AI :: SYSTEM VERSION PROTOCOL                           {RESET}{CYAN}|{RESET}")
+        print(f"{CYAN}+=====================================================================+{RESET}")
+        print(f"{CYAN}|{RESET}   Version:          {GREEN}v{__version__}{RESET}")
+        print(f"{CYAN}|{RESET}   Codename:         Precision & Flow")
+        print(f"{CYAN}|{RESET}   Commit:           {YELLOW}{commit}{RESET}")
+        print(f"{CYAN}|{RESET}   Node Role:        {CYAN}{role_str}{RESET}")
+        print(f"{CYAN}|{RESET}   Mesh Server:      {server_str}")
+        print(f"{CYAN}|{RESET}   Sovereignty:      {GREEN}Zero Telemetry · 100% Local Compute · AGPL-3.0{RESET}")
+        print(f"{CYAN}+=====================================================================+{RESET}\n")
+        return 0
+
     # Normalize localhost to 127.0.0.1 to avoid Windows IPv6 DNS resolution latency
     target_host = "127.0.0.1" if args.host.lower() in ("localhost", "127.0.0.1") else args.host
     server_base_url = None

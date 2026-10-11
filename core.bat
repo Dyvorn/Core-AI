@@ -45,10 +45,16 @@ if /i "%~1"=="mesh" goto mesh
 if /i "%~1"=="clean" goto clean
 if /i "%~1"=="clean-setup" goto clean
 if /i "%~1"=="factory-reset" goto clean
-if /i "%~1"=="purge" goto clean
+if /i "%~1"=="version" goto version
+if /i "%~1"=="-v" goto version
+if /i "%~1"=="--version" goto version
 if /i "%~1"=="uninstall" goto uninstall
 
 goto quick_solve
+
+:version
+"%PYTHON%" interfaces\cli\client.py version
+goto :eof
 
 :logo
 "%PYTHON%" -u -m core.animation
@@ -175,6 +181,7 @@ echo     config      - System settings, operator identity, tone, ^& custom prefe
 echo     models      - Dedicated easy AI model selector (interactive picker ^& roles)
 echo     dashboard   - Launch dedicated Sovereign Mesh Master Dashboard in browser
 echo     scan        - Scan local network for active Sovereign Main Servers
+echo     version     - Display kernel version, codename, node role, and commit
 echo     clean       - Clean server state wipe (delete DB, config, logs; keep files/venv)
 echo     reset       - Clean slate factory reset back to Day-Zero
 echo     logo / anim - Launch interactive 3D Sovereign Core holographic viewer

@@ -183,8 +183,9 @@ def create_gateway_app(
         if os.getenv("CORE_DISABLE_DISCOVERY", "0") != "1":
             try:
                 from core.discovery import LANBeacon
+                configured_port = int(os.getenv("CORE_PORT", 8000))
                 beacon = LANBeacon(
-                    service_port=8000,
+                    service_port=configured_port,
                     server_info_provider=lambda: {
                         "active_user": state_manager.get_user_profile().preferred_name,
                         "active_model": planner.get_active_model() or "heuristic"
@@ -289,7 +290,7 @@ def create_gateway_app(
     @app.post("/api/v1/pipeline")
     async def submit_pipeline(request: PipelineSubmitRequest, background_tasks: BackgroundTasks):
         """Submit a problem / goal for the AI to decompose and solve."""
-        plan = planner.plan_problem(request.goal, request.context)
+        plan = await asyncio.to_thread(planner.plan_problem, request.goal, request.context)
         
         # Execute asynchronously in background
         async def run_plan():
@@ -319,10 +320,10 @@ def create_gateway_app(
     @app.post("/api/v1/pipeline/solve_sync")
     async def solve_pipeline_sync(request: PipelineSubmitRequest):
         """Synchronously decompose, execute, and return completed pipeline result."""
-        plan = planner.plan_problem(request.goal, request.context)
+        plan = await asyncio.to_thread(planner.plan_problem, request.goal, request.context)
         finished = await pipeline_engine.execute_pipeline(plan)
         profile = state_manager.get_user_profile()
-        spoken = planner.formulate_spoken_response(finished, profile=profile)
+        spoken = await asyncio.to_thread(planner.formulate_spoken_response, finished, profile=profile)
         return {
             "pipeline_id": finished.id,
             "status": finished.status,

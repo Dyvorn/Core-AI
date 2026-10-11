@@ -311,7 +311,8 @@ class ServiceManager:
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    creationflags=flags
+                    creationflags=flags,
+                    start_new_session=(os.name != "nt")
                 )
 
             self._save_pid(proc.pid)

@@ -12,7 +12,7 @@
 ```
 
 ```text
-[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.2.0-alpha ]  [ TESTS: 123/123 PASSED (100%) ]
+[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.2.0-alpha ]  [ TESTS: 139/139 PASSED (100%) ]
 [ LICENSE: AGPL-3.0-ONLY ]   [ ARCHITECTURE: ASYNC-DAG ] [ ETHOS: #ANTISLOP ]
 ```
 

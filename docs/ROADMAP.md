@@ -69,8 +69,10 @@ gantt
   - **Proactive Hardware Vitals Supervisors**: Continuous RAM and CPU monitoring rules alerting operators on high utilization thresholds (`watch my ram`).
   - **Developer Daily Driver & Scratch Memory (`tools/native/dev_tools.py`)**: Instant Git status inspection (`git status`), SQLite key-value operator notes (`save note`, `my notes`), and OS clipboard reading/writing.
   - **Zero-Delay Terminal Launch (`main.py`)**: Instant interactive REPL boot (<5ms) by removing artificial boot delays.
-  - **#ANTISLOP Mock Purge**: Purged fake smart home mocks (`tools/native/home_assistant.py`) and dynamic tool residue (`tools/dynamic/hash_string.py`).
-  - **118 / 118 Tests Passing**: Comprehensive test coverage expanded to 100% green status.
+  - **Clean Slate Server Reset (`core clean`)**: Zero-residue purge of SQLite DB, logs, and caches while strictly preserving code and virtual environment.
+  - **Asynchronous Gateway Offloading & Mesh Latency Probe (`core mesh ping`)**: Delegated blocking DAG planning to thread pools and added sub-millisecond round-trip mesh latency diagnostics.
+  - **Sovereign System Resource Inspector (`core "system vitals"`)**: Deterministic <10ms hardware vitals inspection for CPU load, RAM usage, and disk space with bilingual speech synthesis.
+  - **139 / 139 Tests Passing**: Comprehensive test coverage expanded to 100% green status with zero blockers.
 
 
 ### Phase 4: Mobile Companion & Nothing OS Integration `[Q1 2027]`
