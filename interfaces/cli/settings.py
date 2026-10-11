@@ -234,6 +234,131 @@ class SettingsCLI:
         self.state_manager.save_user_profile(profile)
         print(f"{GREEN}[OK] Mesh configuration updated: role='{clean_role}'{RESET}")
 
+    def edit_file(self, target: str = "config"):
+        """Opens configuration file in operator's system editor."""
+        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        t_lower = target.lower()
+        if t_lower in ("env", "keys", "secrets", ".env"):
+            file_path = os.path.join(root_dir, "config", ".env")
+        else:
+            file_path = os.path.join(root_dir, "config", "settings.yaml")
+
+        if not os.path.exists(file_path):
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write("# Core AI Sovereign Configuration\n")
+
+        editor = os.environ.get("EDITOR")
+        if not editor:
+            if os.name == "nt":
+                editor = "notepad.exe"
+            else:
+                for candidate in ["nano", "vim", "vi"]:
+                    import shutil
+                    if shutil.which(candidate):
+                        editor = candidate
+                        break
+                editor = editor or "nano"
+
+        print(f"{CYAN}[*] Opening {file_path} in {editor}...{RESET}")
+        import subprocess
+        subprocess.call([editor, file_path])
+
+    def list_audio_devices(self):
+        """Displays all host input (mic) and output (speaker) devices."""
+        from engines.audio_router import SpatialAudioRouter
+        router = SpatialAudioRouter(state_manager=self.state_manager)
+        devs = router.list_system_audio_devices()
+        profile = self.state_manager.get_user_profile()
+        audio_prefs = profile.preferences.get("audio", {})
+        active_mic = os.getenv("CORE_MIC_DEVICE", audio_prefs.get("mic_device"))
+        active_spk = os.getenv("CORE_SPEAKER_DEVICE", audio_prefs.get("speaker_device"))
+
+        print(f"\n{BRIGHT}=== Host Audio Input Interfaces (Microphones) [{len(devs['inputs'])}] ==={RESET}")
+        for d in devs["inputs"]:
+            is_active = " [ACTIVE]" if (active_mic is not None and (str(active_mic) == str(d['index']) or str(active_mic).lower() in d['name'].lower())) else ""
+            print(f"  [{d['index']:2d}] {d['name']} (Channels={d['max_input_channels']}, {d['default_samplerate']:.0f}Hz){GREEN}{is_active}{RESET}")
+
+        print(f"\n{BRIGHT}=== Host Audio Output Interfaces (Speakers) [{len(devs['outputs'])}] ==={RESET}")
+        for d in devs["outputs"]:
+            is_active = " [ACTIVE]" if (active_spk is not None and (str(active_spk) == str(d['index']) or str(active_spk).lower() in d['name'].lower())) else ""
+            print(f"  [{d['index']:2d}] {d['name']} (Channels={d['max_output_channels']}, {d['default_samplerate']:.0f}Hz){GREEN}{is_active}{RESET}")
+
+        print(f"\n  To set microphone:  {CYAN}core mic <index|name>{RESET}")
+        print(f"  To set speaker:     {CYAN}core speaker <index|name>{RESET}")
+        print(f"  To test microphone: {CYAN}core mic test{RESET}\n")
+
+    def set_mic(self, query: str):
+        """Sets active microphone device by index or substring name."""
+        from engines.audio_router import SpatialAudioRouter
+        router = SpatialAudioRouter(state_manager=self.state_manager)
+        dev_idx = int(query) if query.isdigit() else router.resolve_device_index(query, kind="input")
+        if dev_idx is None:
+            print(f"{RED}[!] Microphone '{query}' not found. Run 'core audio' to inspect devices.{RESET}")
+            return
+        profile = self.state_manager.get_user_profile()
+        if "audio" not in profile.preferences:
+            profile.preferences["audio"] = {}
+        profile.preferences["audio"]["mic_device"] = dev_idx
+        self.state_manager.save_user_profile(profile)
+        self.set_env_key("CORE_MIC_DEVICE", str(dev_idx))
+        print(f"{GREEN}[OK] Default microphone set to index [{dev_idx}].{RESET}")
+
+    def set_speaker(self, query: str):
+        """Sets active speaker device by index or substring name."""
+        from engines.audio_router import SpatialAudioRouter
+        router = SpatialAudioRouter(state_manager=self.state_manager)
+        dev_idx = int(query) if query.isdigit() else router.resolve_device_index(query, kind="output")
+        if dev_idx is None:
+            print(f"{RED}[!] Speaker '{query}' not found. Run 'core audio' to inspect devices.{RESET}")
+            return
+        profile = self.state_manager.get_user_profile()
+        if "audio" not in profile.preferences:
+            profile.preferences["audio"] = {}
+        profile.preferences["audio"]["speaker_device"] = dev_idx
+        self.state_manager.save_user_profile(profile)
+        self.set_env_key("CORE_SPEAKER_DEVICE", str(dev_idx))
+        print(f"{GREEN}[OK] Default speaker set to index [{dev_idx}].{RESET}")
+
+    def test_mic(self):
+        """Records 2.5 seconds of audio and displays a visual peak level meter."""
+        print(f"{CYAN}[*] Testing microphone for 3 seconds... speak into your mic now!{RESET}")
+        try:
+            import sounddevice as sd
+            import numpy as np
+            profile = self.state_manager.get_user_profile()
+            mic_id = profile.preferences.get("audio", {}).get("mic_device")
+            recorded = sd.rec(int(16000 * 3.0), samplerate=16000, channels=1, device=mic_id, dtype='float32')
+            sd.wait()
+            rms = float(np.sqrt(np.mean(recorded**2))) if len(recorded) > 0 else 0.0
+            peak = float(np.max(np.abs(recorded))) if len(recorded) > 0 else 0.0
+            pct = min(100, int((peak / 0.8) * 100))
+            bar = "█" * (pct // 5) + "░" * (20 - (pct // 5))
+            status = f"{GREEN}EXCELLENT{RESET}" if peak > 0.05 else (f"{YELLOW}QUIET{RESET}" if peak > 0.01 else f"{RED}NO SIGNAL{RESET}")
+            print(f"  Level: [{CYAN}{bar}{RESET}] Peak: {pct}% ({status}) | RMS: {rms:.4f}")
+        except Exception as e:
+            print(f"{RED}[!] Microphone test error: {e}{RESET}")
+
+    def set_env_key(self, key: str, value: str):
+        """Updates or sets an environment key in config/.env."""
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        env_path = os.path.join(root, "config", ".env")
+        lines = []
+        found = False
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith(f"{key}=") or line.startswith(f"export {key}="):
+                        lines.append(f"{key}={value}\n")
+                        found = True
+                    else:
+                        lines.append(line)
+        if not found:
+            lines.append(f"{key}={value}\n")
+        os.makedirs(os.path.dirname(env_path), exist_ok=True)
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+
 
 def main():
     cli = SettingsCLI()
@@ -241,6 +366,27 @@ def main():
 
     if not args or args[0] in ["status", "overview", "show", "info"]:
         cli.print_settings_overview()
+    elif args[0] in ["edit"]:
+        target = args[1] if len(args) > 1 else "config"
+        cli.edit_file(target)
+    elif args[0] in ["audio", "mics", "speakers"]:
+        cli.list_audio_devices()
+    elif args[0] in ["mic"]:
+        if len(args) == 1 or args[1] in ["list", "show"]:
+            cli.list_audio_devices()
+        elif args[1] in ["test"]:
+            cli.test_mic()
+        elif args[1] in ["set"] and len(args) >= 3:
+            cli.set_mic(" ".join(args[2:]))
+        elif len(args) >= 2:
+            cli.set_mic(" ".join(args[1:]))
+    elif args[0] in ["speaker"]:
+        if len(args) == 1 or args[1] in ["list", "show"]:
+            cli.list_audio_devices()
+        elif args[1] in ["set"] and len(args) >= 3:
+            cli.set_speaker(" ".join(args[2:]))
+        elif len(args) >= 2:
+            cli.set_speaker(" ".join(args[1:]))
     elif args[0] in ["model", "models"]:
         if len(args) == 1 or args[1] in ["select", "picker", "choose"]:
             cli.interactive_model_selector()

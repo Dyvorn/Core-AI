@@ -15,6 +15,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [[0.2.1-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.2.1-alpha) — 2026-10-11
+### Codename: "Ubiquitous Mesh & Linux Polish"
+
+| Kernel | Status | Verification | Ethos |
+| :---: | :---: | :---: | :---: |
+| **`v0.2.1-alpha`** | 🟢 **OPERATIONAL** | 🧪 **144 / 144 PASSED** | 🛡️ **#ANTISLOP** |
+
+Linux terminal rendering overhaul, multi-machine ambient voice satellite mesh, dynamic mic/speaker hardware introspection, zero-slop configuration editing, and git permission hardening.
+
+### 🌟 Added & Enhanced
+
+#### 🐧 Linux Terminal Rendering & Readline ANSI Code Alignment (`core/terminal.py`, `main.py`)
+- **Readline Escape Sequence Shielding (`make_readline_safe_prompt`)**: Wraps ANSI color codes in `\001` (`RL_PROMPT_START_IGNORE`) and `\002` (`RL_PROMPT_END_IGNORE`) control markers on POSIX hosts. Completely eliminates erratic cursor misalignment, phantom line-wraps, and corrupted backspaces caused by GNU Readline counting non-printable styling bytes.
+- **Dynamic Pixel-Perfect Box Matrix (`render_box`)**: Calculates visual line widths using `strip_ansi` to guarantee perfectly symmetrical, closed Unicode borders across both Windows Terminal and Linux console sessions.
+
+#### 🎙️ Distributed Voice Satellite & Multi-Machine Audio Mesh (`interfaces/voice/satellite.py`, `core/gateway.py`, `main.py`)
+- **Dedicated Voice Satellite Daemon (`core satellite` / `core.sh satellite` / `core.bat satellite`)**: Allows any connected edge machine (laptop, desktop PC, Raspberry Pi / SBC) to act as an ambient voice station. Performs local Silero VAD + Faster-Whisper transcription, checks Spoken-To discourse filters, offloads DAG reasoning to the central server (Ollama / Cloud LLM), and speaks synthesized responses out of the local machine's speakers.
+- **Universal Voice Gateway Transcription Endpoint (`POST /api/v1/voice/transcription`)**: Central gateway endpoint receiving audio transcripts from any edge device, running non-blocking DAG execution via `asyncio.to_thread`, and returning spoken responses.
+- **Automatic Edge Node Voice Routing (`main.py`)**: Spoken queries captured while running in `edge_node` mode automatically route across the mesh to the primary reasoning server instead of failing on local model unavailability.
+
+#### 🎛️ Dynamic Audio Device Management & Diagnostics (`interfaces/cli/settings.py`, `main.py`, `core.sh`, `core.bat`)
+- **Device Introspection & Switching (`core audio`, `core mic`, `core speaker`)**: List, switch, and inspect all input microphones and output speakers dynamically with hardware sample rates and host APIs.
+- **Interactive Audio Probing (`mic test`, `speaker test`)**: Quick hardware testing to verify capture levels and speaker output without restarting the daemon.
+
+#### 📝 Zero-Slop Configuration Management (`interfaces/cli/settings.py`, `interfaces/cli/client.py`)
+- **Direct System Editor Launch (`core edit config`, `core edit env`)**: Opens configuration files directly in the operator's preferred `$EDITOR` (Nano, Vim, VS Code, or Notepad) with automatic validation.
+- **Interactive Configuration Explorer (`core config`)**: Displays current network, model, audio, and storage preferences with quick-toggle switches.
+
+#### 🛡️ Git & Shell Script Permission Hardening (`.gitattributes`, `core.sh`)
+- **Universal LF Enforcement (`.gitattributes`)**: Normalizes line endings (`*.sh text eol=lf`) repository-wide, preventing Windows CRLF git conversions from dirtying trees or failing bash execution on Debian/Ubuntu.
+- **Pre-Pull Safeguard & Executable Perms (`core.sh update`)**: Automatically cleans untracked/modified script stubs and restores `chmod +x` executable permissions post-update.
+
+---
+
 ## [[0.2.0-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.2.0-alpha) — 2026-10-07
 ### Codename: "Precision & Flow"
 

@@ -388,22 +388,29 @@ class ServiceManager:
         except ImportError:
             G = C = Y = R = B = RST = ""
 
-        print(f"\n{C}+=====================================================================+{RST}")
-        print(f"{C}|{B}   CORE AI :: DAEMON & GATEWAY STATUS CARD                           {RST}{C}|{RST}")
-        print(f"{C}+=====================================================================+{RST}")
+        from core.terminal import render_box
         daemon_str = f"{G}ONLINE (PID {info['pid']}){RST}" if running else f"{Y}OFFLINE{RST}"
         watchdog_str = f"{G}ONLINE (PID {info['watchdog_pid']}, Self-Healing){RST}" if info.get("watchdog_running") else f"{Y}STANDALONE (No Watchdog){RST}"
         lan_ip = self.get_lan_ip()
         lan_suffix = f" | LAN: http://{lan_ip}:{port}" if lan_ip and lan_ip != "127.0.0.1" else ""
         gateway_str = f"{G}ONLINE (http://localhost:{port}{lan_suffix}){RST}" if gw_ok else f"{Y}OFFLINE{RST}"
-        print(f"{C}|{RST}   Daemon Process:       {daemon_str}")
-        print(f"{C}|{RST}   Watchdog Supervisor:  {watchdog_str}")
-        print(f"{C}|{RST}   Universal Gateway:    {gateway_str}")
+
+        rows = [
+            ("Daemon Process:", daemon_str),
+            ("Watchdog Supervisor:", watchdog_str),
+            ("Universal Gateway:", gateway_str)
+        ]
         if gw_ok and isinstance(details, dict):
-            print(f"{C}|{RST}   Active Operator:      {G}{details.get('active_user', 'N/A')}{RST}")
-            print(f"{C}|{RST}   Active Model:         {C}{details.get('active_model', 'N/A')}{RST}")
-            print(f"{C}|{RST}   Connected Nodes:      {Y}{len(details.get('connected_edge_nodes', []))}{RST}")
-        print(f"{C}+=====================================================================+{RST}\n")
+            rows.append(("Active Operator:", f"{G}{details.get('active_user', 'N/A')}{RST}"))
+            rows.append(("Active Model:", f"{C}{details.get('active_model', 'N/A')}{RST}"))
+            rows.append(("Connected Nodes:", f"{Y}{len(details.get('connected_edge_nodes', []))}{RST}"))
+
+        card = render_box(
+            title="CORE AI :: DAEMON & GATEWAY STATUS CARD",
+            rows=rows,
+            width=71
+        )
+        print(f"\n{card}\n")
 
     @classmethod
     def get_system_metrics(

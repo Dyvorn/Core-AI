@@ -98,9 +98,54 @@ def main() -> int:
         run_clean_setup(interactive=True)
         return 0
 
+    if goal_text.lower().startswith("satellite"):
+        from interfaces.voice.satellite import VoiceSatellite
+        sat_args = args.goal[1:] if len(args.goal) > 1 else []
+        sat = VoiceSatellite()
+        return sat.run()
+
+    if goal_text.lower().startswith("audio") or goal_text.lower().startswith("mics") or goal_text.lower().startswith("speakers"):
+        from interfaces.cli.settings import SettingsCLI
+        SettingsCLI().list_audio_devices()
+        return 0
+
+    if goal_text.lower().startswith("mic"):
+        from interfaces.cli.settings import SettingsCLI
+        cli = SettingsCLI()
+        parts = goal_text.split(maxsplit=2)
+        if len(parts) == 1:
+            cli.list_audio_devices()
+        elif parts[1] == "test":
+            cli.test_mic()
+        elif parts[1] == "set" and len(parts) > 2:
+            cli.set_mic(parts[2])
+        else:
+            cli.set_mic(" ".join(parts[1:]))
+        return 0
+
+    if goal_text.lower().startswith("speaker"):
+        from interfaces.cli.settings import SettingsCLI
+        cli = SettingsCLI()
+        parts = goal_text.split(maxsplit=2)
+        if len(parts) == 1:
+            cli.list_audio_devices()
+        elif parts[1] == "set" and len(parts) > 2:
+            cli.set_speaker(parts[2])
+        else:
+            cli.set_speaker(" ".join(parts[1:]))
+        return 0
+
+    if goal_text.lower().startswith("edit"):
+        from interfaces.cli.settings import SettingsCLI
+        parts = goal_text.split(maxsplit=1)
+        target = parts[1] if len(parts) > 1 else "config"
+        SettingsCLI().edit_file(target)
+        return 0
+
     if goal_text.lower() in ("version", "--version", "-v"):
-        from core import __version__
+        from core import __version__, __codename__
         from core.updater import CoreUpdater
+        from core.terminal import render_box
         updater = CoreUpdater()
         commit = updater.get_current_commit() or "dev"
         try:
@@ -112,16 +157,19 @@ def main() -> int:
             role_str = "STANDALONE"
             server_str = "http://localhost:8000"
 
-        print(f"\n{CYAN}+=====================================================================+{RESET}")
-        print(f"{CYAN}|{BOLD}   C.O.R.E. AI :: SYSTEM VERSION PROTOCOL                           {RESET}{CYAN}|{RESET}")
-        print(f"{CYAN}+=====================================================================+{RESET}")
-        print(f"{CYAN}|{RESET}   Version:          {GREEN}v{__version__}{RESET}")
-        print(f"{CYAN}|{RESET}   Codename:         Precision & Flow")
-        print(f"{CYAN}|{RESET}   Commit:           {YELLOW}{commit}{RESET}")
-        print(f"{CYAN}|{RESET}   Node Role:        {CYAN}{role_str}{RESET}")
-        print(f"{CYAN}|{RESET}   Mesh Server:      {server_str}")
-        print(f"{CYAN}|{RESET}   Sovereignty:      {GREEN}Zero Telemetry · 100% Local Compute · AGPL-3.0{RESET}")
-        print(f"{CYAN}+=====================================================================+{RESET}\n")
+        card = render_box(
+            title="C.O.R.E. AI :: SYSTEM VERSION PROTOCOL",
+            rows=[
+                ("Version:", f"{GREEN}v{__version__}{RESET}"),
+                ("Codename:", f"{CYAN}{__codename__}{RESET}"),
+                ("Commit:", f"{YELLOW}{commit}{RESET}"),
+                ("Node Role:", f"{CYAN}{role_str}{RESET}"),
+                ("Mesh Server:", server_str),
+                ("Sovereignty:", f"{GREEN}Zero Telemetry · 100% Local Compute · AGPL-3.0{RESET}")
+            ],
+            width=71
+        )
+        print(f"\n{card}\n")
         return 0
 
     # Normalize localhost to 127.0.0.1 to avoid Windows IPv6 DNS resolution latency

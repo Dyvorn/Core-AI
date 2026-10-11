@@ -30,6 +30,13 @@ if /i "%~1"=="vitals" goto metrics
 if /i "%~1"=="scan" goto scan
 if /i "%~1"=="config" goto config
 if /i "%~1"=="settings" goto config
+if /i "%~1"=="edit" goto edit
+if /i "%~1"=="audio" goto audio
+if /i "%~1"=="mics" goto audio
+if /i "%~1"=="speakers" goto audio
+if /i "%~1"=="mic" goto mic
+if /i "%~1"=="speaker" goto speaker
+if /i "%~1"=="satellite" goto satellite
 if /i "%~1"=="dashboard" goto dashboard
 if /i "%~1"=="ui" goto dashboard
 if /i "%~1"=="models" goto models
@@ -53,6 +60,30 @@ if /i "%~1"=="--version" goto version
 if /i "%~1"=="uninstall" goto uninstall
 
 goto quick_solve
+
+:edit
+shift
+"%PYTHON%" interfaces\cli\settings.py edit %1 %2 %3 %4 %5
+goto :eof
+
+:audio
+"%PYTHON%" interfaces\cli\settings.py audio
+goto :eof
+
+:mic
+shift
+"%PYTHON%" interfaces\cli\settings.py mic %1 %2 %3 %4 %5
+goto :eof
+
+:speaker
+shift
+"%PYTHON%" interfaces\cli\settings.py speaker %1 %2 %3 %4 %5
+goto :eof
+
+:satellite
+shift
+"%PYTHON%" interfaces\voice\satellite.py %1 %2 %3 %4 %5 %6 %7 %8 %9
+goto :eof
 
 :version
 "%PYTHON%" interfaces\cli\client.py version

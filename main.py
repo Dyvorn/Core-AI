@@ -84,6 +84,9 @@ from brain.spatial_handoff import SpatialHandoffEngine
 from engines.voice_in import VoiceInEngine
 from engines.voice_out import VoiceOutEngine
 
+from core import __version__, __codename__
+from core.terminal import render_box, make_readline_safe_prompt
+
 logger = logging.getLogger("CoreAI.Main")
 
 try:
@@ -124,13 +127,18 @@ def play_boot_sequence(skip_anim: bool = True):
     print(f"{CYAN}-----------------------------------------------------------------------{RESET}\n", flush=True)
 
 def print_banner(operator_name: str, zone: str, port: int):
-    print(f"{CYAN}+=====================================================================+{RESET}", flush=True)
-    print(f"{CYAN}|{BRIGHT}   C.O.R.E. AI :: CONCURRENT OMNIPRESENT REASONING ENGINE            {RESET}{CYAN}|{RESET}", flush=True)
-    print(f"{CYAN}|{RESET}   v0.2.0-alpha [Precision & Flow] - Sovereign Ubiquitous Life OS       {CYAN}|{RESET}", flush=True)
-    print(f"{CYAN}+=====================================================================+{RESET}", flush=True)
-    print(f"{CYAN}|{RESET}   Operator: {GREEN}{operator_name:<16}{RESET} Zone: {YELLOW}{zone:<16}{RESET} Status: {GREEN}ONLINE       {RESET}{CYAN}|{RESET}", flush=True)
-    print(f"{CYAN}|{RESET}   Gateway:  {CYAN}http://localhost:{port:<5}{RESET} API Docs: {CYAN}/docs{RESET} WebSocket: {CYAN}/ws/events{RESET}   {CYAN}|{RESET}", flush=True)
-    print(f"{CYAN}+=====================================================================+{RESET}\n", flush=True)
+    card = render_box(
+        title="C.O.R.E. AI :: CONCURRENT OMNIPRESENT REASONING ENGINE",
+        rows=[
+            ("Edition:", f"{CYAN}v{__version__} [{__codename__}] - Sovereign Life OS{RESET}"),
+            ("Operator:", f"{GREEN}{operator_name}{RESET}"),
+            ("Spatial Zone:", f"{YELLOW}{zone}{RESET}"),
+            ("Universal Gateway:", f"{CYAN}http://localhost:{port}{RESET}"),
+            ("API & WebSockets:", f"/docs · /ws/events · /ws/nodes")
+        ],
+        width=71
+    )
+    print(f"\n{card}\n", flush=True)
     print(f"{MAGENTA}Type any goal to solve it, or type 'help' for built-in commands.{RESET}\n", flush=True)
 
 def print_help():
@@ -480,7 +488,8 @@ def run_interactive_repl(
 
     def get_prompt() -> str:
         mic_ind = f" {GREEN}[MIC:ON]{RESET}" if (voice_in and voice_in.is_recording) else f" {YELLOW}[MIC:OFF]{RESET}"
-        return f"{CYAN}Core{RESET} [{GREEN}{active_name}{RESET}@{YELLOW}{active_zone}{RESET}{mic_ind}] {BRIGHT}>{RESET} "
+        raw = f"{CYAN}Core{RESET} [{GREEN}{active_name}{RESET}@{YELLOW}{active_zone}{RESET}{mic_ind}] {BRIGHT}>{RESET} "
+        return make_readline_safe_prompt(raw)
 
     def on_speech(text: str):
         nonlocal active_zone
@@ -512,7 +521,26 @@ def run_interactive_repl(
                 voice_out.synthesize_and_play(dec.autonomous_response, blocking=False)
             print(get_prompt(), end="", flush=True)
             return
+
         target_cmd = dec.clean_command or text
+
+        # If running as edge_node, dispatch voice goal centrally to main server across the mesh
+        if mesh_client and mesh_client.role == "edge_node":
+            mesh_res = mesh_client.execute_over_mesh(
+                goal=target_cmd,
+                context={"zone": active_zone, "operator": active_name, "source_node": mesh_client.node_id}
+            )
+            if mesh_res.get("execution_mode") == "remote_main_server":
+                res_data = mesh_res.get("result", {})
+                spoken = res_data.get("spoken_response") or res_data.get("final_output") or "Task completed."
+                if isinstance(spoken, dict):
+                    spoken = spoken.get("message") or spoken.get("status") or str(spoken)
+                print(f"{CYAN}Core AI [Remote]:{RESET} {spoken}\n")
+                if voice_out:
+                    voice_out.synthesize_and_play(str(spoken), blocking=False)
+                print(get_prompt(), end="", flush=True)
+                return
+
         plan = planner.plan_problem(target_cmd, context={"zone": active_zone, "operator": active_name})
         finished = asyncio.run(engine.execute_pipeline(plan))
         for s in finished.steps:
@@ -585,20 +613,82 @@ def run_interactive_repl(
                 print(f"  Gateway:      {GREEN}http://localhost:{port}{RESET}")
                 print()
 
-            elif cmd_lower == "audio":
+            elif cmd_lower in ["audio", "mics", "speakers"]:
                 devs = audio_router.list_system_audio_devices()
-                print(f"\n{BRIGHT}--- Connected Audio Inputs ({len(devs['inputs'])}) ---{RESET}")
-                for d in devs["inputs"][:8]:
-                    print(f"  [{d['index']:2d}] [MIC] {d['name']} (channels={d['max_input_channels']})")
-                print(f"\n{BRIGHT}--- Connected Audio Outputs ({len(devs['outputs'])}) ---{RESET}")
-                for d in devs["outputs"][:8]:
-                    print(f"  [{d['index']:2d}] [SPK] {d['name']} (channels={d['max_output_channels']})")
+                cur_in = getattr(voice_in, "input_device", None)
+                cur_out = getattr(voice_out, "output_device", None)
+                print(f"\n{BRIGHT}--- Connected Audio Inputs / Microphones ({len(devs['inputs'])}) ---{RESET}")
+                for d in devs["inputs"][:12]:
+                    is_act = " [ACTIVE]" if (cur_in is not None and (cur_in == d['index'] or str(cur_in) == str(d['index']))) else ""
+                    print(f"  [{d['index']:2d}] [MIC] {d['name']} (ch={d['max_input_channels']}, rate={d['default_samplerate']:.0f}Hz){GREEN}{is_act}{RESET}")
+                print(f"\n{BRIGHT}--- Connected Audio Outputs / Speakers ({len(devs['outputs'])}) ---{RESET}")
+                for d in devs["outputs"][:12]:
+                    is_act = " [ACTIVE]" if (cur_out is not None and (cur_out == d['index'] or str(cur_out) == str(d['index']))) else ""
+                    print(f"  [{d['index']:2d}] [SPK] {d['name']} (ch={d['max_output_channels']}, rate={d['default_samplerate']:.0f}Hz){GREEN}{is_act}{RESET}")
                 routes = state.list_all_audio_routes()
                 if routes:
                     print(f"\n{BRIGHT}--- Configured Zone Audio Routes ({len(routes)}) ---{RESET}")
                     for r in routes:
                         print(f"  - {YELLOW}{r.zone_id:<18}{RESET} : Mic='{r.input_device_name}' | Speaker='{r.output_device_name}'")
-                print()
+                print(f"\n  To switch device:  {CYAN}mic set <index|name>{RESET}  or  {CYAN}speaker set <index|name>{RESET}\n")
+
+            elif cmd_lower.startswith("mic set "):
+                val = user_input.split(maxsplit=2)[2].strip()
+                dev_idx = int(val) if val.isdigit() else audio_router.resolve_device_index(val, kind="input")
+                if dev_idx is None:
+                    print(f"{RED}[!] Microphone '{val}' not found. Type 'audio' to inspect available devices.{RESET}\n")
+                else:
+                    if voice_in:
+                        was_rec = voice_in.is_recording
+                        voice_in.stop()
+                        voice_in.input_device = dev_idx
+                        if was_rec:
+                            voice_in.start_listening(callback=on_speech)
+                    prof = state.get_user_profile()
+                    if "audio" not in prof.preferences:
+                        prof.preferences["audio"] = {}
+                    prof.preferences["audio"]["mic_device"] = dev_idx
+                    state.save_user_profile(prof)
+                    print(f"{GREEN}[OK] Active microphone switched to device index [{dev_idx}].{RESET}\n")
+
+            elif cmd_lower in ["mic test", "test mic"]:
+                print(f"{CYAN}[*] Testing active microphone for 3 seconds... speak into your mic now!{RESET}")
+                try:
+                    import sounddevice as sd
+                    cur_in = getattr(voice_in, "input_device", None)
+                    rec_rate = getattr(voice_in, "hw_samplerate", 16000)
+                    recorded = sd.rec(int(rec_rate * 3.0), samplerate=rec_rate, channels=1, device=cur_in, dtype='float32')
+                    sd.wait()
+                    rms = float(np.sqrt(np.mean(recorded**2))) if len(recorded) > 0 else 0.0
+                    peak = float(np.max(np.abs(recorded))) if len(recorded) > 0 else 0.0
+                    pct = min(100, int((peak / 0.8) * 100))
+                    bar = "█" * (pct // 5) + "░" * (20 - (pct // 5))
+                    status_lbl = f"{GREEN}EXCELLENT{RESET}" if peak > 0.05 else (f"{YELLOW}QUIET{RESET}" if peak > 0.01 else f"{RED}NO SIGNAL{RESET}")
+                    print(f"  Level: [{CYAN}{bar}{RESET}] Peak: {pct}% ({status_lbl}) | RMS: {rms:.4f}\n")
+                except Exception as test_err:
+                    print(f"{RED}[!] Mic test error: {test_err}{RESET}\n")
+
+            elif cmd_lower.startswith("speaker set "):
+                val = user_input.split(maxsplit=2)[2].strip()
+                dev_idx = int(val) if val.isdigit() else audio_router.resolve_device_index(val, kind="output")
+                if dev_idx is None:
+                    print(f"{RED}[!] Speaker '{val}' not found. Type 'audio' to inspect available devices.{RESET}\n")
+                else:
+                    if voice_out:
+                        voice_out.output_device = dev_idx
+                    prof = state.get_user_profile()
+                    if "audio" not in prof.preferences:
+                        prof.preferences["audio"] = {}
+                    prof.preferences["audio"]["speaker_device"] = dev_idx
+                    state.save_user_profile(prof)
+                    print(f"{GREEN}[OK] Active speaker switched to device index [{dev_idx}].{RESET}\n")
+
+            elif cmd_lower in ["speaker test", "test speaker"]:
+                if voice_out:
+                    print(f"{CYAN}[*] Synthesizing speech test on active speaker...{RESET}")
+                    voice_out.synthesize_and_play(f"Audio playback verified, {active_name}.", blocking=False)
+                else:
+                    print(f"{YELLOW}[!] VoiceOut engine is not active.{RESET}\n")
 
             elif cmd_lower.startswith("handoff ") or cmd_lower.startswith("relocate "):
                 target_z = user_input.split(maxsplit=1)[1].strip()

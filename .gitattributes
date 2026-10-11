@@ -1,0 +1,38 @@
+# Core AI :: Git Attributes & Line Ending Standardization
+# Prevents line ending conflicts between Windows and Linux hosts
+
+# Default to auto text handling
+* text=auto
+
+# Shell scripts must always use LF on all operating systems
+*.sh text eol=lf
+install.sh text eol=lf
+core.sh text eol=lf
+
+# Windows scripts
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Source code and config files
+*.py text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.ini text eol=lf
+
+# Binary files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.onnx binary
+*.bin binary
+*.pt binary
+*.pth binary
+*.wav binary
+*.mp3 binary
+*.png binary
+*.jpg binary
+*.ico binary

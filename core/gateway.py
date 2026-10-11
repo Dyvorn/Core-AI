@@ -21,6 +21,7 @@ from core.schemas import (
 )
 from core.state import StateManager
 from core.bus import EventBus
+from core import __version__, __codename__
 from tools.registry import ToolRegistry
 from brain.planner import Planner
 from brain.pipeline_engine import PipelineEngine
@@ -129,6 +130,12 @@ class SpokenToEvaluateRequest(BaseModel):
     utterance: str
     zone: Optional[str] = None
 
+class VoiceTranscriptionRequest(BaseModel):
+    utterance: str
+    source_node: Optional[str] = "edge_satellite"
+    zone: Optional[str] = "office"
+    operator: Optional[str] = None
+
 
 def create_gateway_app(
     state_manager: StateManager,
@@ -206,7 +213,7 @@ def create_gateway_app(
 
     app = FastAPI(
         title="Core AI Universal Gateway",
-        version="0.2.0-alpha",
+        version=__version__,
         description="C.O.R.E. (Concurrent Omnipresent Reasoning Engine) - Protocol-Agnostic Edge Gateway for Smart Mirrors, Vehicles, Phones, Glasses, and Homelab.",
         lifespan=lifespan
     )
@@ -240,8 +247,8 @@ def create_gateway_app(
         profile = state_manager.get_user_profile()
         return {
             "status": "online",
-            "version": "0.2.0-alpha",
-            "codename": "Precision & Flow",
+            "version": __version__,
+            "codename": __codename__,
             "acronym": "Concurrent Omnipresent Reasoning Engine",
             "active_user": profile.preferred_name,
             "platform": platform.system(),
@@ -516,6 +523,62 @@ def create_gateway_app(
         profile = state_manager.get_user_profile()
         decision = spoken_to.evaluate(req.utterance, profile=profile)
         return decision.model_dump()
+
+    @app.post("/api/v1/voice/transcription")
+    async def process_voice_transcription(req: VoiceTranscriptionRequest):
+        """
+        Universal Distributed Voice Perception Endpoint:
+        Receives transcribed speech from any edge satellite, phone, or connected PC.
+        Applies Discourse Reasoning, executes the DAG pipeline asynchronously,
+        and returns the natural spoken response.
+        """
+        profile = state_manager.get_user_profile()
+        decision = await asyncio.to_thread(spoken_to.evaluate, req.utterance, profile=profile)
+
+        if decision.action_type == "interrupt":
+            return {
+                "status": "interrupted",
+                "should_respond": False,
+                "action_type": "interrupt",
+                "spoken_response": "Stopped."
+            }
+
+        if not decision.should_respond:
+            return {
+                "status": "ignored",
+                "should_respond": False,
+                "role": decision.discourse_role.value,
+                "spoken_response": None
+            }
+
+        target_cmd = decision.clean_command or req.utterance
+        context = {
+            "zone": req.zone or profile.preferences.get("primary_space", "office"),
+            "operator": req.operator or profile.preferred_name,
+            "source_node": req.source_node,
+            "via": "gateway_voice_transcription"
+        }
+
+        plan = await asyncio.to_thread(planner.plan_problem, target_cmd, context)
+        finished = await pipeline_engine.execute_pipeline(plan)
+        spoken = await asyncio.to_thread(planner.formulate_spoken_response, finished, profile=profile)
+
+        # Broadcast HUD notification card to ambient displays
+        await connection_manager.broadcast_event("hud_card", {
+            "title": f"Core AI - {req.source_node}",
+            "body": spoken,
+            "accent_color": "#00ffcc" if finished.status == "completed" else "#ff3366",
+            "zone": context["zone"]
+        })
+
+        return {
+            "status": finished.status,
+            "should_respond": True,
+            "spoken_response": spoken,
+            "final_output": finished.final_output,
+            "pipeline_id": finished.id,
+            "role": decision.discourse_role.value
+        }
 
     @app.get("/api/v1/logs")
 

@@ -6,6 +6,8 @@ import logging
 import threading
 from typing import Dict, Any, List, Optional, Tuple, Callable
 
+from core import __version__
+
 logger = logging.getLogger("CoreAI.Discovery")
 
 DISCOVERY_PORT = int(os.getenv("CORE_DISCOVERY_PORT", 8008))
@@ -57,7 +59,7 @@ class LANBeacon:
         return {
             "magic": DISCOVERY_MAGIC_RESP,
             "service": "core_ai_gateway",
-            "version": "0.2.0-alpha",
+            "version": __version__,
             "hostname": socket.gethostname(),
             "lan_ip": lan_ip,
             "port": self.service_port,

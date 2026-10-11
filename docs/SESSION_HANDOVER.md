@@ -1,14 +1,14 @@
 # Core AI -- Session Handover & Action Plan
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 139/139 TESTS PASSED ] [ PYTHON: 3.13+ ]
-[ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]      [ VERSION: v0.2.0-alpha ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 144/144 TESTS PASSED ] [ PYTHON: 3.13+ ]
+[ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]      [ VERSION: v0.2.1-alpha ]
 ```
 
 - **Date**: October 11, 2026  
 - **Lead Architect**: Dyvorn (*aka Vyrn / Refined*)  
-- **Release**: `v0.2.0-alpha` (Codename: "Precision & Flow")  
-- **System Status**: All 139 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
+- **Release**: `v0.2.1-alpha` (Codename: "Ubiquitous Mesh & Linux Polish")  
+- **System Status**: All 144 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
 
 ---
 

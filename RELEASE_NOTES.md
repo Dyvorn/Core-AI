@@ -1,5 +1,5 @@
 # C.O.R.E. AI :: SYSTEM RELEASE PROTOCOL
-### KERNEL PROTOCOL v0.2.0-alpha // CODENAME: "PRECISION & FLOW"
+### KERNEL PROTOCOL v0.2.1-alpha // CODENAME: "UBIQUITOUS MESH & LINUX POLISH"
 
 ```text
    ______ ____  ____  ______   ___    ____
@@ -13,7 +13,7 @@ CONCURRENT OMNIPRESENT REASONING ENGINE // SOVEREIGN LIFE OS
 
 | Kernel Version | Operational Status | Verification | Sovereign Ethos |
 | :---: | :---: | :---: | :---: |
-| **`v0.2.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **139 / 139 PASSED** | 🛡️ **#ANTISLOP** |
+| **`v0.2.1-alpha`** | 🟢 **OPERATIONAL** | 🧪 **144 / 144 PASSED** | 🛡️ **#ANTISLOP** |
 
 | Mesh Storage | Cryptography | Telemetry | License |
 | :---: | :---: | :---: | :---: |

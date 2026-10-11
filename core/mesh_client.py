@@ -292,7 +292,7 @@ def main():
             print(f"{G}[+] Server Status: ONLINE (Latency: {latency:.2f} ms){RST}")
             print(f"    Operator: {G}{data.get('active_user', 'Operator')}{RST} | Platform: {data.get('platform', 'N/A')} | Model: {C}{data.get('active_model', 'N/A')}{RST}")
             nodes = data.get("connected_edge_nodes", [])
-            print(f"    Connected Edge Nodes: {len(nodes)} | Version: {data.get('version', '0.2.0-alpha')}\n")
+            print(f"    Connected Edge Nodes: {len(nodes)} | Version: {data.get('version', 'unknown')}\n")
         else:
             print(f"{R}[-] Server Status: UNREACHABLE ({data.get('error', 'offline')}){RST}")
             print(f"    Latency Probe: {latency:.2f} ms")

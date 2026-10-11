@@ -46,6 +46,25 @@ case "$COMMAND" in
         shift
         "$PYTHON" interfaces/cli/settings.py "$@"
         ;;
+    edit)
+        shift
+        "$PYTHON" interfaces/cli/settings.py edit "$@"
+        ;;
+    audio|mics|speakers)
+        "$PYTHON" interfaces/cli/settings.py audio
+        ;;
+    mic)
+        shift
+        "$PYTHON" interfaces/cli/settings.py mic "$@"
+        ;;
+    speaker)
+        shift
+        "$PYTHON" interfaces/cli/settings.py speaker "$@"
+        ;;
+    satellite|voice-satellite)
+        shift
+        "$PYTHON" interfaces/voice/satellite.py "$@"
+        ;;
     models|model)
         shift
         "$PYTHON" interfaces/cli/settings.py model "$@"
@@ -78,7 +97,9 @@ case "$COMMAND" in
         "$PYTHON" -c "from core.updater import CoreUpdater; u = CoreUpdater(); d, e = u.create_state_snapshot(); print(f'[OK] Snapshot preserved:\n  Database: {d}\n  Config:   {e}')"
         ;;
     update)
+        git checkout -- core.sh install.sh 2>/dev/null || true
         "$PYTHON" -c "from core.updater import CoreUpdater; u = CoreUpdater(); ok, msg = u.apply_update(); print(msg)"
+        chmod +x core.sh install.sh 2>/dev/null || true
         ;;
     test)
         "$PYTHON" -m pytest tests
