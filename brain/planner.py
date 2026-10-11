@@ -322,6 +322,24 @@ class Planner:
             is_de = any(c in goal_lower for c in ["stopp", "abbrechen", "halt"])
             context["direct_response"] = "Aktion angehalten." if is_de else "Action stopped."
 
+        # Pattern: Mesh & Node Pairing Guidance ("add my pc to the mesh", "connect computer to mesh", "pc verbinden")
+        elif any(k in goal_lower for k in [
+            "add my pc", "add pc", "connect pc", "connect my pc", "add to mesh", "join mesh", "to the mesh",
+            "add computer", "connect computer", "pc verbinden", "rechner verbinden", "netzwerk verbinden",
+            "add this machine"
+        ]):
+            is_de = any(c in goal_lower for c in ["verbinden", "hinzufügen", "netzwerk"])
+            if is_de:
+                context["direct_response"] = (
+                    "Um deinen PC mit dem Core AI Mesh zu verbinden, öffne ein Terminal auf deinem PC und führe "
+                    "'core mesh connect http://192.168.2.203:8000' aus, oder starte den Sprach-Satelliten mit 'core satellite'."
+                )
+            else:
+                context["direct_response"] = (
+                    "To add your PC to the Core AI mesh, open a terminal on your PC and run "
+                    "'core mesh connect http://192.168.2.203:8000', or start ambient voice capture with 'core satellite'."
+                )
+
         # Pattern: Pure Time query ("wie spät ist es", "what time is it", "how, what time is it")
         elif any(k in goal_lower for k in ["wie spät", "spät", "spaet", "uhrzeit", "uhr", "what time", "current time", "time is it", "the time", "wie sp"]):
             steps.append(PipelineStep(
@@ -721,14 +739,35 @@ class Planner:
         except Exception:
             pass
 
-        if "ollama" in model.lower():
-            compact_catalog = [{"name": t["name"], "desc": t.get("description", "")[:100]} for t in catalog]
+        is_ollama = "ollama" in model.lower()
+        if is_ollama:
+            # Smart Relevance Filtering for Local Edge Models (Prevents suffocating low-power CPUs)
+            goal_words = set(re.findall(r"\w+", goal.lower()))
+            scored_tools = []
+            for t in catalog:
+                desc = t.get("description", "").lower()
+                name = t["name"].lower()
+                score = sum(1 for w in goal_words if len(w) > 2 and (w in desc or w in name))
+                scored_tools.append((score, t))
+            scored_tools.sort(key=lambda x: x[0], reverse=True)
+            matched = [t for s, t in scored_tools if s > 0][:5]
+            if not matched:
+                matched = [t for t in catalog if t["name"] in {"get_time", "get_system_status", "run_shell_command", "lookup_knowledge", "search_web_query"}][:4]
+            compact_catalog = [{"name": t["name"], "desc": t.get("description", "")[:60]} for t in matched]
             catalog_repr = json.dumps(compact_catalog)
+
+            system_prompt = f"""You are Core AI DAG Planner for {operator_name}.
+Available Tools: {catalog_repr}
+Respond strictly in JSON matching one of these formats:
+If conversational or no tool needed:
+{{"goal": "{goal}", "direct_response": "concise answer", "steps": []}}
+If tools are needed:
+{{"goal": "{goal}", "direct_response": null, "steps": [{{"id": "step1", "name": "description", "tool_name": "name", "arguments": {{}}, "depends_on": []}}]}}
+Do NOT output any markdown commentary or text outside the JSON."""
         else:
             catalog_repr = json.dumps(catalog, indent=2)
-
-        aliases_text = f" (Recognized Honorifics/Aliases: {', '.join(operator_aliases)})" if operator_aliases else ""
-        system_prompt = f"""You are the Brain and DAG Orchestrator of Core AI, an autonomous sovereign life OS with Jarvis-level situational awareness.
+            aliases_text = f" (Recognized Honorifics/Aliases: {', '.join(operator_aliases)})" if operator_aliases else ""
+            system_prompt = f"""You are the Brain and DAG Orchestrator of Core AI, an autonomous sovereign life OS with Jarvis-level situational awareness.
 Operator: {operator_name}{aliases_text}
 Preferred Persona & Tone: {operator_tone}
 Current Spatial Zone: {operator_zone}
@@ -780,7 +819,7 @@ Output ONLY a JSON object matching this schema:
 }}
 Do NOT output any markdown formatting or commentary outside the JSON.
 """
-        call_timeout = 120.0 if "ollama" in model.lower() else 25.0
+        call_timeout = 60.0 if is_ollama else 25.0
         kwargs: Dict[str, Any] = {"timeout": call_timeout, "num_retries": 0}
         if "ollama" in model.lower():
             kwargs["api_base"] = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")

@@ -133,6 +133,10 @@ class PipelinePlan(BaseModel):
     final_output: Optional[Any] = None
     error_summary: Optional[str] = None
 
+    @property
+    def direct_response(self) -> Optional[str]:
+        return self.context.get("direct_response")
+
 class StepResult(BaseModel):
     step_id: str
     tool_name: str
