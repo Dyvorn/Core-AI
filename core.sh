@@ -6,6 +6,8 @@ cd "$DIR"
 
 if [ -f ".venv/bin/python" ]; then
     PYTHON=".venv/bin/python"
+elif [ -f "venv/bin/python" ]; then
+    PYTHON="venv/bin/python"
 else
     PYTHON="python3"
 fi

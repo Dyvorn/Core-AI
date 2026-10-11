@@ -301,16 +301,24 @@ class ServiceManager:
                         cmd,
                         cwd=self.root_dir,
                         stdout=open(os.path.join(self.root_dir, "logs", "server_stdout.log"), "a"),
-                        stderr=subprocess.STDOUT
+                        stderr=subprocess.STDOUT,
+                        start_new_session=True
                     )
             else:
                 flags = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == "nt" else 0
+                stdout_target = subprocess.DEVNULL
+                stderr_target = subprocess.DEVNULL
+                if os.name != "nt":
+                    daemon_log = open(os.path.join(self.root_dir, "logs", "server_stdout.log"), "a")
+                    stdout_target = daemon_log
+                    stderr_target = subprocess.STDOUT
+
                 proc = subprocess.Popen(
                     cmd,
                     cwd=self.root_dir,
                     stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stdout=stdout_target,
+                    stderr=stderr_target,
                     creationflags=flags,
                     start_new_session=(os.name != "nt")
                 )
