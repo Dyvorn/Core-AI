@@ -85,7 +85,7 @@ def main() -> int:
         # If no goal provided, launch interactive console via main.py
         root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         main_script = os.path.join(root_dir, "main.py")
-        return subprocess.call([sys.executable, main_script], cwd=root_dir)
+        return subprocess.call([sys.executable, "-u", main_script], cwd=root_dir)
 
     # Normalize localhost to 127.0.0.1 to avoid Windows IPv6 DNS resolution latency
     target_host = "127.0.0.1" if args.host.lower() in ("localhost", "127.0.0.1") else args.host

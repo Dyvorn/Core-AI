@@ -425,6 +425,7 @@ Your server exposes open, interactive REST and WebSocket endpoints:
 | `core backup` | Snapshot SQLite state database and `.env` config |
 | `core test` | Run automated test suite (pytest) |
 | `core setup` | Run interactive bootstrap and identity wizard |
+| `core clean` | Clean slate server reset (wipe database, config, logs; keep files & virtualenv installed) |
 | `core uninstall` | Clean zero-residue uninstallation |
 
 ---

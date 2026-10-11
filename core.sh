@@ -58,8 +58,13 @@ case "$COMMAND" in
             "$PYTHON" interfaces/cli/setup_wizard.py status
         fi
         ;;
+    clean|clean-setup|factory-reset|purge)
+        shift
+        "$PYTHON" interfaces/install/clean_setup.py "$@"
+        ;;
     reset)
-        "$PYTHON" interfaces/cli/setup_wizard.py reset
+        shift
+        "$PYTHON" interfaces/install/clean_setup.py "$@"
         ;;
     logo|anim)
         "$PYTHON" -m core.animation
@@ -107,7 +112,8 @@ case "$COMMAND" in
         echo "    dashboard   - Launch dedicated Sovereign Mesh Master Dashboard in browser"
         echo "    scan        - Scan local network for active Sovereign Main Servers"
         echo "    account     - View Sovereign Operator Account identity & security card"
-        echo "    reset       - Reset local account database to clean Day-Zero state"
+        echo "    clean       - Clean server state wipe (delete DB, config, logs; keep files/venv)"
+        echo "    reset       - Clean slate factory reset back to Day-Zero"
         echo "    logo / anim - Launch interactive 3D Sovereign Core holographic viewer"
         echo "    update      - Self-update from GitHub with state backup & test guard"
         echo "    test        - Run automated test suite (pytest)"

@@ -1,8 +1,9 @@
+import os
 import json
 import logging
 import threading
 import queue
-from typing import Callable, Any, Dict, List
+from typing import Callable, Any, Dict, List, Optional
 from datetime import datetime, timezone
 import base64
 
@@ -63,8 +64,19 @@ class InMemoryBus:
 class EventBus:
     """Event Bus with Redis Pub/Sub and automatic in-memory fallback"""
     
-    def __init__(self, redis_url: str = "redis://localhost:6379/0"):
-        self.redis_url = redis_url
+    def __init__(self, redis_url: Optional[str] = None):
+        target_url = redis_url or os.getenv("CORE_REDIS_URL") or os.getenv("REDIS_URL")
+        # If no explicit Redis URL is provided and CORE_USE_REDIS is not set, use zero-latency in-memory bus directly
+        if not target_url and os.getenv("CORE_USE_REDIS", "0").lower() not in ("1", "true", "yes"):
+            self.redis_url = "memory://"
+            self.use_fallback = True
+            self.in_memory_bus: InMemoryBus = InMemoryBus()
+            self.redis_client = None
+            self.pubsub = None
+            logger.debug("Operating on high-speed in-memory EventBus (no external Redis configured).")
+            return
+
+        self.redis_url = target_url or "redis://127.0.0.1:6379/0"
         self.use_fallback = False
         self.in_memory_bus: InMemoryBus = InMemoryBus()
         self.redis_client = None
@@ -72,14 +84,14 @@ class EventBus:
 
         try:
             import redis
-            client = redis.from_url(redis_url, socket_timeout=1.0, socket_connect_timeout=1.0)
+            client = redis.from_url(self.redis_url, socket_timeout=0.25, socket_connect_timeout=0.25)
             client.ping()
             self.redis_client = client
             self.pubsub = self.redis_client.pubsub(ignore_subscribe_messages=True)
             logger.info("Connected successfully to Redis EventBus")
         except Exception as e:
             self.use_fallback = True
-            logger.warning(f"Redis not reachable at {redis_url} ({e}). Falling back to internal InMemoryBus.")
+            logger.warning(f"Redis not reachable at {self.redis_url} ({e}). Falling back to internal InMemoryBus.")
 
     @property
     def is_connected(self) -> bool:

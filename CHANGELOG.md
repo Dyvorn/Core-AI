@@ -26,6 +26,12 @@ Major Quality of Life (QoL) and stability milestone dedicated to 100% daily driv
 
 ### 🌟 Added & Enhanced
 
+#### 🧹 Clean Slate Server Reset & Zero-Residue Purge (`interfaces/install/clean_setup.py`, `core.bat`, `core.sh`, `main.py`)
+- **Zero-Residue Clean State Wipe (`core clean` / `core reset`)**: Operators can now wipe all local SQLite database records (`core_ai.db`, WAL, SHM), credentials (`config/.env`), execution audit trails (`logs/*`), backup snapshots (`backups/*`), dynamically generated tools (`tools/dynamic/*.py`), and bytecode caches with a single command to perform a pristine Day-Zero setup on their server.
+- **Strict File & Virtualenv Preservation**: Strictly protects the Python virtual environment (`.venv`), Git repository (`.git`), installed packages, and all project source code files ("delete everything but the files so everything is still installed").
+- **Interactive & Headless Automation**: Supports interactive confirmation with automatic post-wipe handover to the bootstrap setup wizard (`core setup`), as well as headless flags (`-y` / `--yes`, `--setup`, `--keep-env`, `--dry-run`).
+- **Native Tool & Natural Language Planner Routing**: Integrated `factory_reset` into `SafetyGate.CRITICAL_CONFIRMATION_TOOLS` and deterministic DAG planner, recognizing natural requests such as `core "delete everything but the files"` and `core "clean new setup"`.
+
 #### 🎙️ Ultra-Low-Latency Voice Detection, Silero VAD & Verbal Barge-In (`engines/voice_in.py`, `engines/voice_out.py`, `brain/spoken_to.py`, `main.py`)
 - **Neural Silero VAD (ONNX)**: Integrated on-device Silero VAD operating on 512-sample (32ms at 16kHz) frames. Accurately pinpoints vocal onset, ignores fan noise, breathing, typing, and room reflections, and cleanly cuts off speech after ~350ms of trailing silence (eliminating 7.0s safety lockouts).
 - **Verbal Barge-In & Instant Playback Interruption**: Operator can interrupt Core AI mid-speech at any moment by speaking *"Stop"*, *"Stopp"*, *"No, no, stop, stop, stop"*, *"Halt"*, or *"Warte"*. The audio worker halts hardware sounddevice playback within 20ms and purges pending queues.

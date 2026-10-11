@@ -676,6 +676,7 @@ Inside the terminal shell (`Core [Operator@zone] > `), type any natural language
 | `logo / anim` | Launch interactive real-time 3D Sovereign Core holographic viewer |
 | `update` | Pull GitHub updates with automated pre-update state backup & test guard |
 | `backup` | Create instant point-in-time snapshot of SQLite state (`core_ai.db`) and config (`.env`) |
+| `clean / reset` | Zero-residue clean server wipe (delete DB, config, logs, caches; keep all files & virtualenv installed) |
 | `bg / daemon` | Transition terminal session to background headless daemon mode |
 | `clear` | Clear terminal screen |
 | `exit / quit` | Cleanly terminate all background servers, audio threads, and bus |
@@ -728,7 +729,8 @@ Core AI is designed to run 24/7 as a dependable sovereign daemon on your main ma
   .\core.bat run         # Launch interactive REPL terminal
   .\core.bat backup      # Snapshot SQLite database and config/.env into backups/
   .\core.bat update      # Git pull with pre-backup state snapshot and automated rollback test guard
-  .\core.bat test        # Run full pytest test suite (118/118 tests passed)
+  .\core.bat test        # Run full pytest test suite
+  .\core.bat clean       # Zero-residue clean server wipe (delete DB, config, logs; keep files & venv for fresh setup)
   .\core.bat setup       # Re-run interactive bootstrap wizard
   .\core.bat uninstall   # Clean zero-residue uninstallation
 
@@ -746,6 +748,7 @@ Core AI is designed to run 24/7 as a dependable sovereign daemon on your main ma
   ./core.sh backup
   ./core.sh update
   ./core.sh test
+  ./core.sh clean
   ./core.sh setup
   ./core.sh uninstall
   ```

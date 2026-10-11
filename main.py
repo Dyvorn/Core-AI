@@ -16,12 +16,12 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 # Force UTF-8 encoding on standard streams to prevent Windows cp1252 UnicodeEncodeError with local LLMs
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
     try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
     except Exception:
         pass
 if sys.stderr and hasattr(sys.stderr, "reconfigure"):
     try:
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
     except Exception:
         pass
 
@@ -31,7 +31,7 @@ from core.schemas import TextEvent, CommandEvent, AdaptiveResponseEvent, TTSRequ
 from core.context import ContextManager
 from core.state import StateManager
 from tools.registry import ToolRegistry
-from tools.native.system_tools import get_time, time_schema, get_system_status
+from tools.native.system_tools import get_time, time_schema, get_system_status, factory_reset, factory_reset_schema
 from tools.native.file_tools import read_text_file, read_file_schema, write_text_file, write_file_schema, list_dir_contents, list_dir_schema
 from tools.native.math_tools import calculate_math, calculate_math_schema, summarize_numbers, summarize_numbers_schema
 from tools.native.network_tools import scan_local_network, scan_local_network_schema, inspect_lan_device, inspect_lan_device_schema
@@ -104,9 +104,9 @@ def play_boot_sequence(skip_anim: bool = True):
         except Exception:
             pass
 
-    print(f"\n{CYAN}======================================================================={RESET}")
-    print(f"{CYAN}  CORE AI :: SOVEREIGN LIFE OS - INITIALIZING MICROKERNEL{RESET}")
-    print(f"{CYAN}======================================================================={RESET}")
+    print(f"\n{CYAN}======================================================================={RESET}", flush=True)
+    print(f"{CYAN}  CORE AI :: SOVEREIGN LIFE OS - INITIALIZING MICROKERNEL{RESET}", flush=True)
+    print(f"{CYAN}======================================================================={RESET}", flush=True)
     steps = [
         "Mounting SQLite State Manager & Dynamic Topologies",
         "Initializing EventBus & Inter-Node Transport",
@@ -115,18 +115,18 @@ def play_boot_sequence(skip_anim: bool = True):
         "Spawning Universal Gateway (REST & WebSocket Mesh)"
     ]
     for step in steps:
-        print(f"  [+] {step:<54} [{GREEN}OK{RESET}]")
-    print(f"{CYAN}-----------------------------------------------------------------------{RESET}\n")
+        print(f"  [+] {step:<54} [{GREEN}OK{RESET}]", flush=True)
+    print(f"{CYAN}-----------------------------------------------------------------------{RESET}\n", flush=True)
 
 def print_banner(operator_name: str, zone: str, port: int):
-    print(f"{CYAN}+=====================================================================+{RESET}")
-    print(f"{CYAN}|{BRIGHT}   C.O.R.E. AI :: CONCURRENT OMNIPRESENT REASONING ENGINE            {RESET}{CYAN}|{RESET}")
-    print(f"{CYAN}|{RESET}   v0.2.0-alpha [Precision & Flow] - Sovereign Ubiquitous Life OS       {CYAN}|{RESET}")
-    print(f"{CYAN}+=====================================================================+{RESET}")
-    print(f"{CYAN}|{RESET}   Operator: {GREEN}{operator_name:<16}{RESET} Zone: {YELLOW}{zone:<16}{RESET} Status: {GREEN}ONLINE       {RESET}{CYAN}|{RESET}")
-    print(f"{CYAN}|{RESET}   Gateway:  {CYAN}http://localhost:{port:<5}{RESET} API Docs: {CYAN}/docs{RESET} WebSocket: {CYAN}/ws/events{RESET}   {CYAN}|{RESET}")
-    print(f"{CYAN}+=====================================================================+{RESET}\n")
-    print(f"{MAGENTA}Type any goal to solve it, or type 'help' for built-in commands.{RESET}\n")
+    print(f"{CYAN}+=====================================================================+{RESET}", flush=True)
+    print(f"{CYAN}|{BRIGHT}   C.O.R.E. AI :: CONCURRENT OMNIPRESENT REASONING ENGINE            {RESET}{CYAN}|{RESET}", flush=True)
+    print(f"{CYAN}|{RESET}   v0.2.0-alpha [Precision & Flow] - Sovereign Ubiquitous Life OS       {CYAN}|{RESET}", flush=True)
+    print(f"{CYAN}+=====================================================================+{RESET}", flush=True)
+    print(f"{CYAN}|{RESET}   Operator: {GREEN}{operator_name:<16}{RESET} Zone: {YELLOW}{zone:<16}{RESET} Status: {GREEN}ONLINE       {RESET}{CYAN}|{RESET}", flush=True)
+    print(f"{CYAN}|{RESET}   Gateway:  {CYAN}http://localhost:{port:<5}{RESET} API Docs: {CYAN}/docs{RESET} WebSocket: {CYAN}/ws/events{RESET}   {CYAN}|{RESET}", flush=True)
+    print(f"{CYAN}+=====================================================================+{RESET}\n", flush=True)
+    print(f"{MAGENTA}Type any goal to solve it, or type 'help' for built-in commands.{RESET}\n", flush=True)
 
 def print_help():
     print(f"\n{BRIGHT}Core Terminal Commands:{RESET}")
@@ -162,6 +162,7 @@ def print_help():
     print(f"  {GREEN}logo / anim{RESET}               - Launch interactive 3D Sovereign Core holographic viewer")
     print(f"  {GREEN}update{RESET}                    - Apply GitHub updates with automated state backup & test guard")
     print(f"  {GREEN}backup{RESET}                    - Create instant point-in-time snapshot of SQLite state & config")
+    print(f"  {GREEN}clean / reset{RESET}             - Wipe DB, config, logs & dynamic tools for clean server setup")
     print(f"  {GREEN}bg / daemon{RESET}               - Send Core AI to background headless daemon mode")
     print(f"  {GREEN}clear{RESET}                     - Clear terminal screen")
     print(f"  {GREEN}exit / quit{RESET}               - Cleanly shut down Core AI and background services\n")
@@ -214,6 +215,7 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
         "description": "Get current operating system, distribution, and hardware architecture status",
         "parameters": {"type": "object", "properties": {}}
     })
+    registry.register_tool("factory_reset", factory_reset, factory_reset_schema)
     
     registry.register_tool("read_text_file", read_text_file, read_file_schema)
     registry.register_tool("write_text_file", write_text_file, write_file_schema)
@@ -686,6 +688,23 @@ def run_interactive_repl(
                         print(f"{GREEN}[OK] Local account reset to Day-Zero blank slate.{RESET}\n")
                     else:
                         print(f"{YELLOW}[*] Account reset cancelled.{RESET}\n")
+                except (KeyboardInterrupt, EOFError):
+                    print()
+
+            elif cmd_lower in ["clean", "clean-setup", "factory-reset", "factory_reset", "reset"]:
+                try:
+                    conf = input(f"{RED}[!] Wipe database, config, logs & dynamic tools for a clean server setup? [y/N]: {RESET}").strip().lower()
+                    if conf in ["y", "yes"]:
+                        from interfaces.install.clean_setup import clean_system_state, print_clean_summary_card
+                        res = clean_system_state(root_dir=os.path.dirname(os.path.abspath(__file__)), stop_services=False)
+                        print_clean_summary_card(res)
+                        state = StateManager()
+                        p = state.get_user_profile()
+                        active_name = p.preferred_name
+                        active_zone = "default"
+                        print(f"{GREEN}[OK] Clean slate reset complete. All files and virtual environment preserved.{RESET}\n")
+                    else:
+                        print(f"{YELLOW}[*] Clean reset cancelled.{RESET}\n")
                 except (KeyboardInterrupt, EOFError):
                     print()
 
@@ -1332,6 +1351,8 @@ def main():
     voice_in: Optional[VoiceInEngine] = None
     if not voice_in_disabled:
         try:
+            if not args.headless:
+                print(f"  [+] Initializing Neural Voice Capture ('{args.model_size}')... ", end="", flush=True)
             logger.info(f"Initializing VoiceInEngine (always-on mic) with model '{args.model_size}'...")
             voice_in = VoiceInEngine(
                 model_size=args.model_size,
@@ -1340,6 +1361,8 @@ def main():
             )
             if voice_out:
                 voice_in.register_voice_out(voice_out)
+            if not args.headless:
+                print(f"[{GREEN}OK{RESET}]", flush=True)
             if args.headless:
                 # In headless server mode, connect mic directly into event bus loop
                 voice_in.bridge_to_event_bus(
@@ -1352,6 +1375,8 @@ def main():
             else:
                 logger.info(f"Voice capture engine ready for interactive REPL in zone: '{primary_zone}'.")
         except Exception as e:
+            if not args.headless:
+                print(f"[{YELLOW}SKIPPED{RESET}]", flush=True)
             logger.warning(f"VoiceInEngine auto-initialization skipped ({e}). Continuing in terminal mode.")
             voice_in = None
 

@@ -163,8 +163,17 @@ class VoiceInEngine:
 
         for candidate in cascade:
             logger.info(f"Loading faster-whisper STT ('{candidate}', device={device}, compute={compute_type})...")
+            # 1. Try local cache first for sub-second offline loading (<1.5s vs 7s+ network polling)
             try:
-                model = WhisperModel(candidate, device=device, compute_type=compute_type)
+                model = WhisperModel(candidate, device=device, compute_type=compute_type, local_files_only=True)
+                self.model_size = candidate
+                return model
+            except Exception:
+                pass
+
+            # 2. Try online download if model is not yet in local cache
+            try:
+                model = WhisperModel(candidate, device=device, compute_type=compute_type, local_files_only=False)
                 self.model_size = candidate
                 return model
             except Exception as e:
@@ -172,7 +181,10 @@ class VoiceInEngine:
                 if device != "cpu":
                     try:
                         logger.info(f"Retrying '{candidate}' on CPU (int8)...")
-                        model = WhisperModel(candidate, device="cpu", compute_type="int8")
+                        try:
+                            model = WhisperModel(candidate, device="cpu", compute_type="int8", local_files_only=True)
+                        except Exception:
+                            model = WhisperModel(candidate, device="cpu", compute_type="int8", local_files_only=False)
                         self.device = "cpu"
                         self.compute_type = "int8"
                         self.model_size = candidate

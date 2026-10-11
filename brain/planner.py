@@ -114,7 +114,7 @@ class Planner:
             "lock_workstation", "take_screenshot", "open_youtube", "open_path_in_explorer",
             "relocate_operator", "get_clipboard_text", "set_clipboard_text",
             "create_reminder", "create_vitals_watcher", "list_active_rules",
-            "cancel_proactive_rule", "get_git_status", "manage_notes"
+            "cancel_proactive_rule", "get_git_status", "manage_notes", "factory_reset"
         }
         is_routine_action = (
             len(heuristic_plan.steps) == 1 and
@@ -238,7 +238,7 @@ class Planner:
         steps: List[PipelineStep] = []
 
         # Pattern: YouTube & Web Video ("open youtube", "open yt", "watch yt", "watch youtube", "play youtube")
-        if any(k in goal_lower for k in ["youtube", "yt"]):
+        if re.search(r"\b(?:youtube|yt)\b", goal_lower):
             search_q = None
             if q_match := re.search(r"(?:search|for|find|watch|play)\s+([a-zA-Z0-9_\-\s]+?)(?:\s+(?:on|in)\s+youtube|\s+on\s+yt|$)", goal_lower):
                 raw_q = q_match.group(1).strip()
@@ -354,6 +354,21 @@ class Planner:
                 name="Calculate Math Expression",
                 tool_name="calculate_math",
                 arguments={"expression": expr},
+                depends_on=[]
+            ))
+
+        # Pattern: Clean Setup / Factory Reset / Wipe Runtime State ("delete everything but the files", "clean setup")
+        elif any(k in goal_lower for k in [
+            "clean setup", "clean new setup", "delete everything but the files",
+            "delete everything but files", "wipe everything but the files",
+            "wipe everything but files", "factory reset", "factory-reset",
+            "clean slate", "day-zero reset", "day zero reset"
+        ]):
+            steps.append(PipelineStep(
+                id="factory_reset_step",
+                name="Execute Clean Setup Wipe",
+                tool_name="factory_reset",
+                arguments={"confirm": True},
                 depends_on=[]
             ))
 

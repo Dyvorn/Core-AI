@@ -34,6 +34,31 @@ def get_system_status(**kwargs) -> dict:
 
     return status
 
+def factory_reset(confirm: bool = False, keep_env: bool = False, **kwargs) -> dict:
+    """
+    Executes a zero-residue clean slate reset:
+    Deletes runtime database, logs, backups, and dynamic tools while preserving
+    all code files and the Python virtual environment for a clean new server setup.
+    Requires explicit confirm=True.
+    """
+    if not confirm:
+        return {
+            "status": "confirmation_required",
+            "message": "Factory reset requires explicit confirmation (confirm=True). This wipes runtime database, logs, and credentials while keeping all code files and virtualenv installed."
+        }
+    from interfaces.install.clean_setup import clean_system_state
+    res = clean_system_state(wipe_env=not keep_env, stop_services=False)
+    return {
+        "status": "success",
+        "message": "System wiped to clean Day-Zero state. All code files, dependencies, and venv preserved for fresh setup.",
+        "details": {
+            "removed_db_files": len(res.get("removed_db_files", [])),
+            "cleared_logs": len(res.get("cleared_log_files", [])),
+            "cleared_backups": len(res.get("cleared_backup_files", [])),
+            "cleared_dynamic_tools": len(res.get("cleared_dynamic_tools", []))
+        }
+    }
+
 time_schema = {
     "name": "get_time",
     "description": "Get the current time",
@@ -49,5 +74,25 @@ system_status_schema = {
     "parameters": {
         "type": "object",
         "properties": {}
+    }
+}
+
+factory_reset_schema = {
+    "name": "factory_reset",
+    "description": "Clean-wipe all runtime database state, logs, credentials, and dynamic tools for a fresh Day-Zero server setup, preserving all installed code files and virtual environment",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "confirm": {
+                "type": "boolean",
+                "description": "Must be set to True to confirm execution"
+            },
+            "keep_env": {
+                "type": "boolean",
+                "description": "Optionally preserve config/.env without deleting API keys",
+                "default": False
+            }
+        },
+        "required": ["confirm"]
     }
 }

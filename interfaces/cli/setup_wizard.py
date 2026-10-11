@@ -255,15 +255,17 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "status":
         print_account_status_card()
     elif len(sys.argv) > 1 and sys.argv[1] == "reset":
-        force = "--force" in sys.argv or "-f" in sys.argv
+        force = "--force" in sys.argv or "-f" in sys.argv or "-y" in sys.argv or "--yes" in sys.argv
         if not force:
-            confirm = input("[!] Are you sure you want to reset your local Sovereign Account and data to Day-Zero? [y/N]: ").strip().lower()
+            confirm = input("[!] Are you sure you want to reset your local Sovereign Account and runtime data to Day-Zero? [y/N]: ").strip().lower()
             do_reset = confirm in ["y", "yes"]
         else:
             do_reset = True
         if do_reset:
-            reset_account_to_day_zero(full_wipe=True)
-            print("[OK] Local database and operator account reset to Day-Zero blank slate.")
+            from interfaces.install.clean_setup import clean_system_state, print_clean_summary_card
+            res = clean_system_state(wipe_db=True, wipe_env=True, stop_services=True)
+            print_clean_summary_card(res)
+            print("[OK] Local database, configs, logs, and account reset to Day-Zero blank slate.")
         else:
             print("[*] Reset cancelled.")
     else:

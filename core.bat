@@ -3,6 +3,7 @@ setlocal
 chcp 65001 >nul 2>&1
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUTF8=1"
+set "PYTHONUNBUFFERED=1"
 
 set "ROOT=%~dp0"
 cd /d "%ROOT%"
@@ -41,20 +42,30 @@ if /i "%~1"=="test" goto test
 if /i "%~1"=="autostart" goto autostart
 if /i "%~1"=="watchdog" goto watchdog
 if /i "%~1"=="mesh" goto mesh
+if /i "%~1"=="clean" goto clean
+if /i "%~1"=="clean-setup" goto clean
+if /i "%~1"=="factory-reset" goto clean
+if /i "%~1"=="purge" goto clean
 if /i "%~1"=="uninstall" goto uninstall
 
 goto quick_solve
 
 :logo
-"%PYTHON%" -m core.animation
+"%PYTHON%" -u -m core.animation
 goto :eof
 
 :run
-"%PYTHON%" main.py
+if not "%~1"=="" if /i "%~1"=="run" shift
+if not "%~1"=="" if /i "%~1"=="console" shift
+echo [*] Launching Core AI Sovereign Life OS...
+"%PYTHON%" -u main.py %*
+if %ERRORLEVEL% neq 0 (
+    echo [!] Core AI exited with code %ERRORLEVEL%.
+)
 goto :eof
 
 :quick_solve
-"%PYTHON%" interfaces\cli\client.py %*
+"%PYTHON%" -u interfaces\cli\client.py %*
 goto :eof
 
 :start_daemon
@@ -103,9 +114,15 @@ if /i "%~2"=="reset" goto reset
 "%PYTHON%" interfaces\cli\setup_wizard.py status
 goto :eof
 
+:clean
+shift
+"%PYTHON%" interfaces\install\clean_setup.py %1 %2 %3 %4 %5
+goto end
+
 :reset
-"%PYTHON%" interfaces\cli\setup_wizard.py reset
-goto :eof
+shift
+"%PYTHON%" interfaces\install\clean_setup.py %1 %2 %3 %4 %5
+goto end
 
 :backup
 "%PYTHON%" -c "from core.updater import CoreUpdater; u = CoreUpdater(); d, e = u.create_state_snapshot(); print('[OK] Snapshot preserved:\n  Database: ' + str(d) + '\n  Config:   ' + str(e))"
@@ -158,8 +175,8 @@ echo     config      - System settings, operator identity, tone, ^& custom prefe
 echo     models      - Dedicated easy AI model selector (interactive picker ^& roles)
 echo     dashboard   - Launch dedicated Sovereign Mesh Master Dashboard in browser
 echo     scan        - Scan local network for active Sovereign Main Servers
-echo     account     - View Sovereign Operator Account identity ^& security card
-echo     reset       - Reset local account database to clean Day-Zero state
+echo     clean       - Clean server state wipe (delete DB, config, logs; keep files/venv)
+echo     reset       - Clean slate factory reset back to Day-Zero
 echo     logo / anim - Launch interactive 3D Sovereign Core holographic viewer
 echo     update      - Self-update from GitHub with state backup ^& test guard
 echo     test        - Run automated test suite (pytest)
