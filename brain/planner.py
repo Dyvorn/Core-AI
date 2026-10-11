@@ -117,18 +117,22 @@ class Planner:
             "cancel_proactive_rule", "get_git_status", "manage_notes", "factory_reset",
             "inspect_system_resources"
         }
+        has_direct_heuristic = bool(heuristic_plan.context.get("direct_response"))
         is_routine_action = (
-            len(heuristic_plan.steps) == 1 and
-            heuristic_plan.steps[0].tool_name in routine_tools and
-            not ctx.get("force_llm")
-        )
+            (len(heuristic_plan.steps) == 1 and heuristic_plan.steps[0].tool_name in routine_tools) or
+            has_direct_heuristic
+        ) and not ctx.get("force_llm")
         if is_routine_action:
+            if not heuristic_plan.steps:
+                heuristic_plan.status = "completed"
             heuristic_plan.context["mode"] = "instant_heuristic"
-            logger.info(f"Instant deterministic dispatch for routine goal: '{target_goal}' (tool: {heuristic_plan.steps[0].tool_name})")
+            tool_descr = heuristic_plan.steps[0].tool_name if heuristic_plan.steps else "direct_response"
+            logger.info(f"Instant deterministic dispatch for routine goal: '{target_goal}' (action: {tool_descr})")
             self.pipeline_logger.log_event("PLAN_GENERATED", {
                 "mode": "instant_heuristic",
                 "step_count": len(heuristic_plan.steps),
-                "steps": [s.model_dump() for s in heuristic_plan.steps]
+                "steps": [s.model_dump() for s in heuristic_plan.steps],
+                "has_direct_response": has_direct_heuristic
             }, pipeline_id=heuristic_plan.id)
             return heuristic_plan
 
