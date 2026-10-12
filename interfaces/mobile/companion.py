@@ -311,6 +311,65 @@ class MobileCompanionClient:
             logger.error(f"Failed to dispatch mobile command: {e}")
             return {"status": "error", "message": str(e)}
 
+    def sync(self, since: Optional[str] = None) -> Dict[str, Any]:
+        """Pulls latest state deltas (profile, kv notes, zones, devices, proactive rules) from gateway."""
+        url = f"{self.server_url}/api/v1/mesh/sync/pull"
+        payload = {
+            "node_id": self.client_id,
+            "since": since,
+            "entities": ["profile", "kv_state", "zones", "devices", "proactive_rules"]
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "CoreAI-MobileCompanion"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            logger.error(f"Mobile sync failed: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def list_mesh_nodes(self) -> List[Dict[str, Any]]:
+        """Queries central gateway for active matrix of all voice satellites, mobile clients, and nodes."""
+        url = f"{self.server_url}/api/v1/mesh/nodes"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "CoreAI-MobileCompanion"})
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            logger.error(f"Failed to fetch mesh nodes: {e}")
+            return []
+
+    def send_mesh_message(
+        self,
+        target_node: str,
+        message_type: str = "command",
+        payload: Optional[Dict[str, Any]] = None,
+        priority: str = "normal"
+    ) -> Dict[str, Any]:
+        """Dispatches an inter-device command, alert, speech, or notification from mobile across the mesh."""
+        url = f"{self.server_url}/api/v1/mesh/message"
+        body = {
+            "source_node": self.client_id,
+            "target_node": target_node,
+            "message_type": message_type,
+            "payload": payload or {},
+            "priority": priority
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(body).encode("utf-8"),
+                headers={"Content-Type": "application/json", "User-Agent": "CoreAI-MobileCompanion"}
+            )
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            logger.error(f"Failed to dispatch mesh message from mobile: {e}")
+            return {"status": "error", "message": str(e)}
+
     def print_glance_card(self):
         """Renders high-contrast lock screen glance card on terminal."""
         glance = self.get_glance()
@@ -344,8 +403,8 @@ class MobileCompanionClient:
 
 def main():
     parser = argparse.ArgumentParser(description="Core AI Mobile Companion & Glyph Driver")
-    parser.add_argument("action", nargs="?", default="glance", choices=["glance", "status", "enroll", "glyph", "ask", "logout", "reset-session"], help="Action to perform")
-    parser.add_argument("extra", nargs="*", help="Extra arguments (e.g. prompt for ask)")
+    parser.add_argument("action", nargs="?", default="glance", choices=["glance", "status", "enroll", "glyph", "ask", "sync", "nodes", "send", "logout", "reset-session"], help="Action to perform")
+    parser.add_argument("extra", nargs="*", help="Extra arguments (e.g. prompt for ask, target and type for send)")
     parser.add_argument("--server", default="http://localhost:8000", help="Core AI Gateway URL")
     parser.add_argument("--client-id", default=None, help="Mobile device unique ID")
     parser.add_argument("--token", default=None, help="Explicit session token override")
@@ -385,6 +444,72 @@ def main():
             print(f"{GREEN}[OK] Glyph matrix pattern '{pattern}' dispatched!{RESET}")
         else:
             print(f"{RED}[FAIL] Could not dispatch glyph: {res.get('message')}{RESET}")
+
+    elif args.action == "sync":
+        print(f"[*] Pulling state deltas from Core AI Gateway at {client.server_url}...")
+        res = client.sync()
+        if res.get("status") in ("ok", "success"):
+            p = res.get("payload", {})
+            notes_cnt = len(p.get("kv_state", []))
+            zones_cnt = len(p.get("zones", []))
+            devs_cnt = len(p.get("devices", []))
+            rules_cnt = len(p.get("proactive_rules", []))
+            print(f"{GREEN}[OK] Mobile delta synchronization completed!{RESET}")
+            print(f"     KV Notes / Memory: {notes_cnt} records")
+            print(f"     Spatial Zones:     {zones_cnt} zones")
+            print(f"     Mesh Devices:      {devs_cnt} devices")
+            print(f"     Proactive Rules:   {rules_cnt} rules")
+            print(f"     Server Timestamp:  {res.get('server_time')}\n")
+        else:
+            print(f"{RED}[FAIL] Mobile sync failed: {res.get('message')}{RESET}\n")
+
+    elif args.action in ("nodes", "devices"):
+        print(f"[*] Querying connected mesh nodes from {client.server_url}...\n")
+        nodes = client.list_mesh_nodes()
+        if not nodes:
+            print(f"{YELLOW}No active satellites, mobile companions, or edge nodes reported.{RESET}\n")
+        else:
+            print(f"{CYAN}{'NODE ID':<22} {'TYPE':<16} {'ZONE':<14} {'STATUS':<12} {'DETAILS'}{RESET}")
+            print("-" * 75)
+            for n in nodes:
+                nid = n.get("node_id", "unknown")
+                ntype = n.get("type", "node")
+                nzone = n.get("zone", "global")
+                nstatus = f"{GREEN}ONLINE{RESET}" if n.get("status") in ("online", "active", "listening") else f"{YELLOW}{n.get('status', 'idle')}{RESET}"
+                extra_info = ""
+                if n.get("mic_device"):
+                    extra_info += f"mic:{n['mic_device']} "
+                if n.get("speaker_device"):
+                    extra_info += f"spk:{n['speaker_device']} "
+                if n.get("ip"):
+                    extra_info += f"ip:{n['ip']}"
+                print(f"{nid:<22} {ntype:<16} {nzone:<14} {nstatus:<21} {extra_info.strip()}")
+            print()
+
+    elif args.action == "send":
+        if len(args.extra) < 2:
+            print(f"{YELLOW}Usage: core mobile send <target_node_or_zone> <type> [payload_text_or_json]{RESET}")
+            print("Examples:")
+            print("  core mobile send office speak \"Dinner is ready\"")
+            print("  core mobile send all speak \"System maintenance in 5 minutes\"")
+            print("  core mobile send sat_kitchen stop")
+            sys.exit(1)
+        tgt = args.extra[0]
+        mtype = args.extra[1].lower()
+        content = " ".join(args.extra[2:]) if len(args.extra) > 2 else ""
+        if mtype == "speak":
+            payload = {"text": content}
+        else:
+            try:
+                payload = json.loads(content) if content.startswith("{") else {"command": content}
+            except Exception:
+                payload = {"command": content}
+        print(f"[*] Dispatching mesh message to '{tgt}' (type: {mtype})...")
+        res = client.send_mesh_message(target_node=tgt, message_type=mtype, payload=payload)
+        if res.get("status") in ("delivered", "broadcasted", "success"):
+            print(f"{GREEN}[OK] {res.get('message')}{RESET} (Dispatched to: {res.get('dispatched_to')})")
+        else:
+            print(f"{YELLOW}[!] {res.get('message')}{RESET}")
 
     elif args.action == "ask":
         prompt = " ".join(args.extra).strip()

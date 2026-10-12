@@ -197,11 +197,13 @@ goto :eof
 goto :eof
 
 :watchdog
-"%PYTHON%" -m core.watchdog %2 %3 %4 %5
+shift
+"%PYTHON%" -m core.watchdog %1 %2 %3 %4 %5 %6 %7 %8 %9
 goto :eof
 
 :mesh
-"%PYTHON%" -m core.mesh_client %2 %3 %4 %5
+shift
+"%PYTHON%" -m core.mesh_client %1 %2 %3 %4 %5 %6 %7 %8 %9
 goto :eof
 
 :setup
@@ -240,8 +242,9 @@ echo     test        - Run automated test suite (pytest)
 echo     autostart   - Configure 24/7 boot autostart (core autostart on^|off^|status^|visible)
 echo     watchdog    - Run self-healing supervisor (auto-revives crashes with backoff)
 echo     setup       - Run interactive bootstrap ^& autostart setup
+echo     mesh        - Sovereign Mesh state sync ^& node matrix (core mesh sync^|nodes^|send^|ping)
 echo     satellite   - Run distributed voice satellite perception daemon
-echo     mobile      - Mobile Companion operations (core mobile glance^|enroll^|ask^|glyph)
+echo     mobile      - Mobile Companion operations (core mobile glance^|sync^|nodes^|send^|glyph)
 echo     glyph       - Trigger Nothing OS rear Glyph LED patterns (core glyph reasoning_pulse)
 echo     speak       - Synthesize and speak text locally or across mesh
 echo     uninstall   - Clean zero-residue uninstallation

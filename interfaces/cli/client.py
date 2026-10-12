@@ -165,42 +165,15 @@ def main() -> int:
         return 0
 
     if goal_text.lower().startswith("mobile"):
-        from interfaces.mobile.companion import MobileCompanionClient
-        parts = goal_text.split(maxsplit=2)
-        action = parts[1].lower() if len(parts) > 1 else "glance"
-        client = MobileCompanionClient()
-        if action in ("glance", "status"):
-            client.print_glance_card()
+        from interfaces.mobile.companion import main as mobile_main
+        old_argv = sys.argv
+        try:
+            parts = goal_text.split()
+            sys.argv = ["mobile_companion"] + parts[1:]
+            mobile_main()
             return 0
-        elif action in ("logout", "reset-session"):
-            client.clear_session()
-            print(f"{GREEN}[OK] Mobile companion session cleared.{RESET}")
-            return 0
-        elif action == "enroll":
-            sec = parts[2] if len(parts) > 2 else None
-            res = client.enroll(auth_secret=sec)
-            print(res.get("message", "Enrolled."))
-            return 0
-        elif action == "glyph":
-            from interfaces.mobile.companion import render_glyph_matrix
-            pat = parts[2] if len(parts) > 2 else "reasoning_pulse"
-            print("\n" + render_glyph_matrix(pat) + "\n")
-            res = client.trigger_glyph(pattern=pat)
-            print(f"[*] Glyph matrix pattern '{pat}' dispatched: {res.get('status', 'ok')}")
-            return 0
-        elif action == "ask":
-            prompt = parts[2] if len(parts) > 2 else ""
-            if not prompt:
-                print(f"{YELLOW}Usage: core mobile ask <prompt>{RESET}")
-                return 1
-            print(f"[*] Dispatching prompt from mobile companion: '{prompt}'...")
-            res = client.send_command(prompt)
-            if res.get("status") == "error":
-                print(f"{RED}[FAIL] {res.get('message')}{RESET}")
-                return 1
-            spoken = res.get("spoken_response") or res.get("final_output") or "Done."
-            print(f"\n{GREEN}[Core AI Spoken Response]{RESET} {BOLD}{spoken}{RESET}\n")
-            return 0
+        finally:
+            sys.argv = old_argv
 
     if goal_text.lower().startswith("glyph"):
         from interfaces.mobile.companion import MobileCompanionClient, render_glyph_matrix
@@ -211,6 +184,17 @@ def main() -> int:
         res = client.trigger_glyph(pattern=pattern)
         print(f"[*] Glyph matrix pattern '{pattern}' dispatched: {res.get('status', 'ok')}")
         return 0
+
+    if goal_text.lower().startswith("mesh"):
+        from core.mesh_client import main as mesh_main
+        old_argv = sys.argv
+        try:
+            parts = goal_text.split()
+            sys.argv = ["mesh_client"] + parts[1:]
+            mesh_main()
+            return 0
+        finally:
+            sys.argv = old_argv
 
     if goal_text.lower().startswith("speak"):
         parts = goal_text.split(maxsplit=1)

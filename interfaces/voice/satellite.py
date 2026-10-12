@@ -170,10 +170,24 @@ class VoiceSatellite:
             logger.debug(f"Heartbeat dispatch failed to {url}: {e}")
             return False
 
+    def sync_mesh_state(self) -> Dict[str, Any]:
+        """Performs bidirectional delta sync, pulling latest state and replaying any offline tasks."""
+        try:
+            res = self.mesh_client.sync()
+            if res.get("status") == "success":
+                counts = res.get("merged_counts", {})
+                logger.info(f"Voice satellite '{self.node_id}' synchronized with mesh: {counts}")
+            return res
+        except Exception as e:
+            logger.debug(f"Voice satellite state sync notice: {e}")
+            return {"status": "error", "message": str(e)}
+
     def _heartbeat_loop(self):
-        """Background daemon thread dispatching heartbeats periodically with auto re-discovery."""
+        """Background daemon thread dispatching heartbeats periodically with auto re-discovery and state sync."""
         consecutive_failures = 0
-        if not self.send_heartbeat(status="listening"):
+        if self.send_heartbeat(status="listening"):
+            threading.Thread(target=self.sync_mesh_state, daemon=True).start()
+        else:
             consecutive_failures += 1
 
         while self.is_running:
@@ -195,9 +209,13 @@ class VoiceSatellite:
                                 self.server_url = found[0]["url"]
                                 self.mesh_client.main_server_url = self.server_url
                                 consecutive_failures = 0
+                                threading.Thread(target=self.sync_mesh_state, daemon=True).start()
                         except Exception as re_err:
                             logger.debug(f"LAN re-discovery notice: {re_err}")
                 else:
+                    if consecutive_failures > 0:
+                        # Reconnection detected: reconcile offline tasks and pull state deltas
+                        threading.Thread(target=self.sync_mesh_state, daemon=True).start()
                     consecutive_failures = 0
 
     def get_edge_tools(self) -> List[Dict[str, Any]]:
@@ -232,6 +250,32 @@ class VoiceSatellite:
         Returns a response dictionary if a reply should be transmitted back over WebSocket, or None.
         """
         mtype = msg.get("type")
+
+        # 0. Inter-device mesh message dispatched from gateway
+        if mtype == "mesh_device_message":
+            inner = msg.get("message", {})
+            itype = inner.get("message_type")
+            ipayload = inner.get("payload", {})
+            if itype == "speak" and ipayload.get("text"):
+                phrase = ipayload["text"]
+                if self.voice_out:
+                    print(f"\n{CYAN}[MESH INTER-DEVICE SPEECH]{RESET} \"{phrase}\"\n", flush=True)
+                    self.voice_out.synthesize_and_play(phrase, blocking=False)
+                return None
+            elif itype in ("interrupt", "stop"):
+                if self.voice_out:
+                    self.voice_out.interrupt()
+                    print(f"\n{YELLOW}[MESH INTER-DEVICE INTERRUPT]{RESET} Speech playback halted.\n", flush=True)
+                return None
+            elif itype == "sync":
+                threading.Thread(target=self.sync_mesh_state, daemon=True).start()
+                return {"type": "sync_ack", "node_id": self.node_id, "timestamp": time.time()}
+            elif itype == "command":
+                cmd = ipayload.get("command") or ipayload.get("goal")
+                if cmd:
+                    exec_res = self._local_fallback_executor(cmd)
+                    return {"type": "command_result", "node_id": self.node_id, "result": exec_res}
+            return None
 
         # 1. Direct speech command
         if mtype == "speak":
@@ -288,6 +332,26 @@ class VoiceSatellite:
             if tgt in (self.node_id, "all") and event_data.get("text") and self.voice_out:
                 print(f"\n{CYAN}[BROADCAST SPEECH PLAYBACK]{RESET} \"{event_data['text']}\"\n", flush=True)
                 self.voice_out.synthesize_and_play(event_data["text"], blocking=False)
+            return None
+
+        # 6. Broadcast event format (MESH_DEVICE_MESSAGE)
+        elif msg.get("event") == "MESH_DEVICE_MESSAGE":
+            inner = msg.get("data", {})
+            itype = inner.get("message_type")
+            ipayload = inner.get("payload", {})
+            if itype == "speak" and ipayload.get("text") and self.voice_out:
+                print(f"\n{CYAN}[BROADCAST SPEECH PLAYBACK]{RESET} \"{ipayload['text']}\"\n", flush=True)
+                self.voice_out.synthesize_and_play(ipayload["text"], blocking=False)
+            elif itype in ("interrupt", "stop") and self.voice_out:
+                self.voice_out.interrupt()
+            elif itype == "sync":
+                threading.Thread(target=self.sync_mesh_state, daemon=True).start()
+            return None
+
+        # 7. Broadcast event format (MESH_STATE_UPDATED)
+        elif msg.get("event") == "MESH_STATE_UPDATED":
+            # Real-time state change notice from server: pull deltas immediately
+            threading.Thread(target=self.sync_mesh_state, daemon=True).start()
             return None
 
         return None

@@ -411,4 +411,83 @@ class MobileGlanceStatus(BaseModel):
     version: str = "0.2.2-alpha"
 
 
+# --- Phase 5: Sovereign Mesh State Sync & Inter-Device Communication ---
+
+class MeshSyncPayload(BaseModel):
+    """Container for mesh state deltas exchanged between nodes and main server."""
+    timestamp: float = Field(default_factory=lambda: time.time())
+    profile: Optional[Dict[str, Any]] = None
+    kv_state: List[Dict[str, Any]] = Field(default_factory=list)
+    zones: List[Dict[str, Any]] = Field(default_factory=list)
+    devices: List[Dict[str, Any]] = Field(default_factory=list)
+    proactive_rules: List[Dict[str, Any]] = Field(default_factory=list)
+    audio_routes: List[Dict[str, Any]] = Field(default_factory=list)
+    dynamic_tools: List[Dict[str, Any]] = Field(default_factory=list)
+    offline_tasks: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class MeshSyncPullRequest(BaseModel):
+    """Request from a mesh client to pull updated state entities since a timestamp."""
+    node_id: str
+    since: Optional[str] = None  # ISO timestamp string or None for full sync
+    entities: List[str] = Field(
+        default_factory=lambda: ["profile", "kv_state", "zones", "devices", "proactive_rules", "audio_routes"]
+    )
+
+
+class MeshSyncPullResponse(BaseModel):
+    """Payload returned when pulling state from the central gateway."""
+    status: str = "ok"
+    server_time: float = Field(default_factory=lambda: time.time())
+    payload: MeshSyncPayload
+
+
+class MeshSyncPushRequest(BaseModel):
+    """Request from a mesh client pushing locally created/modified state deltas."""
+    node_id: str
+    payload: MeshSyncPayload
+
+
+class MeshSyncPushResponse(BaseModel):
+    """Response returned upon merging pushed state deltas."""
+    status: str = "merged"
+    server_time: float = Field(default_factory=lambda: time.time())
+    merged_counts: Dict[str, int] = Field(default_factory=dict)
+    message: str = "State deltas merged successfully."
+
+
+class MeshSyncFullRequest(BaseModel):
+    """Two-way atomic synchronization request combining client push and server pull."""
+    node_id: str
+    since: Optional[str] = None
+    client_payload: MeshSyncPayload
+
+
+class MeshSyncFullResponse(BaseModel):
+    """Two-way atomic synchronization response returning merged results and server deltas."""
+    status: str = "synced"
+    server_time: float = Field(default_factory=lambda: time.time())
+    merged_counts: Dict[str, int] = Field(default_factory=dict)
+    server_payload: MeshSyncPayload
+    message: str = "Full bidirectional synchronization completed."
+
+
+class MeshDeviceMessage(BaseModel):
+    """Inter-device communication message routed across the sovereign mesh."""
+    source_node: str
+    target_node: str  # specific node_id, 'all', or spatial room zone (e.g. 'living_room')
+    message_type: str = "command"  # 'command', 'notify', 'speak', 'glyph', 'sync_signal', 'query'
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    priority: str = "normal"
+    timestamp: float = Field(default_factory=lambda: time.time())
+
+
+class MeshDeviceMessageResponse(BaseModel):
+    """Response returned upon dispatching an inter-device mesh message."""
+    status: str
+    message_id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    dispatched_to: List[str] = Field(default_factory=list)
+    message: str = "Message routed."
+
+
 

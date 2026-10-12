@@ -1,14 +1,14 @@
 # Core AI -- Session Handover & Action Plan
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 169/169 TESTS PASSED ] [ PYTHON: 3.13+ ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 180/180 TESTS PASSED ] [ PYTHON: 3.13+ ]
 [ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]      [ VERSION: v0.2.2-alpha ]
 ```
 
 - **Date**: October 12, 2026  
 - **Lead Architect**: Dyvorn (*aka Vyrn / Refined*)  
 - **Release**: `v0.2.2-alpha` (Codename: "Distributed Voice Satellites & Mobile Mesh")  
-- **System Status**: All 169 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
+- **System Status**: All 180 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
 
 ---
 
@@ -125,6 +125,7 @@ All technical fat and legacy prototype mocks have been eliminated in strict adhe
 - tests/test_linux_voice_mesh.py (5)
 - tests/test_logging.py (2)
 - tests/test_mesh_client.py (6)
+- tests/test_mesh_sync_and_communication.py (11)
 - tests/test_model_router.py (5)
 - tests/test_network_and_templates.py (4)
 - tests/test_pipeline_engine.py (2)
@@ -143,7 +144,7 @@ All technical fat and legacy prototype mocks have been eliminated in strict adhe
 - tests/test_v022_satellite_and_mobile.py (25)
 - tests/test_voice_pipeline.py (12)
 ```
-Total: 169 passed / 169 collected across 30 test modules.
+Total: 180 passed / 180 collected across 31 test modules.
 
 ---
 
@@ -154,6 +155,7 @@ Total: 169 passed / 169 collected across 30 test modules.
    - Bidirectional WebSocket companion stream (`/ws/mobile/{client_id}`).
    - Fast task dispatch with visual LED feedback (`MobileCompanionClient.send_command`).
    - Local session persistence (`~/.core_ai_mobile_session.json`) with automatic token reload across CLI commands and `logout` / `reset-session` clearing.
+   - Mobile state synchronization (`core mobile sync`), node matrix query (`core mobile nodes`), and inter-device message routing (`core mobile send`).
 2. **Nothing OS Rear Glyph Matrix LED Driver**:
    - Breathing `reasoning_pulse` during DAG planning.
    - High-contrast `success_flash` (200ms) on task completion.
@@ -167,3 +169,10 @@ Total: 169 passed / 169 collected across 30 test modules.
    - Direct edge node speech push across WebSockets.
    - Dynamic edge tool registration & bidirectional RPC dispatch (`speak_{node_id}`, `status_{node_id}`, `interrupt_{node_id}`).
    - Fast CLI argument forwarding (`core satellite --node-id ... --server ... --headless --speak-only`) via non-destructive `parse_known_args()`.
+   - Real-time `mesh_device_message` handling, `MESH_STATE_UPDATED` broadcast sync, and automatic offline task replay upon reconnection.
+5. **Sovereign Mesh State Sync & Inter-Device Routing (`core/state.py`, `core/gateway.py`, `core/mesh_client.py`)**:
+   - Durable SQLite offline task queueing and replay (`mesh_offline_queue`, migration `v3`).
+   - Bidirectional delta synchronization (`POST /api/v1/mesh/sync`, `core mesh sync [full|pull|push]`).
+   - Intelligent non-destructive profile protection (prevents blank/default "User" from overwriting custom identities).
+   - Inter-device message routing (`POST /api/v1/mesh/message`, `core mesh send <node> <type> <payload>`).
+   - Real-time unified node matrix (`GET /api/v1/mesh/nodes`, `core mesh nodes`).

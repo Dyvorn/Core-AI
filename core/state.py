@@ -2,6 +2,8 @@ import os
 import sqlite3
 import json
 import logging
+import uuid
+import time
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from core.schemas import PipelinePlan, PipelineStep, UserProfile, DeviceTopologyRecord, ProactiveTriggerRule, ZoneRecord, AudioRouteRecord
@@ -188,9 +190,22 @@ class StateManager:
                 )
             ''')
 
+            # 12. Mesh Offline Execution Queue
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS mesh_offline_queue (
+                    id TEXT PRIMARY KEY,
+                    goal TEXT,
+                    context JSON,
+                    result JSON,
+                    status TEXT,
+                    created_at TIMESTAMP,
+                    synced INTEGER DEFAULT 0
+                )
+            ''')
+
             conn.commit()
             self._run_migrations(conn)
-            logger.info("Database initialized successfully with pipeline, profile, dynamic zones, topology, audio routing, and migrations.")
+            logger.info("Database initialized successfully with pipeline, profile, dynamic zones, topology, audio routing, mesh offline queue, and migrations.")
 
         except Exception as e:
             logger.error(f"Database initialization failed: {e}")
@@ -220,6 +235,25 @@ class StateManager:
                 logger.info("Database schema migration v2 applied successfully.")
             except Exception as me:
                 logger.warning(f"Notice during migration v2: {me}")
+
+        if current_version < 3:
+            try:
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS mesh_offline_queue (
+                        id TEXT PRIMARY KEY,
+                        goal TEXT,
+                        context JSON,
+                        result JSON,
+                        status TEXT,
+                        created_at TIMESTAMP,
+                        synced INTEGER DEFAULT 0
+                    )
+                ''')
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_mesh_offline_synced ON mesh_offline_queue(synced)")
+                conn.execute("PRAGMA user_version = 3")
+                logger.info("Database schema migration v3 applied successfully.")
+            except Exception as me:
+                logger.warning(f"Notice during migration v3: {me}")
         conn.commit()
 
     def get_schema_version(self) -> int:
@@ -867,5 +901,298 @@ class StateManager:
             logger.info(f"Deleted audio route for zone '{zone_id}'")
         finally:
             conn.close()
+
+    # --- Phase 5: Mesh Offline Execution Queue & Bidirectional Synchronization ---
+
+    def enqueue_offline_task(
+        self,
+        goal: str,
+        context: Optional[Dict[str, Any]] = None,
+        result: Optional[Dict[str, Any]] = None,
+        status: str = "completed_locally"
+    ) -> str:
+        """Stores an offline executed task into durable SQLite queue for later synchronization."""
+        task_id = str(uuid.uuid4())
+        now_iso = datetime.now(timezone.utc).isoformat()
+        conn = self._get_connection()
+        try:
+            conn.execute('''
+                INSERT INTO mesh_offline_queue (id, goal, context, result, status, created_at, synced)
+                VALUES (?, ?, ?, ?, ?, ?, 0)
+            ''', (
+                task_id,
+                goal,
+                json.dumps(context or {}),
+                json.dumps(result or {}, default=str),
+                status,
+                now_iso
+            ))
+            conn.commit()
+            logger.info(f"Enqueued offline task '{task_id[:8]}' for mesh synchronization.")
+            return task_id
+        finally:
+            conn.close()
+
+    def get_unsynced_offline_tasks(self) -> List[Dict[str, Any]]:
+        """Retrieves all offline tasks pending synchronization with the central server."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT * FROM mesh_offline_queue WHERE synced = 0 ORDER BY created_at ASC")
+            tasks = []
+            for row in cursor.fetchall():
+                d = dict(row)
+                d["context"] = json.loads(d["context"]) if d.get("context") else {}
+                d["result"] = json.loads(d["result"]) if d.get("result") else {}
+                tasks.append(d)
+            return tasks
+        finally:
+            conn.close()
+
+    def mark_offline_tasks_synced(self, task_ids: List[str]) -> int:
+        """Marks offline tasks as successfully synchronized."""
+        if not task_ids:
+            return 0
+        conn = self._get_connection()
+        try:
+            placeholders = ",".join("?" for _ in task_ids)
+            cursor = conn.execute(f"UPDATE mesh_offline_queue SET synced = 1 WHERE id IN ({placeholders})", task_ids)
+            conn.commit()
+            return cursor.rowcount
+        finally:
+            conn.close()
+
+    def get_kv_with_metadata(self, prefix: Optional[str] = None, since: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Retrieves kv_state records with keys, values, and updated_at timestamps, optionally filtered."""
+        conn = self._get_connection()
+        try:
+            query = "SELECT key, value, updated_at FROM kv_state"
+            params = []
+            clauses = []
+            if prefix:
+                clauses.append("key LIKE ?")
+                params.append(f"{prefix}%")
+            if since:
+                clauses.append("updated_at > ?")
+                params.append(since)
+            if clauses:
+                query += " WHERE " + " AND ".join(clauses)
+            cursor = conn.execute(query, params)
+            results = []
+            for row in cursor.fetchall():
+                results.append({
+                    "key": row[0],
+                    "value": json.loads(row[1]) if row[1] else None,
+                    "updated_at": row[2]
+                })
+            return results
+        finally:
+            conn.close()
+
+    def merge_kv_records(self, records: List[Dict[str, Any]]) -> int:
+        """Merges a list of KV records into local kv_state. Last-write-wins based on updated_at."""
+        if not records:
+            return 0
+        merged = 0
+        conn = self._get_connection()
+        try:
+            for r in records:
+                k = r.get("key")
+                v = r.get("value")
+                new_ts = r.get("updated_at") or datetime.now(timezone.utc).isoformat()
+                if not k:
+                    continue
+                cursor = conn.execute("SELECT updated_at FROM kv_state WHERE key = ?", (k,))
+                row = cursor.fetchone()
+                should_update = True
+                if row and row[0]:
+                    existing_ts = row[0]
+                    if existing_ts > new_ts:
+                        should_update = False
+                if should_update:
+                    conn.execute('''
+                        INSERT OR REPLACE INTO kv_state (key, value, updated_at)
+                        VALUES (?, ?, ?)
+                    ''', (k, json.dumps(v), new_ts))
+                    merged += 1
+            conn.commit()
+            return merged
+        finally:
+            conn.close()
+
+    def merge_zones(self, zones: List[Dict[str, Any]]) -> int:
+        """Merges spatial zone definitions."""
+        count = 0
+        for z in zones:
+            zid = z.get("zone_id")
+            if zid:
+                self.ensure_zone_exists(
+                    zone_id=zid,
+                    display_name=z.get("display_name"),
+                    metadata=z.get("metadata")
+                )
+                count += 1
+        return count
+
+    def merge_devices(self, devices: List[Dict[str, Any]]) -> int:
+        """Merges device topology records."""
+        count = 0
+        for d in devices:
+            if not d.get("device_id"):
+                continue
+            rec_dict = dict(d)
+            if isinstance(rec_dict.get("last_seen"), str):
+                rec_dict["last_seen"] = datetime.fromisoformat(rec_dict["last_seen"])
+            rec = DeviceTopologyRecord(**rec_dict)
+            self.register_or_update_device(rec)
+            count += 1
+        return count
+
+    def merge_proactive_rules(self, rules: List[Dict[str, Any]]) -> int:
+        """Merges proactive trigger rules."""
+        count = 0
+        for r in rules:
+            if not r.get("rule_id") or not r.get("name"):
+                continue
+            r_dict = dict(r)
+            if isinstance(r_dict.get("last_triggered_at"), str):
+                r_dict["last_triggered_at"] = datetime.fromisoformat(r_dict["last_triggered_at"])
+            rule = ProactiveTriggerRule(**r_dict)
+            self.register_proactive_rule(rule)
+            count += 1
+        return count
+
+    def merge_audio_routes(self, routes: List[Dict[str, Any]]) -> int:
+        """Merges spatial audio routing configurations."""
+        count = 0
+        for r in routes:
+            if not r.get("zone_id"):
+                continue
+            r_dict = dict(r)
+            if isinstance(r_dict.get("updated_at"), str):
+                r_dict["updated_at"] = datetime.fromisoformat(r_dict["updated_at"])
+            self.set_audio_route(AudioRouteRecord(**r_dict))
+            count += 1
+        return count
+
+    def get_state_deltas(
+        self,
+        since: Optional[str] = None,
+        entities: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Extracts all state entities matching requested criteria for delta synchronization."""
+        targets = set(entities or ["profile", "kv_state", "zones", "devices", "proactive_rules", "audio_routes", "dynamic_tools"])
+        deltas: Dict[str, Any] = {
+            "timestamp": time.time(),
+            "profile": None,
+            "kv_state": [],
+            "zones": [],
+            "devices": [],
+            "proactive_rules": [],
+            "audio_routes": [],
+            "dynamic_tools": [],
+            "offline_tasks": []
+        }
+
+        if "profile" in targets:
+            prof = self.get_user_profile()
+            deltas["profile"] = prof.model_dump(mode="json")
+
+        if "kv_state" in targets:
+            deltas["kv_state"] = self.get_kv_with_metadata(since=since)
+
+        if "zones" in targets:
+            deltas["zones"] = [z.model_dump(mode="json") for z in self.list_zones()]
+
+        if "devices" in targets:
+            deltas["devices"] = [d.model_dump(mode="json") for d in self.list_all_devices()]
+
+        if "proactive_rules" in targets:
+            deltas["proactive_rules"] = [r.model_dump(mode="json") for r in self.get_all_proactive_rules()]
+
+        if "audio_routes" in targets:
+            deltas["audio_routes"] = [a.model_dump(mode="json") for a in self.list_all_audio_routes()]
+
+        if "dynamic_tools" in targets:
+            deltas["dynamic_tools"] = self.get_dynamic_tool_records()
+
+        return deltas
+
+    def merge_state_deltas(self, deltas: Dict[str, Any]) -> Dict[str, int]:
+        """Applies incoming delta payload from another node and returns merged item counts."""
+        counts = {
+            "profile": 0,
+            "kv_state": 0,
+            "zones": 0,
+            "devices": 0,
+            "proactive_rules": 0,
+            "audio_routes": 0,
+            "offline_tasks": 0
+        }
+
+        # 1. Profile merge
+        p_data = deltas.get("profile")
+        if p_data and isinstance(p_data, dict):
+            existing_prof = self.get_user_profile()
+            in_name = p_data.get("preferred_name")
+            is_incoming_custom = in_name not in ("User", "Operator", None, "")
+            is_existing_custom = existing_prof.preferred_name not in ("User", "Operator", None, "")
+
+            in_updated = p_data.get("updated_at")
+            if isinstance(in_updated, str):
+                in_updated_dt = datetime.fromisoformat(in_updated)
+            else:
+                in_updated_dt = in_updated
+
+            should_save = False
+            if not is_incoming_custom and is_existing_custom:
+                # Never overwrite a custom operator profile with a blank-slate default
+                should_save = False
+            elif is_incoming_custom and not is_existing_custom:
+                # Promote to custom operator profile
+                should_save = True
+            elif in_updated_dt and existing_prof.updated_at and in_updated_dt > existing_prof.updated_at:
+                should_save = True
+            elif in_updated_dt and not existing_prof.updated_at:
+                should_save = True
+
+            if should_save:
+                p_data["updated_at"] = in_updated_dt
+                self.save_user_profile(UserProfile(**p_data))
+                counts["profile"] = 1
+
+        # 2. KV state
+        if deltas.get("kv_state"):
+            counts["kv_state"] = self.merge_kv_records(deltas["kv_state"])
+
+        # 3. Zones
+        if deltas.get("zones"):
+            counts["zones"] = self.merge_zones(deltas["zones"])
+
+        # 4. Devices
+        if deltas.get("devices"):
+            counts["devices"] = self.merge_devices(deltas["devices"])
+
+        # 5. Proactive rules
+        if deltas.get("proactive_rules"):
+            counts["proactive_rules"] = self.merge_proactive_rules(deltas["proactive_rules"])
+
+        # 6. Audio routes
+        if deltas.get("audio_routes"):
+            counts["audio_routes"] = self.merge_audio_routes(deltas["audio_routes"])
+
+        # 7. Offline tasks merge (for server receiving from edge nodes)
+        tasks = deltas.get("offline_tasks", [])
+        for t in tasks:
+            if isinstance(t, dict):
+                self.log_execution(
+                    source=f"edge_offline:{t.get('source_node', 'roaming')}",
+                    level="INFO",
+                    message=f"Synced offline task: {t.get('goal')}",
+                    payload={"context": t.get("context"), "result": t.get("result"), "offline_id": t.get("id")}
+                )
+                counts["offline_tasks"] += 1
+
+        return counts
+
 
 

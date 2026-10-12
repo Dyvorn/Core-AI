@@ -20,7 +20,9 @@ from core.schemas import (
     TrustTier, DeviceEnrollmentRequest, DeviceEnrollmentResponse,
     AudioRouteRecord, AudioRouteUpdateRequest, SpatialHandoffEvent,
     SatelliteHeartbeatRequest, SatelliteHeartbeatResponse, SatelliteSpeakRequest,
-    MobileEnrollmentRequest, MobileEnrollmentResponse, GlyphPattern, GlyphTriggerRequest, MobileGlanceStatus
+    MobileEnrollmentRequest, MobileEnrollmentResponse, GlyphPattern, GlyphTriggerRequest, MobileGlanceStatus,
+    MeshSyncPullRequest, MeshSyncPullResponse, MeshSyncPushRequest, MeshSyncPushResponse,
+    MeshSyncFullRequest, MeshSyncFullResponse, MeshDeviceMessage, MeshDeviceMessageResponse, MeshSyncPayload
 )
 from core.state import StateManager
 from core.bus import EventBus
@@ -176,6 +178,133 @@ class ConnectionManager:
         except asyncio.TimeoutError:
             self.pending_tool_calls.pop(request.id, None)
             raise TimeoutError(f"Remote tool call '{request.tool_name}' on node '{node_id}' timed out after {timeout}s")
+
+    async def send_to_node(self, node_id: str, message: Dict[str, Any]) -> bool:
+        """Sends a JSON message directly to a connected edge node or mobile companion."""
+        payload = json.dumps(message)
+        if node_id in self.edge_nodes:
+            try:
+                await self.edge_nodes[node_id].send_text(payload)
+                return True
+            except Exception:
+                self.edge_nodes.pop(node_id, None)
+                return False
+        elif node_id in self.mobile_clients:
+            try:
+                await self.mobile_clients[node_id].send_text(payload)
+                return True
+            except Exception:
+                self.mobile_clients.pop(node_id, None)
+                return False
+        return False
+
+    async def broadcast_mesh(self, event_type: str, data: Dict[str, Any]) -> int:
+        """Broadcasts across all active edge nodes, mobile companions, and broadcast terminals."""
+        payload = json.dumps({
+            "event": event_type,
+            "data": data,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        sent_count = 0
+        dead_edges = set()
+        for nid, sock in self.edge_nodes.items():
+            try:
+                await sock.send_text(payload)
+                sent_count += 1
+            except Exception:
+                dead_edges.add(nid)
+        for dead in dead_edges:
+            self.edge_nodes.pop(dead, None)
+
+        dead_mobs = set()
+        for cid, sock in self.mobile_clients.items():
+            try:
+                await sock.send_text(payload)
+                sent_count += 1
+            except Exception:
+                dead_mobs.add(cid)
+        for dead in dead_mobs:
+            self.mobile_clients.pop(dead, None)
+
+        dead_bcs = set()
+        for sock in self.broadcast_clients:
+            try:
+                await sock.send_text(payload)
+                sent_count += 1
+            except Exception:
+                dead_bcs.add(sock)
+        for dead in dead_bcs:
+            self.broadcast_clients.discard(dead)
+
+        return sent_count
+
+    def get_all_nodes_summary(self, state_manager: Optional[StateManager] = None) -> List[Dict[str, Any]]:
+        """Returns consolidated inventory of all connected and registered nodes across the mesh."""
+        nodes = []
+        seen_ids = set()
+
+        # 1. Active Voice Satellites
+        for sat in self.get_active_satellites():
+            nid = sat.get("node_id")
+            if nid:
+                seen_ids.add(nid)
+                nodes.append({
+                    "node_id": nid,
+                    "name": nid,
+                    "type": "voice_satellite",
+                    "zone": sat.get("zone", "office"),
+                    "status": sat.get("effective_status", "online"),
+                    "connected_ws": nid in self.edge_nodes,
+                    "last_seen": sat.get("last_seen"),
+                    "capabilities": sat.get("capabilities", ["audio_in", "audio_out"])
+                })
+
+        # 2. Connected Mobile Companions
+        for cid in list(self.mobile_clients.keys()):
+            seen_ids.add(cid)
+            nodes.append({
+                "node_id": cid,
+                "name": cid,
+                "type": "mobile_companion",
+                "zone": "mobile/default",
+                "status": "online",
+                "connected_ws": True,
+                "last_seen": time.time(),
+                "capabilities": ["glance_cards", "glyph_matrix", "voice_stream"]
+            })
+
+        # 3. Other Connected Edge Nodes
+        for nid in list(self.edge_nodes.keys()):
+            if nid not in seen_ids:
+                seen_ids.add(nid)
+                nodes.append({
+                    "node_id": nid,
+                    "name": nid,
+                    "type": "edge_node",
+                    "zone": "roaming",
+                    "status": "online",
+                    "connected_ws": True,
+                    "last_seen": time.time(),
+                    "capabilities": ["remote_exec"]
+                })
+
+        # 4. Registered Devices from Topology if not already in list
+        if state_manager:
+            for dev in state_manager.list_all_devices():
+                if dev.device_id not in seen_ids:
+                    seen_ids.add(dev.device_id)
+                    nodes.append({
+                        "node_id": dev.device_id,
+                        "name": dev.name or dev.device_id,
+                        "type": dev.device_type,
+                        "zone": dev.current_zone or "unassigned",
+                        "status": "offline",
+                        "connected_ws": False,
+                        "last_seen": dev.last_seen.isoformat() if dev.last_seen else None,
+                        "capabilities": dev.capabilities or []
+                    })
+
+        return nodes
 
 
 # Global Gateway Context
@@ -784,6 +913,39 @@ def create_gateway_app(
                         logger.info(f"Received event from edge node '{node_id}': {event_data}")
                         await connection_manager.broadcast_event("EDGE_EVENT", {"node_id": node_id, "payload": event_data})
 
+                    # Real-time WebSocket state synchronization pull
+                    elif msg_type == "sync_pull":
+                        since = msg.get("since")
+                        ents = msg.get("entities")
+                        deltas = state_manager.get_state_deltas(since=since, entities=ents)
+                        await websocket.send_text(json.dumps({
+                            "type": "sync_response",
+                            "server_time": time.time(),
+                            "payload": deltas
+                        }))
+
+                    # Real-time WebSocket state synchronization push
+                    elif msg_type == "sync_push":
+                        client_deltas = msg.get("payload", {})
+                        counts = state_manager.merge_state_deltas(client_deltas)
+                        await connection_manager.broadcast_mesh("MESH_STATE_UPDATED", {
+                            "source_node": node_id,
+                            "merged_counts": counts,
+                            "timestamp": time.time()
+                        })
+                        await websocket.send_text(json.dumps({
+                            "type": "sync_ack",
+                            "merged_counts": counts,
+                            "time": time.time()
+                        }))
+
+                    # Inter-device message forwarding over WebSocket
+                    elif msg_type == "mesh_message":
+                        m_payload = msg.get("message", {})
+                        tgt = m_payload.get("target_node")
+                        if tgt:
+                            await connection_manager.send_to_node(tgt, {"type": "mesh_device_message", "message": m_payload})
+
                 except Exception as parse_err:
                     logger.error(f"Error parsing edge node message from '{node_id}': {parse_err}")
 
@@ -947,6 +1109,131 @@ def create_gateway_app(
             "brightness": req.brightness,
             "duration_ms": req.duration_ms
         }
+
+    # --- Phase 5: Sovereign Mesh State Sync & Inter-Device Communication ---
+
+    @app.get("/api/v1/mesh/nodes")
+    def get_mesh_nodes():
+        """Returns consolidated inventory of all connected and registered nodes across the sovereign mesh."""
+        return connection_manager.get_all_nodes_summary(state_manager=state_manager)
+
+    @app.post("/api/v1/mesh/sync/pull", response_model=MeshSyncPullResponse)
+    def pull_mesh_state(req: MeshSyncPullRequest):
+        """Pulls updated state deltas from the central gateway since a timestamp."""
+        deltas = state_manager.get_state_deltas(since=req.since, entities=req.entities)
+        return MeshSyncPullResponse(
+            status="ok",
+            server_time=time.time(),
+            payload=MeshSyncPayload(**deltas)
+        )
+
+    @app.post("/api/v1/mesh/sync/push", response_model=MeshSyncPushResponse)
+    async def push_mesh_state(req: MeshSyncPushRequest):
+        """Merges locally created/modified state deltas from a mesh node into central state."""
+        counts = state_manager.merge_state_deltas(req.payload.model_dump())
+        await connection_manager.broadcast_mesh("MESH_STATE_UPDATED", {
+            "source_node": req.node_id,
+            "merged_counts": counts,
+            "timestamp": time.time()
+        })
+        return MeshSyncPushResponse(
+            status="merged",
+            server_time=time.time(),
+            merged_counts=counts,
+            message="State deltas merged successfully."
+        )
+
+    @app.post("/api/v1/mesh/sync", response_model=MeshSyncFullResponse)
+    async def sync_mesh_full(req: MeshSyncFullRequest):
+        """Two-way atomic synchronization: merges client deltas and returns server deltas."""
+        merged_counts = state_manager.merge_state_deltas(req.client_payload.model_dump())
+        server_deltas = state_manager.get_state_deltas(since=req.since)
+        await connection_manager.broadcast_mesh("MESH_STATE_UPDATED", {
+            "source_node": req.node_id,
+            "merged_counts": merged_counts,
+            "timestamp": time.time()
+        })
+        return MeshSyncFullResponse(
+            status="synced",
+            server_time=time.time(),
+            merged_counts=merged_counts,
+            server_payload=MeshSyncPayload(**server_deltas),
+            message="Bidirectional mesh synchronization completed."
+        )
+
+    @app.post("/api/v1/mesh/message", response_model=MeshDeviceMessageResponse)
+    async def dispatch_mesh_message(msg: MeshDeviceMessage):
+        """Routes an inter-device command, alert, speech, or notification across the sovereign mesh."""
+        dispatched_to = []
+        target = msg.target_node.lower().strip()
+
+        # 1. Mesh-wide broadcast
+        if target in ("all", "broadcast"):
+            count = await connection_manager.broadcast_mesh("MESH_DEVICE_MESSAGE", msg.model_dump())
+            dispatched_to.append(f"all ({count} nodes)")
+            return MeshDeviceMessageResponse(
+                status="broadcasted",
+                dispatched_to=dispatched_to,
+                message=f"Broadcasted to {count} connected mesh nodes."
+            )
+
+        # 2. Direct Node targeting (WebSocket)
+        if msg.target_node in connection_manager.edge_nodes or msg.target_node in connection_manager.mobile_clients:
+            delivered = await connection_manager.send_to_node(
+                msg.target_node,
+                {"type": "mesh_device_message", "message": msg.model_dump()}
+            )
+            if delivered:
+                dispatched_to.append(msg.target_node)
+
+        # 3. Spatial Room Zone targeting
+        zones = state_manager.list_zones()
+        matching_zone = next((z for z in zones if z.zone_id.lower() == target or z.display_name.lower() == target), None)
+        if matching_zone or target in [s.get("zone") for s in connection_manager.get_active_satellites()]:
+            zone_id = matching_zone.zone_id if matching_zone else target
+            for sat in connection_manager.get_active_satellites():
+                if sat.get("zone") == zone_id:
+                    snid = sat.get("node_id")
+                    if snid and snid in connection_manager.edge_nodes:
+                        await connection_manager.send_to_node(
+                            snid,
+                            {"type": "mesh_device_message", "message": msg.model_dump()}
+                        )
+                        dispatched_to.append(snid)
+
+        # 4. Message-type specific actions (Speech, Glyph)
+        if msg.message_type == "speak" and msg.payload.get("text"):
+            speech_text = msg.payload["text"]
+            bus.publish("tts_events", {"text": speech_text, "target": msg.target_node})
+            if not dispatched_to:
+                for sat in connection_manager.get_active_satellites():
+                    if sat.get("node_id") == msg.target_node or sat.get("zone") == msg.target_node:
+                        snid = sat.get("node_id")
+                        if snid and snid in connection_manager.edge_nodes:
+                            await connection_manager.send_to_node(
+                                snid,
+                                {"type": "speak", "text": speech_text}
+                            )
+                            dispatched_to.append(snid)
+
+        elif msg.message_type == "glyph" and msg.payload.get("pattern"):
+            pat = msg.payload["pattern"]
+            dur = msg.payload.get("duration_ms", 500)
+            await connection_manager.broadcast_glyph(pat, duration_ms=dur)
+            dispatched_to.append("mobile_glyph_mesh")
+
+        if dispatched_to:
+            return MeshDeviceMessageResponse(
+                status="delivered",
+                dispatched_to=dispatched_to,
+                message=f"Dispatched message to {len(dispatched_to)} node(s)."
+            )
+        else:
+            return MeshDeviceMessageResponse(
+                status="queued_or_unreachable",
+                dispatched_to=[],
+                message=f"Target '{msg.target_node}' is not currently active on the mesh."
+            )
 
     @app.websocket("/ws/mobile/{client_id}")
     async def websocket_mobile_companion(websocket: WebSocket, client_id: str):

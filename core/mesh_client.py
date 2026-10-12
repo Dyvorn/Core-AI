@@ -150,13 +150,24 @@ class MeshClient:
 
         if local_executor:
             local_result = local_executor(goal, context)
-            # Buffer executed task into offline log
+            # Buffer executed task into offline log and durable SQLite queue
             self.offline_buffer.append({
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "goal": goal,
                 "context": context,
                 "status": "completed_locally"
             })
+            try:
+                res_dict = local_result if isinstance(local_result, dict) else {"output": str(local_result)}
+                self.state_manager.enqueue_offline_task(
+                    goal=goal,
+                    context=context,
+                    result=res_dict,
+                    status="completed_locally"
+                )
+            except Exception as eq_err:
+                logger.debug(f"Could not enqueue offline task to SQLite: {eq_err}")
+
             return {
                 "execution_mode": "local_autonomous_fallback",
                 "notice": notice,
@@ -245,6 +256,174 @@ class MeshClient:
             logger.warning(f"Error scanning LAN for Core AI servers: {e}")
             return []
 
+    def get_last_sync_time(self) -> Optional[str]:
+        """Returns the ISO timestamp of the last successful synchronization."""
+        try:
+            profile = self.state_manager.get_user_profile()
+            return profile.preferences.get("mesh", {}).get("last_sync_at")
+        except Exception:
+            return None
+
+    def set_last_sync_time(self, ts_iso: str):
+        """Records the timestamp of successful synchronization into profile preferences."""
+        try:
+            profile = self.state_manager.get_user_profile()
+            if "mesh" not in profile.preferences:
+                profile.preferences["mesh"] = {}
+            profile.preferences["mesh"]["last_sync_at"] = ts_iso
+            self.state_manager.save_user_profile(profile)
+        except Exception as e:
+            logger.debug(f"Could not persist last sync timestamp: {e}")
+
+    def sync(self, pull_only: bool = False, push_only: bool = False) -> Dict[str, Any]:
+        """
+        Performs state synchronization between this node and the central Core AI Gateway:
+        - Pulls profile preferences, scratch notes, spatial zones, devices, and rules from the server.
+        - Pushes locally modified notes, zones, and replayed offline tasks to the server.
+        - Durable: Marks offline tasks as synced upon successful completion.
+        """
+        is_online, ping_info = self.ping_main_server()
+        if not is_online:
+            return {
+                "status": "offline",
+                "message": f"Cannot synchronize: Main Server at {self.main_server_url} is unreachable ({ping_info.get('error', 'offline')}).",
+                "merged_counts": {}
+            }
+
+        last_sync = self.get_last_sync_time()
+
+        # 1. Pull Only
+        if pull_only:
+            try:
+                url = f"{self.main_server_url}/api/v1/mesh/sync/pull"
+                req_data = json.dumps({"node_id": self.node_id, "since": last_sync}).encode("utf-8")
+                req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=15.0) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    server_payload = data.get("payload", {})
+                    merged = self.state_manager.merge_state_deltas(server_payload)
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    self.set_last_sync_time(now_iso)
+                    return {
+                        "status": "success",
+                        "mode": "pull",
+                        "merged_counts": merged,
+                        "server_time": data.get("server_time"),
+                        "message": f"Successfully pulled state deltas from {self.main_server_url}."
+                    }
+            except Exception as e:
+                logger.error(f"Sync pull failed: {e}")
+                return {"status": "error", "message": str(e), "merged_counts": {}}
+
+        # Collect unsynced offline tasks
+        unsynced_tasks = self.state_manager.get_unsynced_offline_tasks()
+        task_ids = [t["id"] for t in unsynced_tasks if "id" in t]
+        for t in unsynced_tasks:
+            t["source_node"] = self.node_id
+
+        # Extract local deltas
+        local_deltas = self.state_manager.get_state_deltas(since=last_sync)
+        local_deltas["offline_tasks"] = unsynced_tasks
+
+        # 2. Push Only
+        if push_only:
+            try:
+                url = f"{self.main_server_url}/api/v1/mesh/sync/push"
+                push_req = json.dumps({"node_id": self.node_id, "payload": local_deltas}, default=str).encode("utf-8")
+                req = urllib.request.Request(url, data=push_req, headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=15.0) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    if task_ids:
+                        self.state_manager.mark_offline_tasks_synced(task_ids)
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    self.set_last_sync_time(now_iso)
+                    return {
+                        "status": "success",
+                        "mode": "push",
+                        "merged_counts": data.get("merged_counts", {}),
+                        "server_time": data.get("server_time"),
+                        "message": f"Successfully pushed state deltas to {self.main_server_url}."
+                    }
+            except Exception as e:
+                logger.error(f"Sync push failed: {e}")
+                return {"status": "error", "message": str(e), "merged_counts": {}}
+
+        # 3. Two-Way Atomic Full Sync
+        try:
+            url = f"{self.main_server_url}/api/v1/mesh/sync"
+            sync_payload = {
+                "node_id": self.node_id,
+                "since": last_sync,
+                "client_payload": local_deltas
+            }
+            req_bytes = json.dumps(sync_payload, default=str).encode("utf-8")
+            req = urllib.request.Request(url, data=req_bytes, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=20.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                server_payload = data.get("server_payload", {})
+                server_merged = self.state_manager.merge_state_deltas(server_payload)
+                if task_ids:
+                    self.state_manager.mark_offline_tasks_synced(task_ids)
+                now_iso = datetime.now(timezone.utc).isoformat()
+                self.set_last_sync_time(now_iso)
+
+                push_counts = data.get("merged_counts", {})
+                total_merged = {
+                    "pulled": server_merged,
+                    "pushed": push_counts,
+                    "offline_replayed": len(task_ids)
+                }
+                return {
+                    "status": "success",
+                    "mode": "two_way",
+                    "merged_counts": total_merged,
+                    "server_time": data.get("server_time"),
+                    "message": "Bidirectional mesh synchronization completed successfully."
+                }
+        except Exception as e:
+            logger.error(f"Two-way sync failed: {e}")
+            return {"status": "error", "message": str(e), "merged_counts": {}}
+
+    def send_message(
+        self,
+        target_node: str,
+        message_type: str = "command",
+        payload: Optional[Dict[str, Any]] = None,
+        priority: str = "normal"
+    ) -> Dict[str, Any]:
+        """Dispatches an inter-device command, alert, speech, or notification across the sovereign mesh."""
+        url = f"{self.main_server_url}/api/v1/mesh/message"
+        body = {
+            "source_node": self.node_id,
+            "target_node": target_node,
+            "message_type": message_type,
+            "payload": payload or {},
+            "priority": priority
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(body).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            logger.error(f"Failed to dispatch inter-device message: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def list_mesh_nodes(self) -> List[Dict[str, Any]]:
+        """Queries the central gateway for real-time inventory of all mesh satellites, companions, and nodes."""
+        url = f"{self.main_server_url}/api/v1/mesh/nodes"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": f"CoreAI-Mesh/{self.node_id}"})
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            logger.warning(f"Could not fetch mesh nodes from {url}: {e}")
+            return []
+
+
 def main():
     import sys
     if sys.platform == "win32":
@@ -267,23 +446,103 @@ def main():
     if not args or args[0] in ["status", "info"]:
         is_online, ping_info = client.ping_main_server()
         status_str = f"{G}REACHABLE (Online){RST}" if is_online else f"{Y}UNREACHABLE ({ping_info.get('error', 'offline')}){RST}"
+        unsynced = client.state_manager.get_unsynced_offline_tasks()
+        last_sync = client.get_last_sync_time() or "Never"
         print(f"\n{C}+=====================================================================+{RST}")
         print(f"{C}|{B}   CORE AI :: INTERCONTINENTAL SOVEREIGN MESH STATUS                 {RST}{C}|{RST}")
         print(f"{C}+=====================================================================+{RST}")
         print(f"{C}|{RST}   Node Role:        {C}{client.role.upper()}{RST}")
         print(f"{C}|{RST}   Main Server URL:  {client.main_server_url}")
         print(f"{C}|{RST}   Server Status:    {status_str}")
-        print(f"{C}|{RST}   Offline Buffer:   {len(client.offline_buffer)} items queued")
+        print(f"{C}|{RST}   Last State Sync:  {G}{last_sync}{RST}")
+        print(f"{C}|{RST}   Offline Queue:    {Y}{len(unsynced)} pending offline tasks{RST}")
         if client.role == "edge_node" and not is_online:
             print(f"{C}|{RST}   {Y}[>] Autonomous Local Fallback is ACTIVE (never locked out).{RST}")
         print(f"{C}+=====================================================================+{RST}\n")
         print("  Commands:")
+        print("    core mesh sync                         (Two-way delta sync notes/zones/devices/tasks)")
+        print("    core mesh nodes                        (Inspect all connected satellites & mesh devices)")
         print("    core mesh scan                         (Scan LAN subnet for running Main Servers)")
         print("    core mesh ping                         (Measure round-trip latency to Main Server)")
         print("    core mesh connect auto                 (Auto-discover and pair to first LAN Server)")
         print("    core mesh connect <http://host:port>   (Bind this machine as edge node to server)")
+        print("    core mesh send <node> <type> <payload> (Send inter-device command/speech across mesh)")
         print("    core mesh role <main_server|edge_node> (Set operational node role)")
         print("    core mesh disconnect                   (Revert to standalone main server)\n")
+
+    elif args[0] in ["sync", "synchronize"]:
+        mode = args[1].lower() if len(args) > 1 else "full"
+        print(f"\n{C}[*] Synchronizing state with Core AI Gateway at {client.main_server_url}...{RST}")
+        if mode == "pull":
+            res = client.sync(pull_only=True)
+        elif mode == "push":
+            res = client.sync(push_only=True)
+        else:
+            res = client.sync()
+
+        if res.get("status") == "success":
+            print(f"{G}[OK] {res.get('message')}{RST}")
+            counts = res.get("merged_counts", {})
+            if isinstance(counts, dict) and "pulled" in counts:
+                p_in = counts.get("pulled", {})
+                p_out = counts.get("pushed", {})
+                replayed = counts.get("offline_replayed", 0)
+                print(f"     Pulled:  {p_in.get('kv_state', 0)} notes, {p_in.get('zones', 0)} zones, {p_in.get('devices', 0)} devices, {p_in.get('proactive_rules', 0)} rules")
+                print(f"     Pushed:  {p_out.get('kv_state', 0)} notes, {p_out.get('zones', 0)} zones, {p_out.get('devices', 0)} devices")
+                if replayed > 0:
+                    print(f"     Replayed Offline Tasks: {G}{replayed} tasks unified into central log{RST}")
+            else:
+                print(f"     Merged Items: {counts}")
+            print(f"     Last Sync Timestamp: {G}{client.get_last_sync_time()}{RST}\n")
+        else:
+            print(f"{R}[FAIL] {res.get('message')}{RST}\n")
+
+    elif args[0] in ["nodes", "list", "devices"]:
+        print(f"\n{C}[*] Querying Sovereign Mesh Nodes from {client.main_server_url}...{RST}")
+        nodes = client.list_mesh_nodes()
+        if not nodes:
+            print(f"{Y}[!] No active mesh nodes returned from server.{RST}\n")
+            return
+        from core.terminal import render_box
+        rows = []
+        for n in nodes:
+            status_col = G if n.get("status") == "online" else (Y if n.get("status") == "stale" else R)
+            ws_str = f"{G}WS-LINKED{RST}" if n.get("connected_ws") else f"{R}OFFLINE{RST}"
+            rows.append((
+                f"[{n.get('type', 'node').upper()}] {n.get('node_id')}:",
+                f"{status_col}{n.get('status', 'unknown').upper()}{RST} | Zone: {C}{n.get('zone', 'default')}{RST} | {ws_str}"
+            ))
+        card = render_box(
+            title="CORE AI :: SOVEREIGN MESH NODES INVENTORY",
+            rows=rows,
+            width=72
+        )
+        print(f"\n{card}\n")
+
+    elif args[0] in ["send", "msg", "dispatch"]:
+        if len(args) < 4:
+            print(f"{YELLOW}Usage: core mesh send <target_node|zone|all> <speak|glyph|command|notify> <payload>{RESET}")
+            return
+        target = args[1]
+        mtype = args[2].lower()
+        payload_text = " ".join(args[3:])
+        payload_dict = {}
+        if mtype == "speak":
+            payload_dict = {"text": payload_text}
+        elif mtype == "glyph":
+            payload_dict = {"pattern": payload_text}
+        elif mtype == "command":
+            payload_dict = {"goal": payload_text}
+        else:
+            payload_dict = {"message": payload_text}
+
+        print(f"[*] Dispatching mesh message to '{target}' (type={mtype})...")
+        res = client.send_message(target_node=target, message_type=mtype, payload=payload_dict)
+        if res.get("status") in ("delivered", "broadcasted"):
+            print(f"{G}[OK] {res.get('message')}{RST}")
+            print(f"     Dispatched to: {res.get('dispatched_to')}\n")
+        else:
+            print(f"{Y}[!] Status: {res.get('status')} - {res.get('message')}{RST}\n")
 
     elif args[0] in ["ping", "latency"]:
         print(f"\n{C}[*] Pinging Core AI Sovereign Mesh Server at {client.main_server_url}...{RST}")
@@ -356,7 +615,8 @@ def main():
 
     else:
         print(f"Unknown mesh command: {args[0]}")
-        print("Valid commands: status, scan, connect, role, disconnect")
+        print("Valid commands: status, sync, nodes, send, scan, ping, connect, role, disconnect")
+
 
 if __name__ == "__main__":
     main()
