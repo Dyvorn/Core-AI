@@ -1,14 +1,14 @@
 # Core AI -- Session Handover & Action Plan
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 144/144 TESTS PASSED ] [ PYTHON: 3.13+ ]
-[ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]      [ VERSION: v0.2.1-alpha ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 169/169 TESTS PASSED ] [ PYTHON: 3.13+ ]
+[ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]      [ VERSION: v0.2.2-alpha ]
 ```
 
-- **Date**: October 11, 2026  
+- **Date**: October 12, 2026  
 - **Lead Architect**: Dyvorn (*aka Vyrn / Refined*)  
-- **Release**: `v0.2.1-alpha` (Codename: "Ubiquitous Mesh & Linux Polish")  
-- **System Status**: All 144 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
+- **Release**: `v0.2.2-alpha` (Codename: "Distributed Voice Satellites & Mobile Mesh")  
+- **System Status**: All 169 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
 
 ---
 
@@ -111,17 +111,18 @@ All technical fat and legacy prototype mocks have been eliminated in strict adhe
 ## Automated Verification Status
 
 ```text
-============================= 139 passed in 35.92s =============================
+============================= 169 passed in 50.53s =============================
 - tests/test_account.py (3)
-- tests/test_animation.py (4)
+- tests/test_animation.py (5)
 - tests/test_bus.py (1)
 - tests/test_clean_setup.py (6)
-- tests/test_daily_driver.py (4)
-- tests/test_desktop_and_os_tools.py (4)
-- tests/test_dynamic_generator.py (4)
+- tests/test_daily_driver.py (5)
+- tests/test_desktop_and_os_tools.py (6)
+- tests/test_dynamic_generator.py (2)
 - tests/test_fast_cli.py (3)
 - tests/test_fix_release_v011.py (5)
 - tests/test_gateway.py (9)
+- tests/test_linux_voice_mesh.py (5)
 - tests/test_logging.py (2)
 - tests/test_mesh_client.py (6)
 - tests/test_model_router.py (5)
@@ -139,22 +140,30 @@ All technical fat and legacy prototype mocks have been eliminated in strict adhe
 - tests/test_spatial_audio.py (5)
 - tests/test_spoken_to.py (12)
 - tests/test_v020_release.py (5)
+- tests/test_v022_satellite_and_mobile.py (25)
 - tests/test_voice_pipeline.py (12)
 ```
+Total: 169 passed / 169 collected across 30 test modules.
 
 ---
 
-## Next Steps (Phase 4: Mobile Companion & Nothing OS Integration)
+## Active Milestone Status (v0.2.2-alpha: Distributed Satellites & Mobile Mesh)
 
-1. **Android & Nothing OS Companion Client**:
-   - Cross-platform WebSocket client connecting to the Gateway via local LAN or Tailscale WireGuard.
-   - Dynamic token enrollment via `interfaces/install/enroll.py`.
+1. **Android & Nothing OS Companion Client (`interfaces/mobile/companion.py`)**:
+   - Zero-friction token enrollment with cryptographic session IDs (`POST /api/v1/mobile/enroll`).
+   - Bidirectional WebSocket companion stream (`/ws/mobile/{client_id}`).
+   - Fast task dispatch with visual LED feedback (`MobileCompanionClient.send_command`).
+   - Local session persistence (`~/.core_ai_mobile_session.json`) with automatic token reload across CLI commands and `logout` / `reset-session` clearing.
 2. **Nothing OS Rear Glyph Matrix LED Driver**:
-   - Breathing/pulsing glyph pattern during DAG reasoning.
-   - Soft 150ms flash on action completion.
-   - Staccato burst for security alerts or guest access requests.
-3. **Lock-Screen Glance Cards & Quick Settings Tiles**:
-   - 1-tap voice invocation tile.
-   - Ambient HUD glance widgets.
-4. **Mobile BLE Peripheral Bridge**:
-   - Smartphone acting as bridge connecting Bluetooth Low Energy smart glasses and bike computer sensors back to the Central Core mesh.
+   - Breathing `reasoning_pulse` during DAG planning.
+   - High-contrast `success_flash` (200ms) on task completion.
+   - Staccato `alert_burst` for alerts or errors.
+3. **Lock-Screen Glance Cards & Quick Settings Telemetry**:
+   - Lock screen glance payload (`GET /api/v1/mobile/glance`).
+   - Terminal glance matrix card (`core mobile glance`, `core mobile status`).
+4. **Distributed Voice Satellites (`interfaces/voice/satellite.py`)**:
+   - LAN auto-discovery and automatic re-discovery on disconnection.
+   - Periodic telemetry heartbeats & dynamic satellite registry.
+   - Direct edge node speech push across WebSockets.
+   - Dynamic edge tool registration & bidirectional RPC dispatch (`speak_{node_id}`, `status_{node_id}`, `interrupt_{node_id}`).
+   - Fast CLI argument forwarding (`core satellite --node-id ... --server ... --headless --speak-only`) via non-destructive `parse_known_args()`.

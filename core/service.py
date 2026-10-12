@@ -407,7 +407,14 @@ class ServiceManager:
         if gw_ok and isinstance(details, dict):
             rows.append(("Active Operator:", f"{G}{details.get('active_user', 'N/A')}{RST}"))
             rows.append(("Active Model:", f"{C}{details.get('active_model', 'N/A')}{RST}"))
-            rows.append(("Connected Nodes:", f"{Y}{len(details.get('connected_edge_nodes', []))}{RST}"))
+            sat_count = details.get("active_satellites_count", 0)
+            mob_count = details.get("mobile_clients_count", 0)
+            node_count = len(details.get("connected_edge_nodes", []))
+            if sat_count > 0:
+                rows.append(("Voice Satellites:", f"{G}{sat_count} Active{RST}"))
+            if mob_count > 0:
+                rows.append(("Mobile Clients:", f"{C}{mob_count} Active{RST}"))
+            rows.append(("Connected Nodes:", f"{Y}{node_count}{RST}"))
 
         card = render_box(
             title="CORE AI :: DAEMON & GATEWAY STATUS CARD",
@@ -452,9 +459,13 @@ class ServiceManager:
 
         edge_nodes = []
         broadcast_count = 0
+        satellites_count = 0
+        mobile_clients_count = 0
         if connection_manager:
             edge_nodes = list(connection_manager.edge_nodes.keys())
             broadcast_count = len(connection_manager.broadcast_clients)
+            satellites_count = connection_manager.get_active_satellites_count() if hasattr(connection_manager, "get_active_satellites_count") else 0
+            mobile_clients_count = len(connection_manager.mobile_clients) if hasattr(connection_manager, "mobile_clients") else 0
 
         active_user = "Operator"
         if state_manager:
@@ -501,7 +512,9 @@ class ServiceManager:
                 "lan_url": f"http://{lan_ip}:{port}",
                 "active_edge_nodes": edge_nodes,
                 "edge_nodes_count": len(edge_nodes),
-                "broadcast_clients_count": broadcast_count
+                "broadcast_clients_count": broadcast_count,
+                "active_satellites_count": satellites_count,
+                "mobile_clients_count": mobile_clients_count
             },
             "system": {
                 "active_user": active_user,
@@ -557,9 +570,12 @@ class ServiceManager:
         active_user = details.get("active_user", "Operator") if gw_ok else "Dyvorn"
         active_model = details.get("active_model", "heuristic") if gw_ok else "N/A"
         nodes_count = len(details.get("connected_edge_nodes", [])) if gw_ok else 0
+        sat_count = details.get("active_satellites_count", 0) if gw_ok else 0
+        mob_count = details.get("mobile_clients_count", 0) if gw_ok else 0
         print(f"{C}|{RST}   Active Operator:      {G}{active_user} (SOVEREIGN OWNER){RST}")
         print(f"{C}|{RST}   Cognitive Engine:     {C}{active_model}{RST}")
         print(f"{C}|{RST}   Connected Edge Nodes: {Y}{nodes_count} active connected{RST}")
+        print(f"{C}|{RST}   Mesh Satellites:      {G}{sat_count} online{RST} | Mobile Companions: {C}{mob_count} active{RST}")
         print(f"{C}|{RST}   SQLite Database:      {db_size_kb} KB ({db_path})")
         print(f"{C}+=====================================================================+{RST}\n")
 

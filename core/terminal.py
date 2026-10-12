@@ -27,6 +27,23 @@ except ImportError:
     CYAN = GREEN = YELLOW = RED = MAGENTA = WHITE = BOLD = RESET = ""
 
 
+def configure_terminal_encoding():
+    """Configures stdout/stderr for UTF-8 with replace error handler to prevent Windows charmap crashes."""
+    if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+        try:
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+configure_terminal_encoding()
+
+
 def strip_ansi(text: str) -> str:
     """Removes ANSI color and style escape sequences to compute true printable visual width."""
     return ANSI_ESCAPE_RE.sub("", text)

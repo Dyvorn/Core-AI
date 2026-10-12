@@ -139,6 +139,24 @@ class PipelineEngine:
         logger.info(f"Pipeline '{plan.id[:8]}' finished with status '{plan.status}' in {total_duration_ms:.2f}ms")
         return plan
 
+    def execute_pipeline_sync(self, plan: PipelinePlan) -> PipelinePlan:
+        """
+        Synchronous execution entrypoint for offline planners, satellites, and CLI workers.
+        Handles event loop isolation gracefully whether called from thread or main process.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(asyncio.run, self.execute_pipeline(plan))
+                return future.result()
+        else:
+            return asyncio.run(self.execute_pipeline(plan))
+
     async def _execute_single_step(
         self,
         pipeline_id: str,

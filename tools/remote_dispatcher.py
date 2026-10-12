@@ -58,8 +58,11 @@ class RemoteToolDispatcher:
 
             # Execute future in the target loop
             try:
-                future = asyncio.run_coroutine_threadsafe(coro, loop)
-                result = future.result(timeout=timeout)
+                if loop.is_running():
+                    future = asyncio.run_coroutine_threadsafe(coro, loop)
+                    result = future.result(timeout=timeout)
+                else:
+                    result = loop.run_until_complete(coro)
                 return {"status": "success", "node_id": node_id, "result": result}
             except Exception as e:
                 logger.error(f"Remote tool execution failed on node '{node_id}': {e}")

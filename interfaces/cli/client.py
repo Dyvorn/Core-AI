@@ -84,7 +84,9 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="Output raw JSON instead of formatted text")
     parser.add_argument("--quiet", "-q", action="store_true", help="Suppress prefix header")
 
-    args = parser.parse_args()
+    args, extra_cli_flags = parser.parse_known_args()
+    if extra_cli_flags:
+        args.goal.extend(extra_cli_flags)
 
     goal_text = " ".join(args.goal).strip()
     if not goal_text:
@@ -100,9 +102,29 @@ def main() -> int:
 
     if goal_text.lower().startswith("satellite"):
         from interfaces.voice.satellite import VoiceSatellite
-        sat_args = args.goal[1:] if len(args.goal) > 1 else []
-        sat = VoiceSatellite()
-        return sat.run()
+        extra = args.goal[1:] if len(args.goal) > 1 else []
+        mode = "auto"
+        zone = None
+        node_id = None
+        server_url = None
+        headless = False
+        if "--speak-only" in extra:
+            mode = "speak_only"
+        elif "--listen-only" in extra:
+            mode = "listen_only"
+        for i, a in enumerate(extra):
+            if a == "--zone" and i + 1 < len(extra):
+                zone = extra[i + 1]
+            elif a == "--mode" and i + 1 < len(extra):
+                mode = extra[i + 1]
+            elif a == "--node-id" and i + 1 < len(extra):
+                node_id = extra[i + 1]
+            elif a == "--server" and i + 1 < len(extra):
+                server_url = extra[i + 1]
+            elif a == "--headless":
+                headless = True
+        sat = VoiceSatellite(mode=mode, zone=zone, node_id=node_id, server_url=server_url)
+        return sat.run(headless=headless)
 
     if goal_text.lower().startswith("audio") or goal_text.lower().startswith("mics") or goal_text.lower().startswith("speakers"):
         from interfaces.cli.settings import SettingsCLI
@@ -141,6 +163,70 @@ def main() -> int:
         target = parts[1] if len(parts) > 1 else "config"
         SettingsCLI().edit_file(target)
         return 0
+
+    if goal_text.lower().startswith("mobile"):
+        from interfaces.mobile.companion import MobileCompanionClient
+        parts = goal_text.split(maxsplit=2)
+        action = parts[1].lower() if len(parts) > 1 else "glance"
+        client = MobileCompanionClient()
+        if action in ("glance", "status"):
+            client.print_glance_card()
+            return 0
+        elif action in ("logout", "reset-session"):
+            client.clear_session()
+            print(f"{GREEN}[OK] Mobile companion session cleared.{RESET}")
+            return 0
+        elif action == "enroll":
+            sec = parts[2] if len(parts) > 2 else None
+            res = client.enroll(auth_secret=sec)
+            print(res.get("message", "Enrolled."))
+            return 0
+        elif action == "glyph":
+            from interfaces.mobile.companion import render_glyph_matrix
+            pat = parts[2] if len(parts) > 2 else "reasoning_pulse"
+            print("\n" + render_glyph_matrix(pat) + "\n")
+            res = client.trigger_glyph(pattern=pat)
+            print(f"[*] Glyph matrix pattern '{pat}' dispatched: {res.get('status', 'ok')}")
+            return 0
+        elif action == "ask":
+            prompt = parts[2] if len(parts) > 2 else ""
+            if not prompt:
+                print(f"{YELLOW}Usage: core mobile ask <prompt>{RESET}")
+                return 1
+            print(f"[*] Dispatching prompt from mobile companion: '{prompt}'...")
+            res = client.send_command(prompt)
+            if res.get("status") == "error":
+                print(f"{RED}[FAIL] {res.get('message')}{RESET}")
+                return 1
+            spoken = res.get("spoken_response") or res.get("final_output") or "Done."
+            print(f"\n{GREEN}[Core AI Spoken Response]{RESET} {BOLD}{spoken}{RESET}\n")
+            return 0
+
+    if goal_text.lower().startswith("glyph"):
+        from interfaces.mobile.companion import MobileCompanionClient, render_glyph_matrix
+        parts = goal_text.split(maxsplit=2)
+        pattern = parts[1] if len(parts) > 1 else "reasoning_pulse"
+        client = MobileCompanionClient()
+        print("\n" + render_glyph_matrix(pattern) + "\n")
+        res = client.trigger_glyph(pattern=pattern)
+        print(f"[*] Glyph matrix pattern '{pattern}' dispatched: {res.get('status', 'ok')}")
+        return 0
+
+    if goal_text.lower().startswith("speak"):
+        parts = goal_text.split(maxsplit=1)
+        phrase = parts[1] if len(parts) > 1 else ""
+        if not phrase:
+            print(f"{YELLOW}Usage: core speak <text>{RESET}")
+            return 1
+        try:
+            from engines.voice_out import VoiceOutEngine
+            vo = VoiceOutEngine(default_voice="auto")
+            print(f"[*] Speaking: \"{phrase}\"")
+            vo.synthesize_and_play(phrase, blocking=True)
+            return 0
+        except Exception as e:
+            print(f"{RED}[!] Speech synthesis failed: {e}{RESET}")
+            return 1
 
     if goal_text.lower() in ("version", "--version", "-v"):
         from core import __version__, __codename__

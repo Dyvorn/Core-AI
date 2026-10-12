@@ -83,7 +83,8 @@ def test_client_cli_version_command(capsys):
         code = main()
         assert code == 0
         captured = capsys.readouterr()
+        from core import __version__
         assert "SYSTEM VERSION PROTOCOL" in captured.out
-        assert "v0.2.1-alpha" in captured.out
+        assert f"v{__version__}" in captured.out
     finally:
         sys.argv = old_argv

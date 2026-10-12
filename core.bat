@@ -57,6 +57,9 @@ if /i "%~1"=="factory-reset" goto clean
 if /i "%~1"=="version" goto version
 if /i "%~1"=="-v" goto version
 if /i "%~1"=="--version" goto version
+if /i "%~1"=="mobile" goto mobile
+if /i "%~1"=="glyph" goto glyph
+if /i "%~1"=="speak" goto speak
 if /i "%~1"=="uninstall" goto uninstall
 
 goto quick_solve
@@ -83,6 +86,20 @@ goto :eof
 :satellite
 shift
 "%PYTHON%" interfaces\voice\satellite.py %1 %2 %3 %4 %5 %6 %7 %8 %9
+goto :eof
+
+:mobile
+shift
+"%PYTHON%" -m interfaces.mobile.companion %1 %2 %3 %4 %5 %6 %7 %8 %9
+goto :eof
+
+:glyph
+shift
+"%PYTHON%" -m interfaces.mobile.companion glyph %1 %2 %3 %4 %5 %6 %7 %8 %9
+goto :eof
+
+:speak
+"%PYTHON%" interfaces\cli\client.py %*
 goto :eof
 
 :version
@@ -222,8 +239,11 @@ echo     update      - Self-update from GitHub with state backup ^& test guard
 echo     test        - Run automated test suite (pytest)
 echo     autostart   - Configure 24/7 boot autostart (core autostart on^|off^|status^|visible)
 echo     watchdog    - Run self-healing supervisor (auto-revives crashes with backoff)
-echo     mesh        - Intercontinental mesh pairing (core mesh connect ^<url^> ^| status)
 echo     setup       - Run interactive bootstrap ^& autostart setup
+echo     satellite   - Run distributed voice satellite perception daemon
+echo     mobile      - Mobile Companion operations (core mobile glance^|enroll^|ask^|glyph)
+echo     glyph       - Trigger Nothing OS rear Glyph LED patterns (core glyph reasoning_pulse)
+echo     speak       - Synthesize and speak text locally or across mesh
 echo     uninstall   - Clean zero-residue uninstallation
 echo.
 echo   Daily One-Shot Execution:

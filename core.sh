@@ -65,6 +65,18 @@ case "$COMMAND" in
         shift
         "$PYTHON" interfaces/voice/satellite.py "$@"
         ;;
+    mobile)
+        shift
+        "$PYTHON" -m interfaces.mobile.companion "$@"
+        ;;
+    glyph)
+        shift
+        "$PYTHON" -m interfaces.mobile.companion glyph "$@"
+        ;;
+    speak)
+        shift
+        "$PYTHON" interfaces/cli/client.py speak "$@"
+        ;;
     models|model)
         shift
         "$PYTHON" interfaces/cli/settings.py model "$@"
@@ -148,6 +160,10 @@ case "$COMMAND" in
         echo "    watchdog    - Run self-healing supervisor (auto-revives crashes with backoff)"
         echo "    mesh        - Intercontinental mesh pairing (./core.sh mesh connect <url> | status)"
         echo "    setup       - Run interactive bootstrap & autostart setup"
+        echo "    satellite   - Run distributed voice satellite perception daemon"
+        echo "    mobile      - Mobile Companion operations (./core.sh mobile glance|enroll|ask|glyph)"
+        echo "    glyph       - Trigger Nothing OS rear Glyph LED patterns (./core.sh glyph reasoning_pulse)"
+        echo "    speak       - Synthesize and speak text locally or across mesh"
         echo "    uninstall   - Clean zero-residue uninstallation"
         echo ""
         echo "  Daily One-Shot Execution:"

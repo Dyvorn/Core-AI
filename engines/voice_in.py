@@ -363,6 +363,10 @@ class VoiceInEngine:
 
         logger.info("VoiceInEngine listening stream stopped.")
 
+    def stop(self):
+        """Interface consistency alias for stop_listening."""
+        self.stop_listening()
+
     def _dispatch_callback(self, text: str):
         """Dispatches speech callback asynchronously so audio capture loop never blocks."""
         if self.callback:

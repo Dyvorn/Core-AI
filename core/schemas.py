@@ -3,6 +3,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 import uuid
+import time
 
 
 def utc_now() -> datetime:
@@ -319,6 +320,95 @@ class SpatialHandoffEvent(BaseModel):
     reason: str = "proximity_or_verbal"
     auto_routed_audio: bool = True
     timestamp: datetime = Field(default_factory=utc_now)
+ 
+ 
+# --- Satellite Telemetry & Remote Voice Control ---
+
+class SatelliteHeartbeatRequest(BaseModel):
+    """Periodic telemetry report emitted by a distributed VoiceSatellite."""
+    node_id: str
+    zone: str = "office"
+    mic_device: Optional[str] = None
+    speaker_device: Optional[str] = None
+    model_size: str = "small"
+    status: str = "listening"  # 'listening', 'speaking', 'offline'
+    uptime_seconds: float = 0.0
+    latency_ms: Optional[float] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class SatelliteHeartbeatResponse(BaseModel):
+    """Response returned upon receiving a satellite heartbeat."""
+    status: str = "acknowledged"
+    node_id: str
+    server_time: float = Field(default_factory=lambda: time.time())
+    message: str = "Heartbeat registered."
+
+
+class SatelliteSpeakRequest(BaseModel):
+    """Request to synthesize and speak audio on a specific voice satellite."""
+    text: str
+    voice: Optional[str] = "auto"
+    priority: str = "normal"
+
+
+# --- Phase 4: Mobile Companion & Nothing OS Integration ---
+
+class MobileEnrollmentRequest(BaseModel):
+    """Request from a mobile companion device enrolling with the gateway."""
+    client_id: str
+    device_name: str
+    model: Optional[str] = "Mobile Device"
+    os_version: Optional[str] = None
+    target_zone: str = "mobile/default"
+    pairing_code: Optional[str] = None
+    auth_secret: Optional[str] = None
+    capabilities: List[str] = Field(
+        default_factory=lambda: ["glance_cards", "voice_stream", "glyph_matrix", "ble_gateway"]
+    )
+
+
+class MobileEnrollmentResponse(BaseModel):
+    """Response returned to mobile companion upon successful enrollment."""
+    status: str
+    client_id: str
+    token: str
+    assigned_tier: TrustTier
+    gateway_ws_url: str
+    operator_name: str
+    primary_space: str
+    message: str
+
+
+class GlyphPattern(str, Enum):
+    """Nothing OS Glyph Matrix light patterns."""
+    IDLE = "idle"
+    LISTENING = "listening"
+    REASONING_PULSE = "reasoning_pulse"
+    SUCCESS_FLASH = "success_flash"
+    ALERT_BURST = "alert_burst"
+    OFF = "off"
+
+
+class GlyphTriggerRequest(BaseModel):
+    """Request to trigger a Nothing OS Glyph LED matrix pattern."""
+    pattern: GlyphPattern = GlyphPattern.REASONING_PULSE
+    brightness: int = 255
+    duration_ms: int = 500
+    zone: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class MobileGlanceStatus(BaseModel):
+    """Lightweight glanceable status payload for mobile lock screens and widgets."""
+    operator_name: str
+    primary_space: str
+    active_model: str
+    unread_reminders: List[Dict[str, Any]] = Field(default_factory=list)
+    system_vitals: Dict[str, Any] = Field(default_factory=dict)
+    active_satellites_count: int = 0
+    server_time: float = Field(default_factory=lambda: time.time())
+    version: str = "0.2.2-alpha"
 
 
 

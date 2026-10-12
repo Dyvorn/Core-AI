@@ -15,6 +15,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [[0.2.2-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.2.2-alpha) — 2026-10-12
+### Codename: "Distributed Voice Satellites & Mobile Mesh"
+
+| Kernel | Status | Verification | Ethos |
+| :---: | :---: | :---: | :---: |
+| **`v0.2.2-alpha`** | 🟢 **OPERATIONAL** | 🧪 **169 / 169 PASSED** | 🛡️ **#ANTISLOP** |
+
+Distributed Voice Satellite auto-discovery & dynamic re-discovery, adaptive operational modes (bidirectional, speak-only, listen-only), dynamic edge tool RPC registration and execution (`speak_{node_id}`, `status_{node_id}`, `interrupt_{node_id}`), autonomous DAG fallback executor, telemetry heartbeat registry, direct edge node speech push, Phase 4 Mobile Companion zero-friction enrollment with local session caching (`~/.core_ai_mobile_session.json`), reactive Nothing OS Glyph LED matrix patterns with ANSI visualizer, lock-screen glance telemetry, fast CLI mobile ask and speak dispatch with non-destructive flag forwarding, and low-power Ollama smart relevance filtering.
+
+### 🌟 Added & Enhanced
+
+#### 🎙️ Distributed Voice Satellite Hardening & Auto-Discovery (`interfaces/voice/satellite.py`, `core/gateway.py`)
+- **UDP LAN Auto-Discovery & Dynamic Re-Discovery**: Voice Satellites automatically scan the local network using `LANBeacon` auto-discovery (`discover_core_servers`) on startup and automatically re-probe the LAN if disconnected for consecutive heartbeat cycles.
+- **Adaptive Hardware Operational Modes (`--mode`, `--speak-only`, `--listen-only`)**: Dynamic capability negotiation (`["audio_in", "audio_out"]`, `["audio_out"]`, or `["audio_in"]`). Voice satellites gracefully adapt to smart speakers, media sinks, or ceiling microphone arrays without crashing if an audio input or output is absent.
+- **Autonomous Local Fallback DAG Executor ("Never a Brick")**: If the connection to the central server drops, the satellite falls back seamlessly to an autonomous in-process DAG planner and pipeline engine, executing local commands directly on edge silicon.
+- **Satellite Telemetry Heartbeat Registry (`POST /api/v1/mesh/satellites/heartbeat`, `GET /api/v1/mesh/satellites`, `GET /api/v1/mesh/satellites/{node_id}`)**: Background heartbeat daemon streams satellite node ID, spatial room zone, audio device indices, model size, and uptime metrics. The gateway dynamically tracks online, stale, and offline satellites, and provides single-satellite inspection.
+- **Direct Edge Node Speech Push (`POST /api/v1/mesh/satellites/{node_id}/speak`, `core speak`)**: The central gateway pushes speech playback directly across connected edge node WebSockets (`/ws/nodes/{node_id}`) or broadcasts to all nodes simultaneously (`node_id="all"`).
+- **Dynamic Edge Tool Registration & Bidirectional RPC (`speak_{node_id}`, `status_{node_id}`, `interrupt_{node_id}`)**: Edge satellites dynamically expose their local actuators and sensor states to the Central Gateway, enabling the AI to actuate remote hardware anywhere across the sovereign mesh.
+- **Service Status Matrix Integration (`core/service.py`)**: `core status` and `core metrics` display active satellite count and mobile companion clients directly on the high-contrast status card.
+
+#### 📱 Phase 4 Mobile Companion & Nothing OS Glyph Integration (`interfaces/mobile/companion.py`, `core/gateway.py`, `core/schemas.py`)
+- **Zero-Friction Mobile Enrollment (`POST /api/v1/mobile/enroll`)**: Secure onboarding endpoint for Android, Nothing OS, and iOS companion devices, assigning `OWNER` or `GUEST` trust tier session tokens and dedicated WebSocket endpoints.
+- **Local Session Persistence (`~/.core_ai_mobile_session.json`)**: Automatic cryptographic token caching and reloading across CLI invocations (`core mobile ask`, `core mobile glance`) with explicit session clearing (`core mobile logout`, `core mobile reset-session`).
+- **Reactive Nothing OS Glyph Matrix LED Driver (`POST /api/v1/mobile/glyph`, `core glyph`)**: Real-time pattern trigger protocol supporting `reasoning_pulse` (subtle breathing pulse during DAG reasoning), `success_flash` (action completion confirmation), and `alert_burst` (security or system alerts), integrated into mobile command dispatch.
+- **ANSI Terminal Glyph Interface Visualizer**: Real-time ASCII/Unicode backplate rendering of the Nothing Phone (2) physical LED matrix (camera ring, diagonal slash, central reasoning arc, battery/alert strip) with cross-platform charmap resilience preventing any Windows console encoding crashes.
+- **Lock-Screen Glanceable Telemetry (`GET /api/v1/mobile/glance`, `core mobile glance`, `core mobile status`)**: Lightweight glance payload and ANSI terminal viewer exposing operator name, active AI model, proactive countdown reminders, host CPU/RAM vitals, and active mesh satellites.
+- **High-Speed Mobile WebSocket Gateway (`/ws/mobile/{client_id}`)**: Bidirectional companion stream for push-to-talk voice commands, real-time glance sync, and glyph acknowledgments.
+- **Dedicated CLI Wrappers (`core mobile ask`, `core glyph`, `core speak`, `core.sh`, `core.bat`)**: Quick terminal helpers to dispatch mobile queries, trigger glyph patterns, and synthesize speech locally or across the mesh with non-destructive flag forwarding (`parse_known_args`).
+
+#### ⚡ Planner & Low-Power Ollama CPU Hardening (`brain/planner.py`, `core/service.py`)
+- **Smart Tool Relevance Filtering**: Automatically scores and selects relevant tools for local Ollama models on low-power CPUs, cutting JSON catalog overhead by over 70% and preventing CPU suffocation.
+- **Deterministic Heuristic Mesh Pairing**: Natural directives ("connect pc to mesh", "pc verbinden") execute instantaneously in <5ms without LLM latency.
+- **SO_REUSEADDR Port Fallback**: Auto-fallback detection and socket reuse preventing port conflicts during service reboots.
+
+---
+
 ## [[0.2.1-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.2.1-alpha) — 2026-10-11
 ### Codename: "Ubiquitous Mesh & Linux Polish"
 

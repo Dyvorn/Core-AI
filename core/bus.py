@@ -98,10 +98,18 @@ class EventBus:
         """Returns True if connected to Redis, False if operating on internal in-memory fallback."""
         return not self.use_fallback and self.redis_client is not None
 
-    def publish(self, channel: str, event: BaseEvent):
-        """Publish an event to a channel"""
+    def publish(self, channel: str, event: Any):
+        """Publish an event (BaseEvent or dict) to a channel"""
         try:
-            data = event.model_dump()
+            if hasattr(event, "model_dump"):
+                data = event.model_dump()
+                event_id = getattr(event, "id", "event")
+            elif isinstance(event, dict):
+                data = event
+                event_id = event.get("id", "dict_event")
+            else:
+                data = dict(event)
+                event_id = "event"
 
             def custom_serializer(obj):
                 if isinstance(obj, bytes):
@@ -116,7 +124,7 @@ class EventBus:
                 self.in_memory_bus.publish(channel, payload)
             else:
                 self.redis_client.publish(channel, payload)
-            logger.debug(f"Published to {channel}: {event.id}")
+            logger.debug(f"Published to {channel}: {event_id}")
         except Exception as e:
             logger.error(f"Error publishing to {channel}: {e}")
 

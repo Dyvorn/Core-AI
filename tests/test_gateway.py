@@ -33,7 +33,8 @@ def test_gateway_health_endpoint(gateway_client):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "online"
-    assert data["version"] == "0.2.1-alpha"
+    from core import __version__
+    assert data["version"] == __version__
 
 def test_gateway_user_profile_crud(gateway_client):
     client, state = gateway_client

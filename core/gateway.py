@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import time
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional, Set
@@ -17,7 +18,9 @@ from core.schemas import (
     BaseEvent, TextEvent, PipelinePlan, UserProfile,
     DeviceTopologyRecord, EdgeNodeRegistration, HUDCardPayload, ToolCallRequest, ToolCallResponse,
     TrustTier, DeviceEnrollmentRequest, DeviceEnrollmentResponse,
-    AudioRouteRecord, AudioRouteUpdateRequest, SpatialHandoffEvent
+    AudioRouteRecord, AudioRouteUpdateRequest, SpatialHandoffEvent,
+    SatelliteHeartbeatRequest, SatelliteHeartbeatResponse, SatelliteSpeakRequest,
+    MobileEnrollmentRequest, MobileEnrollmentResponse, GlyphPattern, GlyphTriggerRequest, MobileGlanceStatus
 )
 from core.state import StateManager
 from core.bus import EventBus
@@ -41,9 +44,42 @@ class ConnectionManager:
         self.broadcast_clients: Set[WebSocket] = set()
         # Dedicated edge node sockets: node_id -> WebSocket
         self.edge_nodes: Dict[str, WebSocket] = {}
+        # Dedicated mobile companion clients: client_id -> WebSocket
+        self.mobile_clients: Dict[str, WebSocket] = {}
+        # Voice Satellite Registry: node_id -> satellite metadata dict
+        self.registered_satellites: Dict[str, Dict[str, Any]] = {}
         # Pending remote tool calls: request_id -> asyncio.Future
         self.pending_tool_calls: Dict[str, asyncio.Future] = {}
         self.loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def register_satellite(self, data: Dict[str, Any]):
+        node_id = data.get("node_id")
+        if node_id:
+            data["last_seen"] = time.time()
+            self.registered_satellites[node_id] = data
+            logger.info(f"Registered voice satellite '{node_id}' in zone '{data.get('zone', 'office')}'. Total: {len(self.registered_satellites)}")
+
+    def get_active_satellites(self) -> List[Dict[str, Any]]:
+        now = time.time()
+        results = []
+        for s in self.registered_satellites.values():
+            sat = dict(s)
+            elapsed = now - sat.get("last_seen", 0)
+            if sat.get("status") == "offline":
+                sat["effective_status"] = "offline"
+            elif elapsed > 60:
+                sat["effective_status"] = "stale"
+            else:
+                sat["effective_status"] = "online"
+            results.append(sat)
+        return results
+
+    def get_active_satellites_count(self) -> int:
+        now = time.time()
+        return sum(
+            1 for s in self.registered_satellites.values()
+            if s.get("status") != "offline" and (now - s.get("last_seen", 0)) <= 60
+        )
 
     async def connect_broadcast(self, websocket: WebSocket):
         await websocket.accept()
@@ -53,6 +89,15 @@ class ConnectionManager:
     def disconnect_broadcast(self, websocket: WebSocket):
         self.broadcast_clients.discard(websocket)
         logger.info(f"Broadcast client disconnected. Remaining: {len(self.broadcast_clients)}")
+
+    async def connect_mobile_client(self, client_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.mobile_clients[client_id] = websocket
+        logger.info(f"Mobile Companion '{client_id}' connected. Total mobile clients: {len(self.mobile_clients)}")
+
+    def disconnect_mobile_client(self, client_id: str):
+        self.mobile_clients.pop(client_id, None)
+        logger.info(f"Mobile Companion '{client_id}' disconnected. Remaining: {len(self.mobile_clients)}")
 
     async def connect_edge_node(self, node_id: str, websocket: WebSocket):
         await websocket.accept()
@@ -64,18 +109,48 @@ class ConnectionManager:
         logger.info(f"Edge Node '{node_id}' disconnected. Remaining: {list(self.edge_nodes.keys())}")
 
     async def broadcast_event(self, event_type: str, data: Dict[str, Any]):
-        """Broadcasts a JSON message to all connected ambient displays and dashboards."""
-        if not self.broadcast_clients:
+        """Broadcasts a JSON message to all connected ambient displays, dashboards, and mobile companions."""
+        if not self.broadcast_clients and not self.mobile_clients:
             return
         payload = json.dumps({"event": event_type, "data": data, "timestamp": datetime.now(timezone.utc).isoformat()})
-        disconnected = set()
+        disconnected_bc = set()
         for client in self.broadcast_clients:
             try:
                 await client.send_text(payload)
             except Exception:
-                disconnected.add(client)
-        for dead in disconnected:
+                disconnected_bc.add(client)
+        for dead in disconnected_bc:
             self.broadcast_clients.discard(dead)
+
+        disconnected_mob = set()
+        for cid, sock in self.mobile_clients.items():
+            try:
+                await sock.send_text(payload)
+            except Exception:
+                disconnected_mob.add(cid)
+        for dead_id in disconnected_mob:
+            self.mobile_clients.pop(dead_id, None)
+
+    async def broadcast_glyph(self, pattern: str, brightness: int = 255, duration_ms: int = 500, metadata: Optional[Dict[str, Any]] = None):
+        """Dispatches Nothing OS Glyph Matrix pattern to all connected mobile companion clients."""
+        if not self.mobile_clients:
+            return
+        payload = json.dumps({
+            "event": "GLYPH_TRIGGER",
+            "pattern": pattern,
+            "brightness": brightness,
+            "duration_ms": duration_ms,
+            "metadata": metadata or {},
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        disconnected = set()
+        for cid, sock in self.mobile_clients.items():
+            try:
+                await sock.send_text(payload)
+            except Exception:
+                disconnected.add(cid)
+        for dead in disconnected:
+            self.mobile_clients.pop(dead, None)
 
     async def dispatch_remote_tool_call(self, node_id: str, request: ToolCallRequest, timeout: float = 20.0) -> Any:
         """Sends a tool execution request across the WebSocket to a physical edge device (car, phone)."""
@@ -183,7 +258,8 @@ def create_gateway_app(
 
         bus.subscribe("tts_events", bus_event_bridge)
         bus.subscribe("hud_events", bus_event_bridge)
-        logger.info("Gateway bridge subscribed to EventBus channels")
+        bus.subscribe("glyph_events", bus_event_bridge)
+        logger.info("Gateway bridge subscribed to EventBus channels (tts, hud, glyph)")
 
         # Zero-UI LAN Auto-Discovery Beacon
         beacon = None
@@ -254,7 +330,9 @@ def create_gateway_app(
             "platform": platform.system(),
             "active_model": planner.get_active_model() or "offline_heuristic",
             "connected_edge_nodes": list(connection_manager.edge_nodes.keys()),
-            "broadcast_clients_count": len(connection_manager.broadcast_clients)
+            "broadcast_clients_count": len(connection_manager.broadcast_clients),
+            "active_satellites_count": connection_manager.get_active_satellites_count(),
+            "mobile_clients_count": len(connection_manager.mobile_clients)
         }
 
     @app.get("/api/v1/server/status")
@@ -272,7 +350,9 @@ def create_gateway_app(
             "active_model": planner.get_active_model() or "offline_heuristic",
             "connected_edge_nodes": list(connection_manager.edge_nodes.keys()),
             "connected_nodes_count": len(connection_manager.edge_nodes),
-            "broadcast_clients_count": len(connection_manager.broadcast_clients)
+            "broadcast_clients_count": len(connection_manager.broadcast_clients),
+            "active_satellites_count": connection_manager.get_active_satellites_count(),
+            "mobile_clients_count": len(connection_manager.mobile_clients)
         }
 
     @app.get("/api/v1/server/metrics")
@@ -640,6 +720,17 @@ def create_gateway_app(
                         )
                         state_manager.register_or_update_device(topo_record)
 
+                        # Immediate registration in satellite manager if device is a voice satellite
+                        if reg.device_type == "voice_satellite":
+                            connection_manager.register_satellite({
+                                "node_id": node_id,
+                                "zone": reg.initial_zone or "office",
+                                "capabilities": reg.capabilities,
+                                "status": "online",
+                                "last_seen": time.time(),
+                                "uptime_seconds": 0.0
+                            })
+
                         # Dynamic Remote Tool Registration (Debt #101)
                         edge_tools = reg_data.get("tools", [])
                         registered_tools_count = 0
@@ -668,6 +759,25 @@ def create_gateway_app(
                             if not fut.done():
                                 fut.set_result(msg.get("result"))
 
+                    # Real-time WebSocket Heartbeat from Voice Satellite
+                    elif msg_type == "heartbeat":
+                        hb = msg.get("data", {})
+                        if not hb.get("node_id"):
+                            hb["node_id"] = node_id
+                        connection_manager.register_satellite(hb)
+                        await websocket.send_text(json.dumps({
+                            "type": "heartbeat_ack",
+                            "node_id": node_id,
+                            "time": time.time()
+                        }))
+
+                    elif msg_type == "ping":
+                        await websocket.send_text(json.dumps({
+                            "type": "pong",
+                            "node_id": node_id,
+                            "time": time.time()
+                        }))
+
                     # Incoming event from node (e.g. button press, speech transcript)
                     elif msg_type == "event":
                         event_data = msg.get("data", {})
@@ -683,5 +793,212 @@ def create_gateway_app(
         except Exception:
             remote_dispatcher.unregister_tools_for_node(node_id)
             connection_manager.disconnect_edge_node(node_id)
+
+    # --- Phase 4: Distributed Voice Satellite Endpoints ---
+
+    @app.post("/api/v1/mesh/satellites/heartbeat", response_model=SatelliteHeartbeatResponse)
+    def satellite_heartbeat(req: SatelliteHeartbeatRequest):
+        """Ingests periodic telemetry reports from distributed voice satellites."""
+        connection_manager.register_satellite(req.model_dump())
+        return SatelliteHeartbeatResponse(
+            status="acknowledged",
+            node_id=req.node_id,
+            server_time=time.time(),
+            message=f"Heartbeat registered for node '{req.node_id}' in zone '{req.zone}'."
+        )
+
+    @app.get("/api/v1/mesh/satellites")
+    def list_satellites():
+        """Lists active and registered voice satellites across the sovereign mesh."""
+        return connection_manager.get_active_satellites()
+
+    @app.get("/api/v1/mesh/satellites/{node_id}")
+    def get_satellite_details(node_id: str):
+        """Returns detailed telemetry and connection status for a specific voice satellite."""
+        satellites = connection_manager.get_active_satellites()
+        for sat in satellites:
+            if sat.get("node_id") == node_id:
+                sat_data = dict(sat)
+                sat_data["is_connected_ws"] = node_id in connection_manager.edge_nodes
+                return sat_data
+        raise HTTPException(status_code=404, detail=f"Voice satellite '{node_id}' not found.")
+
+    @app.post("/api/v1/mesh/satellites/{node_id}/speak")
+    async def speak_on_satellite(node_id: str, req: SatelliteSpeakRequest):
+        """Dispatches an audio speech synthesis command to a specific voice satellite or zone."""
+        payload = {
+            "node_id": node_id,
+            "text": req.text,
+            "voice": req.voice,
+            "priority": req.priority
+        }
+        await connection_manager.broadcast_event("SATELLITE_SPEAK", payload)
+
+        # Directly push speech playback payload to connected edge node WebSockets
+        target_nodes = []
+        if node_id in connection_manager.edge_nodes:
+            target_nodes.append((node_id, connection_manager.edge_nodes[node_id]))
+        elif node_id == "all":
+            target_nodes.extend(list(connection_manager.edge_nodes.items()))
+        else:
+            # Check if node_id corresponds to a spatial room zone (e.g. 'living_room', 'office')
+            for sat in connection_manager.get_active_satellites():
+                if sat.get("zone") == node_id:
+                    snid = sat.get("node_id")
+                    if snid and snid in connection_manager.edge_nodes:
+                        target_nodes.append((snid, connection_manager.edge_nodes[snid]))
+
+        for nid, sock in target_nodes:
+            try:
+                await sock.send_text(json.dumps({
+                    "type": "speak",
+                    "text": req.text,
+                    "voice": req.voice,
+                    "priority": req.priority
+                }))
+            except Exception as e:
+                logger.warning(f"Failed to push speak command to edge node '{nid}': {e}")
+
+        bus.publish("tts_events", {
+            "type": "satellite_speak",
+            "target_node": node_id,
+            "text": req.text
+        })
+        return {"status": "dispatched", "node_id": node_id, "text": req.text}
+
+    # --- Phase 4: Mobile Companion & Nothing OS Integration Endpoints ---
+
+    @app.post("/api/v1/mobile/enroll", response_model=MobileEnrollmentResponse)
+    def enroll_mobile_companion(req: MobileEnrollmentRequest):
+        """Zero-friction onboarding endpoint for mobile companions (Android, Nothing OS)."""
+        expected_secret = os.getenv("CORE_AUTH_SECRET", "core_sovereign_secret")
+        is_owner = (
+            (req.auth_secret is not None and req.auth_secret == expected_secret)
+            or (req.pairing_code is not None and (req.pairing_code == expected_secret or req.pairing_code == expected_secret[-6:]))
+            or (req.auth_secret is None and req.pairing_code is None and not os.getenv("CORE_REQUIRE_AUTH"))
+        )
+        assigned_tier = TrustTier.OWNER if is_owner else TrustTier.GUEST
+
+        token = f"mob_{uuid.uuid4().hex[:16]}"
+        topo_record = DeviceTopologyRecord(
+            device_id=req.client_id,
+            name=req.device_name,
+            device_type="phone",
+            current_zone=req.target_zone,
+            capabilities=req.capabilities,
+            trust_tier=assigned_tier.value,
+            metadata={"session_token": token, "model": req.model, "os_version": req.os_version}
+        )
+        state_manager.register_or_update_device(topo_record)
+        profile = state_manager.get_user_profile()
+
+        return MobileEnrollmentResponse(
+            status="enrolled",
+            client_id=req.client_id,
+            token=token,
+            assigned_tier=assigned_tier,
+            gateway_ws_url=f"/ws/mobile/{req.client_id}",
+            operator_name=profile.preferred_name or "Operator",
+            primary_space=profile.preferences.get("primary_space", "office"),
+            message=f"Mobile companion '{req.device_name}' successfully enrolled into Core AI mesh."
+        )
+
+    @app.get("/api/v1/mobile/glance", response_model=MobileGlanceStatus)
+    def get_mobile_glance():
+        """Returns real-time glanceable status telemetry for mobile lock-screens and quick settings."""
+        profile = state_manager.get_user_profile()
+        active_rules = state_manager.get_active_proactive_rules()
+        reminders = [
+            {"name": r.name, "action": r.action_goal, "type": r.condition_type}
+            for r in active_rules if r.condition_type in ("countdown", "timer")
+        ]
+        from tools.native.system_tools import inspect_system_resources
+        vitals = inspect_system_resources()
+
+        return MobileGlanceStatus(
+            operator_name=profile.preferred_name or "Operator",
+            primary_space=profile.preferences.get("primary_space", "office"),
+            active_model=planner.get_active_model() or "offline_heuristic",
+            unread_reminders=reminders,
+            system_vitals=vitals,
+            active_satellites_count=connection_manager.get_active_satellites_count(),
+            server_time=time.time(),
+            version=__version__
+        )
+
+    @app.post("/api/v1/mobile/glyph")
+    async def trigger_glyph(req: GlyphTriggerRequest):
+        """Triggers Nothing OS Glyph Matrix LED patterns across connected mobile devices."""
+        bus.publish("glyph_events", {
+            "pattern": req.pattern.value,
+            "brightness": req.brightness,
+            "duration_ms": req.duration_ms,
+            "zone": req.zone
+        })
+        await connection_manager.broadcast_glyph(
+            pattern=req.pattern.value,
+            brightness=req.brightness,
+            duration_ms=req.duration_ms,
+            metadata=req.metadata
+        )
+        return {
+            "status": "dispatched",
+            "pattern": req.pattern.value,
+            "brightness": req.brightness,
+            "duration_ms": req.duration_ms
+        }
+
+    @app.websocket("/ws/mobile/{client_id}")
+    async def websocket_mobile_companion(websocket: WebSocket, client_id: str):
+        """Dedicated bidirectional session for mobile companion clients (glance cards, voice, glyph)."""
+        await connection_manager.connect_mobile_client(client_id, websocket)
+        try:
+            profile = state_manager.get_user_profile()
+            sync_data = {
+                "event": "GLANCE_SYNC",
+                "client_id": client_id,
+                "operator": profile.preferred_name,
+                "version": __version__,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await websocket.send_text(json.dumps(sync_data))
+
+            while True:
+                raw_text = await websocket.receive_text()
+                try:
+                    msg = json.loads(raw_text)
+                    m_type = msg.get("type")
+                    if m_type == "ping":
+                        await websocket.send_text(json.dumps({"type": "pong", "time": time.time()}))
+                    elif m_type == "voice_command":
+                        cmd_text = msg.get("text", "")
+                        if cmd_text:
+                            await connection_manager.broadcast_glyph("reasoning_pulse", duration_ms=400)
+                            plan = await asyncio.to_thread(planner.plan_problem, cmd_text, {"source": "mobile", "client_id": client_id})
+                            finished = await pipeline_engine.execute_pipeline(plan)
+                            spoken = await asyncio.to_thread(planner.formulate_spoken_response, finished, profile=profile)
+                            await connection_manager.broadcast_glyph("success_flash", duration_ms=200)
+                            await websocket.send_text(json.dumps({
+                                "type": "voice_response",
+                                "text": spoken,
+                                "final_output": finished.final_output,
+                                "status": finished.status
+                            }))
+                    elif m_type == "glyph_ack":
+                        logger.debug(f"Mobile client '{client_id}' acknowledged glyph: {msg.get('pattern')}")
+                    elif m_type == "glyph_trigger":
+                        pat = msg.get("pattern", "reasoning_pulse")
+                        dur = int(msg.get("duration_ms", 500))
+                        bright = int(msg.get("brightness", 255))
+                        await connection_manager.broadcast_glyph(pat, brightness=bright, duration_ms=dur)
+                        await websocket.send_text(json.dumps({
+                            "type": "glyph_trigger_ack",
+                            "pattern": pat,
+                            "time": time.time()
+                        }))
+                except json.JSONDecodeError as jde:
+                    logger.debug(f"Malformed JSON payload from mobile client '{client_id}': {jde}")
+        except (WebSocketDisconnect, Exception):
+            connection_manager.disconnect_mobile_client(client_id)
 
     return app
