@@ -706,6 +706,8 @@ class StateManager:
         finally:
             conn.close()
 
+    register_proactive_rule = save_proactive_rule
+
     def get_active_proactive_rules(self) -> List[ProactiveTriggerRule]:
         conn = self._get_connection()
         try:
@@ -1057,7 +1059,7 @@ class StateManager:
             if isinstance(r_dict.get("last_triggered_at"), str):
                 r_dict["last_triggered_at"] = datetime.fromisoformat(r_dict["last_triggered_at"])
             rule = ProactiveTriggerRule(**r_dict)
-            self.register_proactive_rule(rule)
+            self.save_proactive_rule(rule)
             count += 1
         return count
 

@@ -431,6 +431,7 @@ def test_voice_satellite_mesh_message_and_sync_handling(tmp_path):
             }
         }
         res_sync = sat.handle_edge_message(sync_msg)
+        assert res_sync is not None
         assert res_sync["type"] == "sync_ack"
         assert res_sync["node_id"] == "sat_lab"
 
@@ -444,7 +445,9 @@ def test_voice_satellite_mesh_message_and_sync_handling(tmp_path):
             }
         }
         res_cmd = sat.handle_edge_message(cmd_msg)
+        assert res_cmd is not None
         assert res_cmd["type"] == "command_result"
+        assert isinstance(res_cmd["result"], dict)
         assert res_cmd["result"]["status"] == "executed"
         mock_exec.assert_called_with("get status")
 

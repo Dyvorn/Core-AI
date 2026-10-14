@@ -2,6 +2,7 @@ import datetime
 import platform
 import os
 import sys
+from typing import Dict, Any, Optional
 
 def get_time(**kwargs) -> str:
     """Returns the current system time."""
@@ -83,7 +84,7 @@ def inspect_system_resources(**kwargs) -> dict:
     Cross-platform support for Windows, Linux, and macOS.
     """
     import shutil
-    res = {
+    res: Dict[str, Any] = {
         "os": platform.system(),
         "hostname": platform.node(),
         "cpu_count": os.cpu_count() or 1,
@@ -112,7 +113,8 @@ def inspect_system_resources(**kwargs) -> dict:
 
     # Memory usage via psutil if present
     try:
-        import psutil
+        import importlib
+        psutil = importlib.import_module("psutil")
         vmem = psutil.virtual_memory()
         res["memory"] = {
             "total_gb": round(vmem.total / (1024**3), 2),

@@ -521,7 +521,7 @@ def main():
 
     elif args[0] in ["send", "msg", "dispatch"]:
         if len(args) < 4:
-            print(f"{YELLOW}Usage: core mesh send <target_node|zone|all> <speak|glyph|command|notify> <payload>{RESET}")
+            print(f"{Y}Usage: core mesh send <target_node|zone|all> <speak|glyph|command|notify> <payload>{RST}")
             return
         target = args[1]
         mtype = args[2].lower()

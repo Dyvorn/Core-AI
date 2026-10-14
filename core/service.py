@@ -359,6 +359,20 @@ class ServiceManager:
             self._clear_pid()
             return False, f"Error while stopping Core AI: {e}"
 
+    def stop_watchdog(self) -> Tuple[bool, str]:
+        """Gracefully stops any active Watchdog supervisor process."""
+        watchdog_pid = self.get_watchdog_pid()
+        if not watchdog_pid:
+            return False, "Watchdog supervisor is not running."
+        try:
+            kill_process_tree(watchdog_pid)
+            self._clear_watchdog_pid()
+            logger.info(f"Watchdog supervisor (PID {watchdog_pid}) stopped.")
+            return True, f"Watchdog supervisor (PID {watchdog_pid}) stopped."
+        except Exception as e:
+            self._clear_watchdog_pid()
+            return False, f"Error stopping watchdog supervisor: {e}"
+
     def status(self, port: int = 8000) -> Dict[str, Any]:
         """Returns detailed process, supervisor, and gateway health status."""
         pid = self.get_running_pid()

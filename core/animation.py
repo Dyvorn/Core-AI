@@ -23,7 +23,8 @@ if sys.platform == "win32":
         import colorama
         colorama.init()
     except ImportError:
-        os.system("")
+        import subprocess
+        subprocess.run("", shell=True)
 
 # ANSI escape sequences
 ESC = "\033"
@@ -41,12 +42,12 @@ LUMINANCE_RAMP = " .·:;=+*#%@"
 
 def rgb(r: int, g: int, b: int) -> str:
     """Return 24-bit TrueColor ANSI foreground escape sequence."""
-    return f"{ESC}[38;2;{max(0, min(255, int(r)))};{max(0, min(255, int(g)))};{max(0, min(255, int(b)))}m"
+    return f"{ESC}[38;2;{max(0, min(255, r))};{max(0, min(255, g))};{max(0, min(255, b))}m"
 
 
 def rgb_bg(r: int, g: int, b: int) -> str:
     """Return 24-bit TrueColor ANSI background escape sequence."""
-    return f"{ESC}[48;2;{max(0, min(255, int(r)))};{max(0, min(255, int(g)))};{max(0, min(255, int(b)))}m"
+    return f"{ESC}[48;2;{max(0, min(255, r))};{max(0, min(255, g))};{max(0, min(255, b))}m"
 
 
 # Color Themes

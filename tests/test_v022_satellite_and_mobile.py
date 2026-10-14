@@ -612,7 +612,7 @@ def test_mobile_companion_session_persistence(tmp_path):
 
     # Clear session
     client2.clear_session()
-    assert client2.token is None
+    assert getattr(client2, "token") is None
     assert not os.path.exists(session_file)
 
 

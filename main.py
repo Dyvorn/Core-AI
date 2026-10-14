@@ -655,6 +655,7 @@ def run_interactive_repl(
                 print(f"{CYAN}[*] Testing active microphone for 3 seconds... speak into your mic now!{RESET}")
                 try:
                     import sounddevice as sd
+                    import numpy as np
                     cur_in = getattr(voice_in, "input_device", None)
                     rec_rate = getattr(voice_in, "hw_samplerate", 16000)
                     recorded = sd.rec(int(rec_rate * 3.0), samplerate=rec_rate, channels=1, device=cur_in, dtype='float32')

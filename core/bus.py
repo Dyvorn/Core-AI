@@ -120,7 +120,7 @@ class EventBus:
 
             payload = json.dumps(data, default=custom_serializer)
 
-            if self.use_fallback:
+            if self.use_fallback or not self.redis_client:
                 self.in_memory_bus.publish(channel, payload)
             else:
                 self.redis_client.publish(channel, payload)
@@ -130,7 +130,7 @@ class EventBus:
 
     def subscribe(self, channel: str, callback: Callable[[dict], None]):
         """Subscribe to a channel with a callback function"""
-        if self.use_fallback:
+        if self.use_fallback or not self.pubsub:
             self.in_memory_bus.subscribe(channel, callback)
             logger.info(f"Subscribed (in-memory) to {channel}")
         else:
@@ -148,7 +148,7 @@ class EventBus:
 
     def start_listening(self):
         """Start listening for messages in a separate thread"""
-        if self.use_fallback:
+        if self.use_fallback or not self.pubsub:
             self.in_memory_bus.start_listening()
             logger.info("InMemory EventBus listener started")
         else:
