@@ -36,6 +36,10 @@ if /i "%~1"=="mics" goto audio
 if /i "%~1"=="speakers" goto audio
 if /i "%~1"=="mic" goto mic
 if /i "%~1"=="speaker" goto speaker
+if /i "%~1"=="voice" goto voice
+if /i "%~1"=="voices" goto voice
+if /i "%~1"=="speed" goto speed
+if /i "%~1"=="rate" goto speed
 if /i "%~1"=="satellite" goto satellite
 if /i "%~1"=="dashboard" goto dashboard
 if /i "%~1"=="ui" goto dashboard

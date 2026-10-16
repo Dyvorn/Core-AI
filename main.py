@@ -1528,6 +1528,22 @@ def main():
     server_thread = threading.Thread(target=server.run, daemon=True, name="CoreGatewayThread")
     server_thread.start()
 
+    # Proactive 24/7 Network Keep-Alive: prevents Wi-Fi NIC power-saving sleep and refreshes router ARP tables
+    def _run_network_keepalive():
+        import socket
+        while not shutdown_event.is_set():
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                    s.settimeout(0.5)
+                    s.connect(("1.1.1.1", 53))
+                    s.send(b"\x00")
+            except Exception:
+                pass
+            shutdown_event.wait(8.0)
+
+    keepalive_thread = threading.Thread(target=_run_network_keepalive, daemon=True, name="CoreNetworkKeepAliveThread")
+    keepalive_thread.start()
+
     logger.info(f"Core AI Universal Gateway running on http://{host}:{port}")
 
     try:

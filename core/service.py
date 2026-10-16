@@ -593,14 +593,18 @@ class ServiceManager:
         print(f"{C}|{RST}   SQLite Database:      {db_size_kb} KB ({db_path})")
         print(f"{C}+=====================================================================+{RST}\n")
 
-    def generate_systemd_service(self, user: Optional[str] = None, port: int = 8000) -> str:
+    def generate_systemd_service(self, user: Optional[str] = None, port: int = 8000, is_user_unit: bool = False) -> str:
         """
         Generates production-grade systemd service unit file content for dedicated Linux/Fedora servers.
+        Supports both system-wide units (/etc/systemd/system) and user units (~/.config/systemd/user).
         """
         run_user = user or os.environ.get("USER", "root")
         python_bin = os.path.join(self.root_dir, ".venv", "bin", "python")
         if not os.path.exists(python_bin):
             python_bin = sys.executable
+
+        user_line = f"User={run_user}\n" if not is_user_unit else ""
+        wanted_target = "default.target" if is_user_unit else "multi-user.target"
 
         service_unit = (
             "[Unit]\n"
@@ -609,7 +613,7 @@ class ServiceManager:
             "Wants=network-online.target\n\n"
             "[Service]\n"
             "Type=simple\n"
-            f"User={run_user}\n"
+            f"{user_line}"
             f"WorkingDirectory={self.root_dir}\n"
             f"ExecStart={python_bin} -m core.watchdog --port {port}\n"
             "Restart=always\n"
@@ -623,33 +627,47 @@ class ServiceManager:
             "ProtectSystem=full\n"
             "NoNewPrivileges=true\n\n"
             "[Install]\n"
-            "WantedBy=multi-user.target\n"
+            f"WantedBy={wanted_target}\n"
         )
         return service_unit
 
     def install_systemd_service(self, user: Optional[str] = None, port: int = 8000) -> Tuple[bool, str]:
         """
         Installs systemd service on Linux servers.
+        Attempts system-wide installation first (/etc/systemd/system),
+        and seamlessly falls back to user units (~/.config/systemd/user) with session lingering.
         """
         if os.name == "nt":
             return False, "systemd is only available on Linux operating systems."
 
-        content = self.generate_systemd_service(user=user, port=port)
+        content_system = self.generate_systemd_service(user=user, port=port, is_user_unit=False)
         systemd_path = "/etc/systemd/system/core-ai.service"
         try:
             with open(systemd_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            # Try reloading systemd
+                f.write(content_system)
+            # Reload systemd
             subprocess.run(["systemctl", "daemon-reload"], check=False)
             return True, f"Installed systemd unit to '{systemd_path}'. Enable with: sudo systemctl enable --now core-ai"
         except PermissionError:
-            # Fallback to local user unit
+            # Fallback to user unit
+            run_user = user or os.environ.get("USER", "")
+            content_user = self.generate_systemd_service(user=user, port=port, is_user_unit=True)
             user_unit_dir = os.path.expanduser("~/.config/systemd/user")
             os.makedirs(user_unit_dir, exist_ok=True)
             user_path = os.path.join(user_unit_dir, "core-ai.service")
             with open(user_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            return True, f"Installed user systemd unit to '{user_path}'. Enable with: systemctl --user enable --now core-ai"
+                f.write(content_user)
+            
+            # Enable user session lingering so background tasks survive terminal disconnects
+            if run_user:
+                subprocess.run(["loginctl", "enable-linger", run_user], check=False)
+            subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
+
+            return True, (
+                f"Installed user systemd unit to '{user_path}'.\n"
+                f"Enabled user session lingering (loginctl enable-linger).\n"
+                f"Enable and start now with: systemctl --user enable --now core-ai"
+            )
         except Exception as e:
             return False, f"Failed to install systemd service: {e}"
 
