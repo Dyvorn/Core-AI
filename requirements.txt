@@ -15,4 +15,5 @@ websockets
 soundfile
 edge-tts
 pytest>=7.0
+psutil>=5.9.0
 

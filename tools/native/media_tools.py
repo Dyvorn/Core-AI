@@ -20,6 +20,18 @@ def media_control(action: str) -> Dict[str, Any]:
     clean_action = action.lower().strip()
     system = platform.system()
 
+    valid_actions = {
+        "play", "pause", "play_pause", "play/pause", "toggle",
+        "next", "next_track", "skip",
+        "previous", "prev", "prev_track", "back",
+        "stop", "volume_up", "louder", "volume_down", "quieter", "mute", "unmute"
+    }
+    if clean_action not in valid_actions:
+        return {
+            "status": "error",
+            "error": f"Unknown media action '{action}'. Supported: play_pause, next, previous, volume_up, volume_down, mute"
+        }
+
     if system == "Windows":
         try:
             import ctypes
@@ -152,12 +164,22 @@ def set_system_volume(level_percent: int, **kwargs) -> Dict[str, Any]:
             subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{clamped}%"], timeout=2.0, check=True)
             return {"status": "success", "level_percent": clamped, "message": f"Set volume to {clamped}%."}
     except Exception as e:
-        return {"status": "error", "message": f"Failed to set volume: {e}"}
+        return {
+            "status": "unsupported",
+            "level_percent": clamped,
+            "message": f"Host audio subsystem unavailable ({e}). Volume adjustment unsupported on headless host."
+        }
 
 
 def toggle_audio_mute(**kwargs) -> Dict[str, Any]:
     """Toggles master audio mute on the host system."""
-    return media_control(action="mute")
+    res = media_control(action="mute")
+    if res.get("status") == "error":
+        return {
+            "status": "unsupported",
+            "message": res.get("error", "Host audio mute unsupported on this host.")
+        }
+    return res
 
 
 def get_audio_devices(**kwargs) -> Dict[str, Any]:
