@@ -1579,24 +1579,24 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                         val_num = int(v) if v.is_integer() else v
                     except ValueError:
                         val_num = dur[:-1]
-                    dur_de = f"{val_num} Minuten"
-                    dur_en = f"{val_num} minutes"
+                    dur_de = f"{val_num} Minute" if val_num == 1 else f"{val_num} Minuten"
+                    dur_en = f"{val_num} minute" if val_num == 1 else f"{val_num} minutes"
                 elif dur.endswith("s"):
                     try:
                         v = float(dur[:-1])
                         val_num = int(v) if v.is_integer() else v
                     except ValueError:
                         val_num = dur[:-1]
-                    dur_de = f"{val_num} Sekunden"
-                    dur_en = f"{val_num} seconds"
+                    dur_de = f"{val_num} Sekunde" if val_num == 1 else f"{val_num} Sekunden"
+                    dur_en = f"{val_num} second" if val_num == 1 else f"{val_num} seconds"
                 elif dur.endswith("h"):
                     try:
                         v = float(dur[:-1])
                         val_num = int(v) if v.is_integer() else v
                     except ValueError:
                         val_num = dur[:-1]
-                    dur_de = f"{val_num} Stunden"
-                    dur_en = f"{val_num} hours"
+                    dur_de = f"{val_num} Stunde" if val_num == 1 else f"{val_num} Stunden"
+                    dur_en = f"{val_num} hour" if val_num == 1 else f"{val_num} hours"
                 else:
                     dur_de = dur
                     dur_en = dur
