@@ -392,6 +392,9 @@ class MobileCompanionClient:
             ("Voice Satellites:", f"{GREEN}{glance.get('active_satellites_count', 0)} Online{RESET}"),
             ("Kernel Protocol:", f"{CYAN}v{glance.get('version', '0.3.0-alpha')}{RESET}")
         ]
+        sent_sum = glance.get("sentinel_summary")
+        if sent_sum:
+            rows.append(("TRACE Sentinel:", f"{CYAN}{sent_sum[:45]}...{RESET}" if len(sent_sum) > 45 else f"{CYAN}{sent_sum}{RESET}"))
 
         card = render_box(
             title="C.O.R.E. AI :: MOBILE GLANCE MATRIX",
@@ -400,10 +403,47 @@ class MobileCompanionClient:
         )
         print(f"\n{card}\n")
 
+    def get_trace_status(self) -> Dict[str, Any]:
+        """Fetches TRACE tripartite engine status (Track 1, 2, 3) from Gateway."""
+        url = f"{self.server_url}/api/v1/trace/status"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "CoreAI-MobileCompanion"})
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            logger.error(f"Failed to fetch TRACE status: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def print_trace_card(self):
+        """Renders high-contrast TRACE tripartite concurrency status card on mobile companion."""
+        res = self.get_trace_status()
+        if res.get("status") == "error":
+            print(f"{RED}[ERROR] Could not fetch TRACE status from {self.server_url}: {res.get('message')}{RESET}")
+            return
+
+        tracks = res.get("tracks", {})
+        t1 = tracks.get("track_1_foreground", {})
+        t2 = tracks.get("track_2_sentinel", {})
+        t3 = tracks.get("track_3_daemons", {})
+
+        rows = [
+            ("Track 1 (Foreground):", f"{GREEN}{t1.get('status', 'ready').upper()}{RESET} | Req: {t1.get('total_requests', 0)} | Latency: {t1.get('avg_latency_ms', 0)}ms"),
+            ("Track 2 (Sentinel):", f"{CYAN}{t2.get('status', 'standby').upper()}{RESET} | Scans: {t2.get('total_scans', 0)} | Branch: {t2.get('active_branch', 'clean')}"),
+            ("Sentinel Summary:", f"{YELLOW}{str(t2.get('summary', 'No summary available'))[:45]}{RESET}"),
+            ("Track 3 (Daemons):", f"{MAGENTA}{t3.get('status', 'standby').upper()}{RESET} | Reg: {t3.get('registered_daemons', 0)} | Runs: {t3.get('total_executions', 0)}")
+        ]
+
+        card = render_box(
+            title="C.O.R.E. AI :: TRACE TRIPARTITE STATUS",
+            rows=rows,
+            width=68
+        )
+        print(f"\n{card}\n")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Core AI Mobile Companion & Glyph Driver")
-    parser.add_argument("action", nargs="?", default="glance", choices=["glance", "status", "enroll", "glyph", "ask", "sync", "nodes", "send", "logout", "reset-session"], help="Action to perform")
+    parser.add_argument("action", nargs="?", default="glance", choices=["glance", "status", "trace", "sentinel", "enroll", "glyph", "ask", "sync", "nodes", "send", "logout", "reset-session"], help="Action to perform")
     parser.add_argument("extra", nargs="*", help="Extra arguments (e.g. prompt for ask, target and type for send)")
     parser.add_argument("--server", default="http://localhost:8000", help="Core AI Gateway URL")
     parser.add_argument("--client-id", default=None, help="Mobile device unique ID")
@@ -417,6 +457,9 @@ def main():
 
     if args.action in ("glance", "status"):
         client.print_glance_card()
+
+    elif args.action in ("trace", "sentinel"):
+        client.print_trace_card()
 
     elif args.action in ("logout", "reset-session"):
         client.clear_session()

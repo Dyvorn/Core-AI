@@ -20,13 +20,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 | Kernel | Status | Verification | Ethos |
 | :---: | :---: | :---: | :---: |
-| **`v0.3.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **215 / 215 PASSED** | 🛡️ **#ANTISLOP** |
+| **`v0.3.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **217 / 217 PASSED** | 🛡️ **#ANTISLOP** |
 
-Tri-Track Asynchronous Concurrent Execution (TRACE) Engine with decoupled Foreground Spoken-To (<50ms), 24/7 Context Sentinel awareness loop, and Background Daemon workers. Quadrillion Tool Matrix (QTM) native expansion delivering 35+ pre-compiled zero-latency capabilities across OS, Dev Workspace, Media, Homelab/Networking, and Web Automation. Repository reorganization and hygiene.
+Tri-Track Asynchronous Concurrent Execution (TRACE) Engine with decoupled Foreground Spoken-To (<50ms), 24/7 Context Sentinel awareness loop, and Background Daemon workers. Quadrillion Tool Matrix (QTM) native expansion delivering 35+ pre-compiled zero-latency capabilities with instant deterministic heuristic DAG routing across OS, Dev Workspace, Media, Homelab/Networking, and Web Automation. Mobile Glance lock-screen telemetry integration. Repository reorganization and hygiene.
 
 ### 🌟 Added & Enhanced
 
-#### ⚡ TRACE: Tri-Track Asynchronous Concurrent Execution (`brain/trace.py`, `core/gateway.py`, `core/schemas.py`)
+#### ⚡ TRACE: Tri-Track Asynchronous Concurrent Execution (`brain/trace.py`, `core/gateway.py`, `core/schemas.py`, `interfaces/mobile/companion.py`)
 - **Tri-Track Concurrency Architecture**: Decouples microkernel execution into three distinct, non-blocking tracks:
   - **Track 1 (Foreground / Spoken-To)**: Reactive interactive path (<50ms fastpath) with zero thread-blocking. Dynamically merges pre-computed `SentinelContext` into system prompts and plans, allowing instantaneous, context-aware execution without stalling on git, disk, or network queries.
   - **Track 2 (Context Sentinel)**: 24/7 silent background awareness loop scanning *"What is the operator working on? What needs attention or preventive maintenance right now?"*. Gathers git branch, clean/dirty working tree status, uncommitted changes, active scratch notes in SQLite, upcoming calendar appointments, and system hardware vitals.
@@ -37,9 +37,14 @@ Tri-Track Asynchronous Concurrent Execution (TRACE) Engine with decoupled Foregr
   - `GET /api/v1/trace/context`: Snapshot of cached Track 2 SentinelContext.
   - `POST /api/v1/trace/sentinel/scan`: On-demand trigger for immediate background sentinel evaluation.
   - `POST /api/v1/trace/interactive`: Direct foreground invocation with automatic non-blocking context injection.
+  - `GET /api/v1/mobile/glance`: Lock-screen glance endpoint enriched with live `sentinel_summary` and `active_branch`.
+- **Mobile Companion & CLI Client (`interfaces/mobile/companion.py`, `main.py`)**:
+  - Live TRACE Sentinel rendering on mobile lockscreen glance cards.
+  - Added CLI `trace` / `sentinel` commands and ambient Track 2 awareness display in interactive REPL.
 
-#### 🧰 QTM: Quadrillion Tool Matrix Substrate (`tools/native/`, `main.py`)
+#### 🧰 QTM: Quadrillion Tool Matrix Substrate (`tools/native/`, `brain/planner.py`, `main.py`)
 - **Pre-Compiled Zero-Latency Native Arsenal**: Massive expansion of deterministic tools so 99% of tasks execute with zero latency without invoking LLM code generation, keeping dynamic synthesis strictly as an emergent Tier-4 fallback.
+- **Sub-10ms Deterministic Heuristic Dispatch**: Added instant regex/keyword pattern recognition in `brain/planner.py` directly routing storage (`get_disk_usage`), battery (`get_battery_status`), network (`get_network_interfaces`), WAN (`get_public_ip`), host reachability (`ping_host`), open ports (`check_port_open`), DNS lookups (`dns_lookup`), wake-on-lan (`wake_on_lan`), volume/audio control (`set_system_volume`, `get_audio_devices`), git status (`git_diff_summary`), cryptographic hashing (`compute_file_hash`), and URL fetching (`fetch_url_text`) without requiring LLM cold starts.
 - **Automated Native Substrate Auto-Loader (`tools/native/__init__.py:register_all_native_tools`)**: Automatically registers 35+ native tools into any `ToolRegistry` with state management and bus binding in a single call.
 - **Expanded Native Tool Domains**:
   - **System & OS Tools (`tools/native/system_tools.py`)**: `get_disk_usage` (total/used/free storage metrics), `get_battery_status` (charge % and plugged state), `get_network_interfaces` (IP and interface inspection).
@@ -54,8 +59,8 @@ Tri-Track Asynchronous Concurrent Execution (TRACE) Engine with decoupled Foregr
 - **Cleaned Build Artifacts**: Removed transient `.pyc`, `.pytest_cache`, and debug files.
 
 #### 🧪 Verification & Test Suite (`tests/test_qtm_and_trace.py`)
-- Added 21 automated end-to-end unit and integration tests covering the QTM tool catalog, TRACE Sentinel scans, non-blocking Track 1 execution, Track 3 daemon supervision, and Gateway REST endpoints.
-- **Total Test Count**: **215 / 215 tests passing 100% green**.
+- Added 23 automated end-to-end unit and integration tests covering the QTM tool catalog, TRACE Sentinel scans, non-blocking Track 1 execution, Track 3 daemon supervision, Gateway REST endpoints, Mobile glance card sentinel telemetry, and instant deterministic heuristic routing.
+- **Total Test Count**: **217 / 217 tests passing 100% green**.
 
 ---
 

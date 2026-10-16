@@ -409,6 +409,8 @@ class MobileGlanceStatus(BaseModel):
     active_satellites_count: int = 0
     server_time: float = Field(default_factory=lambda: time.time())
     version: str = "0.3.0-alpha"
+    sentinel_summary: Optional[str] = None
+    active_branch: Optional[str] = None
 
 
 # --- Phase 5: Sovereign Mesh State Sync & Inter-Device Communication ---

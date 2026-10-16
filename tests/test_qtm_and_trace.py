@@ -338,3 +338,62 @@ class TestTraceGatewayIntegration:
         assert data["status"] == "success"
         assert "latency_ms" in data
         assert "sentinel_summary" in data
+
+    def test_mobile_glance_includes_trace_sentinel(self, client):
+        resp = client.get("/api/v1/mobile/glance")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "version" in data
+        assert data["version"] == "0.3.0-alpha"
+        assert "sentinel_summary" in data
+
+
+# =============================================================================
+# PLANNER + QTM DETERMINISTIC DISPATCH TESTS
+# =============================================================================
+
+class TestPlannerQTMDeterministicDispatch:
+
+    def test_qtm_deterministic_heuristic_plans(self, fresh_state, clean_registry):
+        from brain.planner import Planner
+        register_all_native_tools(clean_registry, state_manager=fresh_state)
+        planner = Planner(registry=clean_registry, model_router=None, state_manager=fresh_state)
+
+        # 1. Disk usage
+        plan_disk = planner.plan_problem("check free disk space")
+        assert len(plan_disk.steps) == 1
+        assert plan_disk.steps[0].tool_name == "get_disk_usage"
+        assert plan_disk.context.get("mode") == "instant_heuristic"
+
+        # 2. Battery status
+        plan_bat = planner.plan_problem("what is my battery level")
+        assert len(plan_bat.steps) == 1
+        assert plan_bat.steps[0].tool_name == "get_battery_status"
+
+        # 3. Public WAN IP
+        plan_ip = planner.plan_problem("tell me my public ip")
+        assert len(plan_ip.steps) == 1
+        assert plan_ip.steps[0].tool_name == "get_public_ip"
+
+        # 4. Volume control
+        plan_vol = planner.plan_problem("set volume to 75")
+        assert len(plan_vol.steps) == 1
+        assert plan_vol.steps[0].tool_name == "set_system_volume"
+        assert plan_vol.steps[0].arguments.get("level_percent") == 75
+
+        # 5. Audio devices
+        plan_devs = planner.plan_problem("show my audio devices")
+        assert len(plan_devs.steps) == 1
+        assert plan_devs.steps[0].tool_name == "get_audio_devices"
+
+        # 6. Ping host
+        plan_ping = planner.plan_problem("ping 8.8.8.8")
+        assert len(plan_ping.steps) == 1
+        assert plan_ping.steps[0].tool_name == "ping_host"
+        assert plan_ping.steps[0].arguments.get("host") == "8.8.8.8"
+
+        # 7. Git diff
+        plan_diff = planner.plan_problem("show git diff summary")
+        assert len(plan_diff.steps) == 1
+        assert plan_diff.steps[0].tool_name == "git_diff_summary"
+

@@ -116,7 +116,13 @@ class Planner:
             "create_reminder", "create_vitals_watcher", "list_active_rules",
             "cancel_proactive_rule", "get_git_status", "manage_notes", "factory_reset",
             "inspect_system_resources",
-            "manage_calendar", "reconcile_schedule_evidence", "get_upcoming_schedule"
+            "manage_calendar", "reconcile_schedule_evidence", "get_upcoming_schedule",
+            # QTM Substrate (v0.3.0)
+            "get_disk_usage", "get_battery_status", "get_network_interfaces",
+            "get_public_ip", "ping_host", "check_port_open", "dns_lookup", "wake_on_lan",
+            "set_system_volume", "toggle_audio_mute", "get_audio_devices",
+            "git_diff_summary", "compute_file_hash", "find_files_by_pattern",
+            "read_json_file", "write_json_file", "fetch_url_text"
         }
         has_direct_heuristic = bool(heuristic_plan.context.get("direct_response"))
         is_routine_action = (
@@ -288,10 +294,10 @@ class Planner:
         elif any(k in goal_lower for k in ["lock workstation", "lock screen", "lock pc", "bildschirm sperren"]):
             steps.append(PipelineStep(id="lock_step", name="Lock Workstation", tool_name="lock_workstation", arguments={}, depends_on=[]))
 
-        # Pattern: System Resources & Hardware Vitals Inspection ("system vitals", "hardware health", "disk space", "ram usage")
+        # Pattern: System Resources & Hardware Vitals Inspection ("system vitals", "hardware health", "ram usage")
         elif any(k in goal_lower for k in [
             "system vitals", "hardware health", "resource usage", "system resources",
-            "disk space", "festplatte", "disk usage", "ram usage", "speicher frei",
+            "festplatte", "ram usage", "speicher frei",
             "cpu usage", "system auslastung", "hardware status", "vitals"
         ]):
             steps.append(PipelineStep(
@@ -727,6 +733,148 @@ class Planner:
                     arguments={},
                     depends_on=[]
                 ))
+
+        # Pattern: QTM Disk Space & Storage Inspection
+        elif any(k in goal_lower for k in ["disk usage", "free space", "free disk", "festplattenspeicher", "disk space", "speicherplatz"]):
+            steps.append(PipelineStep(
+                id="get_disk_usage_step",
+                name="Inspect Disk Space Usage",
+                tool_name="get_disk_usage",
+                arguments={},
+                depends_on=[]
+            ))
+
+        # Pattern: QTM Battery & Power Status
+        elif any(k in goal_lower for k in ["battery", "batteriestatus", "akkustand", "battery level", "power status"]):
+            steps.append(PipelineStep(
+                id="get_battery_step",
+                name="Inspect Battery Status",
+                tool_name="get_battery_status",
+                arguments={},
+                depends_on=[]
+            ))
+
+        # Pattern: QTM Public WAN IP Resolution
+        elif any(k in goal_lower for k in ["public ip", "wan ip", "externe ip", "what is my ip", "my ip", "meine ip"]):
+            steps.append(PipelineStep(
+                id="get_public_ip_step",
+                name="Resolve Public WAN IP",
+                tool_name="get_public_ip",
+                arguments={},
+                depends_on=[]
+            ))
+
+        # Pattern: QTM Network Interfaces
+        elif any(k in goal_lower for k in ["network interfaces", "ip addresses", "netzwerkschnittstellen", "list interfaces", "my interfaces"]):
+            steps.append(PipelineStep(
+                id="get_interfaces_step",
+                name="Inspect Network Interfaces",
+                tool_name="get_network_interfaces",
+                arguments={},
+                depends_on=[]
+            ))
+
+        # Pattern: QTM Ping Host
+        elif goal_lower.startswith("ping ") or "ping host" in goal_lower:
+            host_target = re.sub(r"^ping\s+(?:host\s+)?", "", goal.strip(), flags=re.IGNORECASE).strip(" .!?")
+            steps.append(PipelineStep(
+                id="ping_host_step",
+                name=f"Ping Host '{host_target}'",
+                tool_name="ping_host",
+                arguments={"host": host_target},
+                depends_on=[]
+            ))
+
+        # Pattern: QTM DNS Lookup
+        elif any(k in goal_lower for k in ["dns lookup", "resolve domain", "ip of domain", "lookup domain"]):
+            domain_target = re.sub(r".*?\b(?:dns lookup|resolve domain|ip of domain|lookup domain)\s+", "", goal.strip(), flags=re.IGNORECASE).strip(" .!?")
+            steps.append(PipelineStep(
+                id="dns_lookup_step",
+                name=f"DNS Lookup for '{domain_target}'",
+                tool_name="dns_lookup",
+                arguments={"domain": domain_target},
+                depends_on=[]
+            ))
+
+        # Pattern: QTM Audio Volume & Mute Control
+        elif any(k in goal_lower for k in ["volume", "lautstärke", "mute", "unmute", "stumm"]):
+            if "mute" in goal_lower or "stumm" in goal_lower:
+                should_mute = "unmute" not in goal_lower and "nicht stumm" not in goal_lower
+                steps.append(PipelineStep(
+                    id="toggle_mute_step",
+                    name="Toggle Audio Mute",
+                    tool_name="toggle_audio_mute",
+                    arguments={"mute": should_mute},
+                    depends_on=[]
+                ))
+            else:
+                vol_match = re.search(r"(\d{1,3})", goal_lower)
+                level = int(vol_match.group(1)) if vol_match else 50
+                steps.append(PipelineStep(
+                    id="set_volume_step",
+                    name=f"Set System Volume to {level}%",
+                    tool_name="set_system_volume",
+                    arguments={"level_percent": level},
+                    depends_on=[]
+                ))
+
+        # Pattern: QTM Audio Hardware Devices
+        elif any(k in goal_lower for k in ["audio devices", "sound devices", "audiogeräte", "soundkarten"]):
+            steps.append(PipelineStep(
+                id="get_audio_devices_step",
+                name="Inspect Audio Devices",
+                tool_name="get_audio_devices",
+                arguments={},
+                depends_on=[]
+            ))
+
+        # Pattern: QTM Git Diff & Changes
+        elif any(k in goal_lower for k in ["git diff", "git changes", "show diff", "diff summary", "was wurde geändert"]):
+            steps.append(PipelineStep(
+                id="git_diff_step",
+                name="Inspect Git Diff Summary",
+                tool_name="git_diff_summary",
+                arguments={},
+                depends_on=[]
+            ))
+
+        # Pattern: QTM Cryptographic File Hash
+        elif any(k in goal_lower for k in ["file hash", "hash of", "sha256 of", "md5 of"]):
+            file_match = re.search(r"(?:hash of|sha256 of|md5 of|file hash)\s+([^\s]+)", goal, flags=re.IGNORECASE)
+            target_f = file_match.group(1).strip("\"'") if file_match else "main.py"
+            alg = "md5" if "md5" in goal_lower else "sha256"
+            steps.append(PipelineStep(
+                id="compute_file_hash_step",
+                name=f"Compute {alg.upper()} Hash of '{target_f}'",
+                tool_name="compute_file_hash",
+                arguments={"file_path": target_f, "algorithm": alg},
+                depends_on=[]
+            ))
+
+        # Pattern: QTM Wake-on-LAN
+        elif any(k in goal_lower for k in ["wake on lan", "wol ", "wake workstation", "wake machine"]):
+            mac_match = re.search(r"([0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2})", goal)
+            target_mac = mac_match.group(1) if mac_match else ""
+            if target_mac:
+                steps.append(PipelineStep(
+                    id="wake_on_lan_step",
+                    name=f"Wake on LAN for '{target_mac}'",
+                    tool_name="wake_on_lan",
+                    arguments={"mac_address": target_mac},
+                    depends_on=[]
+                ))
+
+        # Pattern: QTM Fetch Webpage Text
+        elif any(k in goal_lower for k in ["fetch url", "read webpage", "extract text from url", "webpage text"]):
+            url_match = re.search(r"(https?://[^\s]+)", goal)
+            target_url = url_match.group(1) if url_match else "http://localhost:8000"
+            steps.append(PipelineStep(
+                id="fetch_url_step",
+                name=f"Fetch Webpage Text from '{target_url}'",
+                tool_name="fetch_url_text",
+                arguments={"url": target_url},
+                depends_on=[]
+            ))
 
         # Pattern: Pure conversational greetings (no command or question attached)
         elif raw_goal_clean in [
@@ -1263,7 +1411,7 @@ Do NOT output any markdown formatting or commentary outside the JSON.
         if "get_weather" in step_outputs:
             w_res = step_outputs["get_weather"]
             if isinstance(w_res, dict) and w_res.get("status") == "success":
-                loc = w_res.get("resolved_location") or w_res.get("query_location")
+                loc = w_res.get("resolved_location") or w_res.get("query_location") or w_res.get("location") or "your area"
                 temp_c = w_res.get("temperature_c")
                 cond = w_res.get("condition", "Clear")
                 if language == "de":

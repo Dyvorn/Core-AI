@@ -1103,6 +1103,10 @@ def create_gateway_app(
         from tools.native.system_tools import inspect_system_resources
         vitals = inspect_system_resources()
 
+        sent_ctx = active_trace_engine.get_sentinel_context() if active_trace_engine else None
+        sent_summary = sent_ctx.get_summary_prompt() if sent_ctx else None
+        branch_name = getattr(sent_ctx, "active_workspace_branch", None) if sent_ctx else None
+
         return MobileGlanceStatus(
             operator_name=profile.preferred_name or "Operator",
             primary_space=profile.preferences.get("primary_space", "office"),
@@ -1111,7 +1115,9 @@ def create_gateway_app(
             system_vitals=vitals,
             active_satellites_count=connection_manager.get_active_satellites_count(),
             server_time=time.time(),
-            version=__version__
+            version=__version__,
+            sentinel_summary=sent_summary,
+            active_branch=branch_name
         )
 
     @app.post("/api/v1/mobile/glyph")

@@ -913,6 +913,31 @@ def run_interactive_repl(
                 asyncio.run(proactive.evaluate_triggers())
                 print(f"{GREEN}[OK] Proactive evaluation cycle complete.{RESET}")
 
+            elif cmd_lower in ["trace", "trace status"]:
+                from brain.trace import get_trace_engine
+                te = get_trace_engine(state_manager=state, pipeline_engine=engine, planner=planner, bus=bus)
+                stat = te.get_status()
+                tracks = stat.get("tracks", {})
+                t1 = tracks.get("track_1_foreground", {})
+                t2 = tracks.get("track_2_sentinel", {})
+                t3 = tracks.get("track_3_daemons", {})
+                print(f"\n{BRIGHT}--- TRACE Concurrency Matrix (v0.3.0) ---{RESET}")
+                print(f"  Track 1 [Foreground]: Status={GREEN}{t1.get('status')}{RESET} | Req={t1.get('total_requests')} | Avg Latency={t1.get('avg_latency_ms')}ms")
+                print(f"  Track 2 [Sentinel]:   Status={CYAN}{t2.get('status')}{RESET} | Scans={t2.get('total_scans')} | Duration={t2.get('last_scan_duration_ms')}ms")
+                print(f"    ↳ Context: {YELLOW}{t2.get('summary')}{RESET}")
+                print(f"  Track 3 [Daemons]:    Status={MAGENTA}{t3.get('status')}{RESET} | Reg={t3.get('registered_daemons')} | Executions={t3.get('total_executions')}\n")
+
+            elif cmd_lower in ["sentinel", "sentinel scan"]:
+                from brain.trace import get_trace_engine
+                te = get_trace_engine(state_manager=state, pipeline_engine=engine, planner=planner, bus=bus)
+                print(f"{YELLOW}[*] Triggering Track 2 Context Sentinel scan...{RESET}")
+                ctx = te.run_sentinel_scan()
+                print(f"{GREEN}[OK] Sentinel scan complete ({ctx.scan_duration_ms}ms):{RESET}")
+                print(f"  Branch:  {CYAN}{ctx.active_workspace_branch}{RESET} ({'dirty' if ctx.git_dirty else 'clean'})")
+                print(f"  Summary: {YELLOW}{ctx.git_status_summary}{RESET}")
+                print(f"  Notes:   {ctx.pending_notes_count} scratch note(s)")
+                print(f"  Vitals:  CPU {ctx.system_vitals.get('cpu_percent')}% | RAM {ctx.system_vitals.get('memory_percent')}%\n")
+
             elif cmd_lower in ["harness", "eval", "diag", "selftest"]:
                 print(f"\n{CYAN}======================================================================={RESET}")
                 print(f"{CYAN}  CORE AI :: SOVEREIGN REASONING & EXECUTION HARNESS DIAGNOSTIC{RESET}")
@@ -1018,6 +1043,12 @@ def run_interactive_repl(
                 goal = user_input
                 if cmd_lower.startswith("solve "):
                     goal = user_input[6:].strip()
+
+                from brain.trace import get_trace_engine
+                te = get_trace_engine(state_manager=state, pipeline_engine=engine, planner=planner, bus=bus)
+                sent_ctx = te.get_sentinel_context()
+                if sent_ctx.active_workspace_branch != "unknown":
+                    print(f"  {CYAN}[TRACE Sentinel]{RESET} {sent_ctx.get_summary_prompt()}")
 
                 print(f"\n{CYAN}[*] Decomposing goal with Planner:{RESET} '{goal}'")
 
