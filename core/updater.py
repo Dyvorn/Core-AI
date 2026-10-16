@@ -60,20 +60,26 @@ class CoreUpdater:
         has_updates = current != remote_hash
         return has_updates, current, remote_hash
 
-    def run_tests(self) -> Tuple[bool, str]:
+    def run_tests(self, timeout: float = 300.0) -> Tuple[bool, str]:
         """Runs pytest on the test suite to verify stability."""
         try:
             res = subprocess.run(
-                [sys.executable, "-m", "pytest", "tests"],
+                [sys.executable, "-m", "pytest", "tests", "-q"],
                 cwd=self.repo_dir,
                 capture_output=True,
                 text=True,
-                timeout=90.0
+                timeout=timeout
             )
             passed = res.returncode == 0
-            return passed, res.stdout
+            output = res.stdout if passed else f"{res.stdout}\n{res.stderr}".strip()
+            return passed, output
+        except subprocess.TimeoutExpired as e:
+            msg = f"Automated test guard timed out after {timeout:.0f} seconds."
+            if e.stdout:
+                msg += f"\nStdout before timeout:\n{e.stdout[-1500:]}"
+            return False, msg
         except Exception as e:
-            return False, str(e)
+            return False, f"Failed to execute automated test guard: {e}"
 
     def create_state_snapshot(self, backup_dir: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
         """
@@ -150,7 +156,8 @@ class CoreUpdater:
 
     def apply_update(
         self,
-        on_test_failure_prompt: Optional[Callable[[str], bool]] = None
+        on_test_failure_prompt: Optional[Callable[[str], bool]] = None,
+        force: bool = False
     ) -> Tuple[bool, str]:
         """
         Pulls latest commits, executes test guard, and rolls back if tests fail.
@@ -173,9 +180,15 @@ class CoreUpdater:
         if code != 0:
             return False, f"Git pull failed: {pull_err}"
 
+        if force:
+            new_commit = self.get_current_commit()
+            msg = f"Upgrade successful! Updated to commit {new_commit} (--force override applied; test guard skipped)."
+            logger.info(msg)
+            return True, msg
+
         # Run automated test guard
-        logger.info("Running automated test guard on updated files...")
-        passed, test_out = self.run_tests()
+        logger.info("Running automated test guard on updated files (timeout: 300s)...")
+        passed, test_out = self.run_tests(timeout=300.0)
 
         if passed:
             new_commit = self.get_current_commit()
@@ -185,6 +198,15 @@ class CoreUpdater:
 
         # Tests failed on new update!
         logger.warning("Test guard failed after applying update!")
+        print("\n" + "=" * 65)
+        print("  CORE AI :: TEST GUARD FAILURE DIAGNOSTICS")
+        print("=" * 65)
+        if test_out:
+            print(test_out[-3000:] if len(test_out) > 3000 else test_out)
+        else:
+            print("[!] No test failure output captured.")
+        print("=" * 65 + "\n")
+
         keep_anyway = False
         if on_test_failure_prompt:
             keep_anyway = on_test_failure_prompt(test_out)
@@ -194,6 +216,10 @@ class CoreUpdater:
             self._run_git(["reset", "--hard", previous_commit])
             if db_snap:
                 self.restore_state_snapshot(db_snap, env_snap)
-            return False, f"Update rolled back to {previous_commit} because test guard detected test failures. State snapshot restored."
+            return False, (
+                f"Update rolled back to {previous_commit} because test guard detected test failures. "
+                "State snapshot restored.\n"
+                "(Run './core.sh update --force' to bypass or run './core.sh test' to inspect failures directly)."
+            )
 
         return True, "Update retained per operator override despite test failures."

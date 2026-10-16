@@ -30,9 +30,39 @@ def test_updater_git_inspection():
 
 def test_updater_test_runner():
     updater = CoreUpdater()
-    # Running test suite through updater should execute without error
-    code, cur_commit, remote_commit = updater.check_for_updates()
+    # Running update check should inspect commits cleanly
+    has_updates, cur_commit, remote_commit = updater.check_for_updates()
     assert cur_commit is not None
+
+def test_updater_apply_update_force(monkeypatch):
+    updater = CoreUpdater()
+    # Mock check_for_updates to simulate available update
+    monkeypatch.setattr(updater, "check_for_updates", lambda: (True, "abcdef", "123456"))
+    # Mock _run_git pull to succeed
+    monkeypatch.setattr(updater, "_run_git", lambda args: (0, "Already up to date.", ""))
+    # Mock create_state_snapshot
+    monkeypatch.setattr(updater, "create_state_snapshot", lambda: (None, None))
+    # Mock get_current_commit
+    monkeypatch.setattr(updater, "get_current_commit", lambda: "123456")
+
+    ok, msg = updater.apply_update(force=True)
+    assert ok is True
+    assert "--force override applied" in msg
+
+def test_updater_test_guard_diagnostics(monkeypatch, capsys):
+    updater = CoreUpdater()
+    monkeypatch.setattr(updater, "check_for_updates", lambda: (True, "abcdef", "123456"))
+    monkeypatch.setattr(updater, "_run_git", lambda args: (0, "", ""))
+    monkeypatch.setattr(updater, "create_state_snapshot", lambda: (None, None))
+    # Simulate test failure
+    monkeypatch.setattr(updater, "run_tests", lambda timeout=300.0: (False, "FAILED tests/test_dummy.py::test_fail - AssertionError"))
+
+    ok, msg = updater.apply_update(force=False)
+    assert ok is False
+    assert "test guard detected test failures" in msg
+    captured = capsys.readouterr()
+    assert "CORE AI :: TEST GUARD FAILURE DIAGNOSTICS" in captured.out
+    assert "FAILED tests/test_dummy.py::test_fail" in captured.out
 
 def test_desktop_launcher_creation(tmp_path, monkeypatch):
     from interfaces.install.setup_service import create_desktop_launcher

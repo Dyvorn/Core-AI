@@ -110,7 +110,8 @@ case "$COMMAND" in
         ;;
     update)
         git checkout -- core.sh install.sh 2>/dev/null || true
-        "$PYTHON" -c "from core.updater import CoreUpdater; u = CoreUpdater(); ok, msg = u.apply_update(); print(msg)"
+        shift
+        "$PYTHON" -c "import sys; from core.updater import CoreUpdater; u = CoreUpdater(); force = any(arg in ['--force', '-f', '--skip-tests'] for arg in sys.argv); ok, msg = u.apply_update(force=force); print(msg); sys.exit(0 if ok else 1)" "$@"
         chmod +x core.sh install.sh 2>/dev/null || true
         ;;
     test)
