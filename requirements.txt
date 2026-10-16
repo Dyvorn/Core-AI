@@ -14,4 +14,5 @@ websockets
 # kokoro-onnx (can be added depending on tts backend)
 soundfile
 edge-tts
+pytest>=7.0
 

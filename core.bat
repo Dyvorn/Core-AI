@@ -190,7 +190,13 @@ shift
 goto :eof
 
 :test
-"%PYTHON%" -m pytest tests
+"%PYTHON%" -c "import pytest" >nul 2>&1
+if errorlevel 1 (
+    echo [*] 'pytest' not detected in %PYTHON%. Installing pytest...
+    "%PYTHON%" -m pip install pytest
+)
+shift
+"%PYTHON%" -m pytest tests %1 %2 %3 %4 %5
 goto :eof
 
 :autostart

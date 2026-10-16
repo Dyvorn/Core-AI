@@ -115,7 +115,12 @@ case "$COMMAND" in
         chmod +x core.sh install.sh 2>/dev/null || true
         ;;
     test)
-        "$PYTHON" -m pytest tests
+        if ! "$PYTHON" -c "import pytest" 2>/dev/null; then
+            echo "[*] 'pytest' not detected in $PYTHON. Installing pytest..."
+            "$PYTHON" -m pip install pytest
+        fi
+        shift
+        "$PYTHON" -m pytest tests "$@"
         ;;
     autostart)
         "$PYTHON" -m core.service autostart "$2"

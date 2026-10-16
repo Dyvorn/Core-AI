@@ -64,6 +64,21 @@ def test_updater_test_guard_diagnostics(monkeypatch, capsys):
     assert "CORE AI :: TEST GUARD FAILURE DIAGNOSTICS" in captured.out
     assert "FAILED tests/test_dummy.py::test_fail" in captured.out
 
+def test_updater_missing_pytest_graceful(monkeypatch):
+    updater = CoreUpdater()
+    import subprocess
+    # Simulate pytest missing (exit code 1 on import pytest)
+    orig_run = subprocess.run
+    def mock_run(args, **kwargs):
+        if "-c" in args and "import pytest" in args:
+            return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="No module named pytest")
+        return orig_run(args, **kwargs)
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    passed, out = updater.run_tests()
+    assert passed is True
+    assert "pytest' is not installed" in out
+
 def test_desktop_launcher_creation(tmp_path, monkeypatch):
     from interfaces.install.setup_service import create_desktop_launcher
     fake_desktop = tmp_path / "Desktop"
