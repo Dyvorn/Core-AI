@@ -496,11 +496,6 @@ class VoiceInEngine:
                                     if trailing_cmd and len(trailing_cmd) > 2:
                                         self._dispatch_callback(trailing_cmd)
                                 else:
-                                    if is_currently_speaking:
-                                        if self.voice_out:
-                                            self.voice_out.interrupt()
-                                        print(f"\n[🛑 BARGE-IN] Interrupted playback for new command: \"{clean_text}\"")
-
                                     print(f"[📝 STT] Result: \"{clean_text}\"")
                                     self._dispatch_callback(clean_text)
                             else:

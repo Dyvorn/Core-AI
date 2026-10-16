@@ -333,6 +333,77 @@ class Planner:
             is_de = any(c in goal_lower for c in ["stopp", "abbrechen", "halt"])
             context["direct_response"] = "Aktion angehalten." if is_de else "Action stopped."
 
+        # Pattern: Proactive Timers, Countdowns & Reminders
+        # (e.g. "stell mir ein timer auf 15 minuten", "set a timer for 10 minutes", "timer auf 5m", "remind me in 10 minutes", "aktive timer", "timer abbrechen")
+        elif any(k in goal_lower for k in [
+            "timer", "erinnere", "erinnerung", "remind", "reminder", "countdown", "wecker"
+        ]):
+            # 1. Cancellation
+            if any(k in goal_lower for k in ["abbrechen", "cancel", "lösch", "loesch", "stopp", "stop", "entfern"]):
+                steps.append(PipelineStep(
+                    id="cancel_timer_step",
+                    name="Cancel Timer / Reminder",
+                    tool_name="cancel_proactive_rule",
+                    arguments={"name_or_id": "Timer"},
+                    depends_on=[]
+                ))
+            # 2. List active timers/rules
+            elif any(k in goal_lower for k in ["aktive", "active", "list", "zeige", "show", "welche"]):
+                steps.append(PipelineStep(
+                    id="list_rules_step",
+                    name="List Active Timers & Rules",
+                    tool_name="list_active_rules",
+                    arguments={},
+                    depends_on=[]
+                ))
+            # 3. Create timer / reminder
+            else:
+                dur_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(sekunden?|sec|seconds?|s|minuten?|min|minutes?|m|stunden?|std|hours?|h)\b", goal_lower)
+                if dur_match:
+                    val = float(dur_match.group(1).replace(",", "."))
+                    unit = dur_match.group(2).lower()
+                    h, m, s = 0.0, 0.0, 0.0
+                    if unit in ["s", "sec", "secs", "second", "seconds", "sekunde", "sekunden"]:
+                        s = val
+                        unit_lbl = "s"
+                    elif unit in ["h", "std", "stunde", "stunden", "hour", "hours"]:
+                        h = val
+                        unit_lbl = "h"
+                    else:
+                        m = val
+                        unit_lbl = "m"
+
+                    topic = None
+                    topic_match = re.search(r"(?:an|zu|dass|für|fuer|to|for)\s+([a-zA-Z0-9äöüß\s\-_]+)", goal_lower)
+                    if topic_match:
+                        cand = topic_match.group(1).strip()
+                        if not re.search(r"^\d+\s*(?:sekunde|minute|stunde|min|sec|hour)", cand):
+                            topic = cand.title()
+
+                    val_str = f"{int(val)}" if val.is_integer() else f"{val}"
+                    label = f"Timer ({val_str}{unit_lbl})" if not topic else f"{topic} ({val_str}{unit_lbl})"
+
+                    steps.append(PipelineStep(
+                        id="create_reminder_step",
+                        name=f"Schedule Reminder '{label}'",
+                        tool_name="create_reminder",
+                        arguments={
+                            "reminder_text": label,
+                            "minutes": m,
+                            "seconds": s,
+                            "hours": h
+                        },
+                        depends_on=[]
+                    ))
+                else:
+                    steps.append(PipelineStep(
+                        id="create_reminder_step",
+                        name="Schedule 5-minute Timer",
+                        tool_name="create_reminder",
+                        arguments={"reminder_text": "Timer", "minutes": 5.0},
+                        depends_on=[]
+                    ))
+
         # Pattern: Mesh & Node Pairing Guidance ("add my pc to the mesh", "connect computer to mesh", "pc verbinden")
         elif any(k in goal_lower for k in [
             "add my pc", "add pc", "connect pc", "connect my pc", "add to mesh", "join mesh", "to the mesh",
@@ -1137,7 +1208,11 @@ Do NOT output any markdown formatting or commentary outside the JSON.
         goal_text = plan.goal.lower()
         if not language:
             is_german = any(c in goal_text for c in ["ä", "ö", "ü", "ß"]) or any(
-                w in goal_text.split() for w in ["wie", "was", "ist", "uhrzeit", "spät", "system", "status", "hallo", "schalte", "licht", "berechne"]
+                w in goal_text.split() for w in [
+                    "wie", "was", "ist", "uhrzeit", "spät", "spaet", "hallo", "schalte", "licht", "berechne",
+                    "stell", "stelle", "minuten", "sekunden", "stunden", "erinnere", "erinnerung", "auf",
+                    "mach", "bitte", "danke", "abbrechen", "lösche", "loesche", "zeig", "zeige", "wer", "wo", "wann", "warum"
+                ]
             )
             language = "de" if is_german else "en"
 
@@ -1495,8 +1570,44 @@ Do NOT output any markdown formatting or commentary outside the JSON.
         # 16. Proactive Reminders & Supervisor Rules
         if "create_reminder" in step_outputs:
             rem_res = step_outputs["create_reminder"]
+            if isinstance(rem_res, dict) and rem_res.get("status") == "success":
+                lbl = rem_res.get("reminder_text") or "Timer"
+                dur = str(rem_res.get("duration_str") or "")
+                if dur.endswith("m"):
+                    try:
+                        v = float(dur[:-1])
+                        val_num = int(v) if v.is_integer() else v
+                    except ValueError:
+                        val_num = dur[:-1]
+                    dur_de = f"{val_num} Minuten"
+                    dur_en = f"{val_num} minutes"
+                elif dur.endswith("s"):
+                    try:
+                        v = float(dur[:-1])
+                        val_num = int(v) if v.is_integer() else v
+                    except ValueError:
+                        val_num = dur[:-1]
+                    dur_de = f"{val_num} Sekunden"
+                    dur_en = f"{val_num} seconds"
+                elif dur.endswith("h"):
+                    try:
+                        v = float(dur[:-1])
+                        val_num = int(v) if v.is_integer() else v
+                    except ValueError:
+                        val_num = dur[:-1]
+                    dur_de = f"{val_num} Stunden"
+                    dur_en = f"{val_num} hours"
+                else:
+                    dur_de = dur
+                    dur_en = dur
+
+                if language == "de":
+                    return f"Alles klar {name}, ich habe den Timer auf {dur_de} gestellt."
+                else:
+                    msg = rem_res.get("message")
+                    return f"{msg}, {name}." if msg else f"Reminder scheduled for '{lbl}' in {dur_en}, {name}."
             msg = rem_res.get("message") if isinstance(rem_res, dict) else str(rem_res)
-            return f"Erinnerung gestellt, {name}: {msg}" if language == "de" else f"Reminder set, {name}: {msg}"
+            return f"Erinnerung gestellt, {name}: {msg}" if language == "de" else f"Reminder scheduled for {name}: {msg}"
 
         if "list_active_rules" in step_outputs:
             lar_res = step_outputs["list_active_rules"]

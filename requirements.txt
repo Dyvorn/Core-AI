@@ -13,7 +13,7 @@ websockets
 # sqlite-vec (for future vector db usage)
 # kokoro-onnx (can be added depending on tts backend)
 soundfile
-edge-tts
+edge-tts>=7.3.1
 pytest>=7.0
 psutil>=5.9.0
 

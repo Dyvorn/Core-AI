@@ -57,12 +57,21 @@ def create_reminder(
     sm.save_proactive_rule(rule)
 
     target_local_str = target_dt.strftime("%H:%M:%S UTC")
-    duration_str = f"{int(total_seconds)}s" if total_seconds < 60 else f"{round(total_seconds / 60, 1)}m"
+    if total_seconds < 60:
+        duration_str = f"{int(total_seconds)}s"
+    elif total_seconds >= 3600 and total_seconds % 3600 == 0:
+        duration_str = f"{int(total_seconds // 3600)}h"
+    elif total_seconds >= 3600:
+        duration_str = f"{round(total_seconds / 3600, 1)}h"
+    else:
+        duration_str = f"{int(total_seconds // 60) if total_seconds % 60 == 0 else round(total_seconds / 60, 1)}m"
     return {
         "status": "success",
         "message": f"Reminder scheduled for '{reminder_text}' in {duration_str} (at {target_local_str}).",
         "rule_id": rule.rule_id,
-        "fire_at": target_dt.isoformat()
+        "fire_at": target_dt.isoformat(),
+        "reminder_text": reminder_text,
+        "duration_str": duration_str
     }
 
 

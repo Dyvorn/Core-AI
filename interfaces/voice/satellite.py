@@ -564,6 +564,8 @@ class VoiceSatellite:
     def print_satellite_card(self):
         """Displays high-contrast satellite status matrix."""
         is_online, _, latency = self.mesh_client.ping_latency(timeout=2.0)
+        if not is_online:
+            is_online, _, latency = self.mesh_client.ping_latency(timeout=3.0)
         status_lbl = f"{GREEN}ONLINE ({latency}ms){RESET}" if is_online else f"{YELLOW}OFFLINE (Autonomous Fallback){RESET}"
 
         mic_name = f"Device #{self.mic_device}" if self.mic_device is not None else "Default System Microphone"
