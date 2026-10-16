@@ -22,7 +22,8 @@ from core.schemas import (
     SatelliteHeartbeatRequest, SatelliteHeartbeatResponse, SatelliteSpeakRequest,
     MobileEnrollmentRequest, MobileEnrollmentResponse, GlyphPattern, GlyphTriggerRequest, MobileGlanceStatus,
     MeshSyncPullRequest, MeshSyncPullResponse, MeshSyncPushRequest, MeshSyncPushResponse,
-    MeshSyncFullRequest, MeshSyncFullResponse, MeshDeviceMessage, MeshDeviceMessageResponse, MeshSyncPayload
+    MeshSyncFullRequest, MeshSyncFullResponse, MeshDeviceMessage, MeshDeviceMessageResponse, MeshSyncPayload,
+    ClientComputeSignature, MHACHandshakeRequest, MHACHandshakeResponse, MHACProbeRequest, MHACPullRequest
 )
 from core.state import StateManager
 from core.bus import EventBus
@@ -32,6 +33,7 @@ from brain.planner import Planner
 from brain.pipeline_engine import PipelineEngine
 from engines.audio_router import SpatialAudioRouter
 from brain.spatial_handoff import SpatialHandoffEngine
+from brain.mhac import get_mhac_broker, MHACBroker
 import uuid
 
 logger = logging.getLogger("CoreAI.Gateway")
@@ -348,9 +350,12 @@ def create_gateway_app(
     pipeline_engine: PipelineEngine,
     bus: EventBus,
     remote_dispatcher: Optional[Any] = None,
-    spoken_to: Optional[Any] = None
+    spoken_to: Optional[Any] = None,
+    mhac_broker: Optional[MHACBroker] = None
 ) -> FastAPI:
     """Factory creating the configured FastAPI Gateway Application."""
+
+    active_mhac_broker = mhac_broker or get_mhac_broker()
 
     if remote_dispatcher is None:
         from tools.remote_dispatcher import RemoteToolDispatcher
@@ -450,6 +455,7 @@ def create_gateway_app(
     def get_health():
         import platform
         profile = state_manager.get_user_profile()
+        mhac_info = active_mhac_broker.get_status()
         return {
             "status": "online",
             "version": __version__,
@@ -461,7 +467,9 @@ def create_gateway_app(
             "connected_edge_nodes": list(connection_manager.edge_nodes.keys()),
             "broadcast_clients_count": len(connection_manager.broadcast_clients),
             "active_satellites_count": connection_manager.get_active_satellites_count(),
-            "mobile_clients_count": len(connection_manager.mobile_clients)
+            "mobile_clients_count": len(connection_manager.mobile_clients),
+            "mhac_mode": mhac_info.get("mode", "standalone"),
+            "mhac_active_node": mhac_info.get("active_compute_node", "host")
         }
 
     @app.get("/api/v1/server/status")
@@ -1234,6 +1242,60 @@ def create_gateway_app(
                 dispatched_to=[],
                 message=f"Target '{msg.target_node}' is not currently active on the mesh."
             )
+
+    # --- Phase 6: Multiple Hardware-Aware Computing (MHAC) Inference Delegation ---
+
+    @app.post("/api/v1/mhac/handshake", response_model=MHACHandshakeResponse)
+    async def mhac_handshake(req: MHACHandshakeRequest):
+        """
+        MHAC Capability Evaluation & Context Broker Handshake:
+        Evaluates client compute score vs central host.
+        If client out-competes host and has target model, delegates heavy inference to client.
+        Broadcasts status notice across UI/mesh so the user is actively informed.
+        """
+        response = await asyncio.to_thread(
+            active_mhac_broker.evaluate_handshake,
+            req.client_signature,
+            req.preferred_models
+        )
+        await connection_manager.broadcast_event("MHAC_HANDSHAKE", response.model_dump())
+        return response
+
+    @app.get("/api/v1/mhac/status")
+    def get_mhac_status():
+        """Returns the current MHAC runtime status, active compute node, and host/client scores."""
+        return active_mhac_broker.get_status()
+
+    @app.post("/api/v1/mhac/probe")
+    async def mhac_probe(req: MHACProbeRequest):
+        """Probes a remote or local Ollama instance for installed models."""
+        models = await asyncio.to_thread(
+            active_mhac_broker.probe_client_models,
+            req.endpoint,
+            req.timeout
+        )
+        return {
+            "endpoint": req.endpoint,
+            "installed_models": models,
+            "count": len(models)
+        }
+
+    @app.post("/api/v1/mhac/pull")
+    async def mhac_pull_model(req: MHACPullRequest):
+        """Instructs a remote client's Ollama instance to pull a missing model."""
+        res = await asyncio.to_thread(
+            active_mhac_broker.trigger_client_model_pull,
+            req.endpoint,
+            req.model_name
+        )
+        return res
+
+    @app.post("/api/v1/mhac/reset")
+    async def mhac_reset():
+        """Resets compute delegation back to the central host processor."""
+        active_mhac_broker.reset_delegation()
+        await connection_manager.broadcast_event("MHAC_RESET", {"status": "reset", "active_compute_node": "host"})
+        return {"status": "ok", "message": "Compute delegation reset to central host.", "active_compute_node": "host"}
 
     @app.websocket("/ws/mobile/{client_id}")
     async def websocket_mobile_companion(websocket: WebSocket, client_id: str):

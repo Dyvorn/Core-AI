@@ -16,15 +16,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ---
 
 ## [[0.2.3-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.2.3-alpha) — 2026-10-16
-### Codename: "Proactive Anticipatory Agency & Master Troubleshooting Wiki"
+### Codename: "Proactive Anticipatory Agency, Master Troubleshooting Wiki & Multiple Hardware-Aware Computing (MHAC)"
 
 | Kernel | Status | Verification | Ethos |
 | :---: | :---: | :---: | :---: |
-| **`v0.2.3-alpha`** | 🟢 **OPERATIONAL** | 🧪 **187 / 187 PASSED** | 🛡️ **#ANTISLOP** |
+| **`v0.2.3-alpha`** | 🟢 **OPERATIONAL** | 🧪 **194 / 194 PASSED** | 🛡️ **#ANTISLOP** |
 
-Proactive Anticipatory Agency, Calendar & Schedule Reconciliation Engine, pre-event Preparation Buffer warnings, unscheduled note/evidence scanning, SQLite non-locking WAL & 30-second busy timeout hardening, and the Master Troubleshooting Wiki knowledge base in `docs/wiki/`.
+Proactive Anticipatory Agency, Calendar & Schedule Reconciliation Engine, pre-event Preparation Buffer warnings, unscheduled note/evidence scanning, SQLite non-locking WAL & 30-second busy timeout hardening, Master Troubleshooting Wiki in `docs/wiki/`, and Multiple Hardware-Aware Computing (MHAC) opportunistic compute delegation.
 
 ### 🌟 Added & Enhanced
+
+#### ⚡ Multiple Hardware-Aware Computing (MHAC) Mesh Framework (`brain/mhac.py`, `core/schemas.py`, `core/gateway.py`, `brain/model_router.py`)
+- **Capability & Context Broker**: Transforms the central host (`core`) into an opportunistic compute broker. When high-spec client workstations connect to the mesh, `core` evaluates compute signatures, negotiates model placement, and delegates heavy LLM inference to client GPUs while keeping memory, state, and proactive hooks centralized.
+- **Dynamic Hardware Scoring Formula**:
+  $$\text{ComputeScore} = (\text{CPU Cores} \times 1.0) + (\text{RAM GB} \times 0.5) + (\text{Has GPU} \times 50.0) + (\text{VRAM GB} \times 5.0)$$
+  Enables clear capability separation: low-power 2-core laptop scores ~10.0, client mobile phones score ~6.0, and desktop workstations with RTX GPUs score 150.0-220.0+.
+- **Opportunistic Model Verification & Handshake Protocol**:
+  - Automatically probes client Ollama instances (`GET /api/tags`).
+  - **Accelerated Workstation Mode**: Binds execution layer to client local GPU when target model (`llama3.1:8b`) is present.
+  - **Missing Model Handshake Mode**: Transparently informs operator (*"I can run this 4x faster on your machine, but llama3.1:8b is not installed..."*), offering one-click download via `/api/v1/mhac/pull` or seamless fallback to host CPU.
+  - **Standalone Mode**: Runs self-contained on host internal processor when connecting clients are low-spec.
+- **Decoupled Intelligence vs. Stateless Delegation**: SQLite WAL state, proactive daemons, conversation history, and tool execution remain on `core`; workstation acts strictly as a raw token execution worker.
+- **Non-Blocking Gateway Endpoints**:
+  - `POST /api/v1/mhac/handshake`: Capability evaluation and mesh-wide broadcast.
+  - `GET /api/v1/mhac/status`: Telemetry matrix of connected compute clients.
+  - `POST /api/v1/mhac/probe`: Remote/local Ollama model inventory inspection.
+  - `POST /api/v1/mhac/pull`: Client model download triggering.
+  - `POST /api/v1/mhac/reset`: Reset delegation back to host.
+- **Comprehensive Verification Suite (`tests/test_mhac.py`)**: 7 automated tests covering scoring, handshakes, model routing, and gateway endpoints.
 
 #### 🧠 Proactive Anticipatory Agency & Schedule Evidence Reconciliation (`brain/proactive.py`, `tools/native/calendar_tools.py`, `core/state.py`)
 - **Anticipatory Intelligence vs. Passive Chatbots**: Eliminates the need to ask *"Do I have appointments?"*. Core AI proactively detects implicit commitments from notes and conversation, confirms evidence, adds missing events to the calendar, and configures preparation reminders autonomously.
@@ -43,6 +62,7 @@ Proactive Anticipatory Agency, Calendar & Schedule Reconciliation Engine, pre-ev
 
 #### 📚 Comprehensive Master Wiki & Troubleshooting Knowledge Base (`docs/wiki/`)
 - **`docs/wiki/README.md`**: Master Wiki portal, navigation matrix, and quick problem resolver index.
+- **`docs/wiki/MHAC_ARCHITECTURE.md`**: Architectural blueprint of the Multiple Hardware-Aware Computing framework.
 - **`docs/wiki/TROUBLESHOOTING_AND_SOLUTIONS.md`**: Comprehensive Problem $\to$ Symptom $\to$ Root Cause $\to$ Verified Fix catalog covering Audio/WASAPI -9997, Windows IPv6 loopback delay, SQLite locking, LLM timeouts, and distributed satellites.
 - **`docs/wiki/PROACTIVE_ENGINE.md`**: Technical blueprint of the anticipatory reasoning loop, preparation buffers, and non-intrusive etiquette.
 - **`docs/wiki/ARCHITECTURE_AND_SUBSYSTEMS.md`**: Architectural dossier covering Microkernel, StateManager, EventBus, Spoken-To Pragmatics, and Sovereign Mesh.

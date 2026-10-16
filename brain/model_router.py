@@ -281,11 +281,11 @@ class ModelRouter:
             from brain.mhac import get_mhac_broker
             broker = get_mhac_broker()
             delegated_model = broker.get_delegated_model()
-            if delegated_model and broker.get_delegated_endpoint():
+            delegated_endpoint = broker.get_delegated_endpoint()
+            if delegated_model and delegated_endpoint:
                 mhac_candidate = f"ollama/{delegated_model}"
-                if self.check_model_availability(mhac_candidate):
-                    logger.info(f"[MHAC] Dynamically offloading role '{role}' to accelerated client model: '{mhac_candidate}' on {broker.get_delegated_endpoint()}")
-                    return clean_goal, mhac_candidate
+                logger.info(f"[MHAC] Dynamically offloading role '{role}' to accelerated client model: '{mhac_candidate}' on {delegated_endpoint}")
+                return clean_goal, mhac_candidate
         except Exception:
             pass
 

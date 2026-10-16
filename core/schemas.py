@@ -558,6 +558,19 @@ class MHACHandshakeResponse(BaseModel):
     missing_models: List[str] = Field(default_factory=list)
 
 
+class MHACProbeRequest(BaseModel):
+    """Request to probe model inventory of a remote or local Ollama endpoint."""
+    endpoint: str = "http://127.0.0.1:11434"
+    timeout: float = 2.0
+
+
+class MHACPullRequest(BaseModel):
+    """Request to instruct a client Ollama instance to pull a missing model."""
+    endpoint: str
+    model_name: str
+
+
+
 
 
 

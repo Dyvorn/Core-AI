@@ -19,6 +19,7 @@ Welcome to the **Core AI Master Wiki**. This documentation hub is a living, vers
 | :--- | :--- | :--- |
 | 🛠️ **[Troubleshooting & Solutions](TROUBLESHOOTING_AND_SOLUTIONS.md)** | **Start here if anything goes wrong.** Problem $\to$ Symptom $\to$ Solution catalog for audio, WASAPI, SQLite locks, networking, and LLMs. | All Operators & Developers |
 | 🧠 **[Proactive Autonomous Engine](PROACTIVE_ENGINE.md)** | Deep dive into anticipatory intelligence, calendar/schedule evidence reconciliation, preparation buffers, and non-intrusive alerts. | Architects & Users |
+| ⚡ **[Multiple Hardware-Aware Computing (MHAC)](MHAC_ARCHITECTURE.md)** | Opportunistic compute delegation, hardware scoring, client model probing, and decoupled sovereign mesh intelligence. | Distributed AI & Mesh Engineers |
 | 🏗️ **[Architecture & Subsystems](ARCHITECTURE_AND_SUBSYSTEMS.md)** | Technical anatomy: Microkernel, SQLite WAL StateManager, Async DAG Engine, Spoken-To Pragmatics, and Sovereign Mesh. | Engineers & Contributors |
 | ⚡ **[CLI & Tools Master Reference](CLI_AND_TOOLS_REFERENCE.md)** | Comprehensive dictionary of all CLI commands (`core ...`), flags, native tool schemas, arguments, and return types. | Daily Operators |
 | 📝 **[Submitting Issues & Solutions](SUBMITTING_ISSUES_AND_SOLUTIONS.md)** | How to report uncataloged errors, test proposed remedies, and merge solutions into the central Wiki. | Community & Testers |

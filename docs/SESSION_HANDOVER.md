@@ -1,14 +1,14 @@
 # Core AI -- Session Handover & Action Plan
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 187/187 TESTS PASSED ] [ PYTHON: 3.13+ ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 194/194 TESTS PASSED ] [ PYTHON: 3.13+ ]
 [ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]      [ VERSION: v0.2.3-alpha ]
 ```
 
 - **Date**: October 16, 2026  
 - **Lead Architect**: Dyvorn (*aka Vyrn / Refined*)  
-- **Release**: `v0.2.3-alpha` (Codename: "Proactive Anticipatory Agency & Master Troubleshooting Wiki")  
-- **System Status**: All 187 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
+- **Release**: `v0.2.3-alpha` (Codename: "Proactive Anticipatory Agency, Master Troubleshooting Wiki & Multiple Hardware-Aware Computing")  
+- **System Status**: All 194 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
 
 ---
 
@@ -192,11 +192,18 @@ Total: 180 passed / 180 collected across 31 test modules.
    - Resolved flaky subprocess timeout in `tests/test_daily_driver.py` by setting 30.0s margin.
 3. **Master Knowledge Base & Troubleshooting Wiki (`docs/wiki/`)**:
    - `docs/wiki/README.md`: Central knowledge portal and quick problem resolver index.
+   - `docs/wiki/MHAC_ARCHITECTURE.md`: Architectural blueprint of the Multiple Hardware-Aware Computing framework.
    - `docs/wiki/TROUBLESHOOTING_AND_SOLUTIONS.md`: Exhaustive Problem $\to$ Symptom $\to$ Root Cause $\to$ Verified Solution ledger covering Audio/WASAPI -9997, IPv6 loopback, SQLite locks, LLM provider timeouts, and mesh networks.
    - `docs/wiki/PROACTIVE_ENGINE.md`: Blueprint for anticipatory loops, preparation buffers, and non-intrusive etiquette.
    - `docs/wiki/ARCHITECTURE_AND_SUBSYSTEMS.md`: Detailed microkernel and asynchronous DAG specification.
    - `docs/wiki/CLI_AND_TOOLS_REFERENCE.md`: Complete operational dictionary of all CLI commands, flags, and native tools.
    - `docs/wiki/SUBMITTING_ISSUES_AND_SOLUTIONS.md`: Operator workflow for documenting new edge cases and merging tested fixes into the Wiki.
-4. **Verification Status**:
-   - **187 / 187 automated tests passing** (100% green pass rate across 32 test modules).
+4. **Multiple Hardware-Aware Computing (MHAC) Inference Delegation (`brain/mhac.py`, `core/gateway.py`, `brain/model_router.py`)**:
+   - Opportunistic compute delegation offloading heavy inference to connected workstation GPUs while keeping state, memory, and proactive hooks centralized on `core`.
+   - Hardware scoring formula evaluating CPU cores, RAM, GPU presence, and dedicated VRAM.
+   - Client Ollama model inventory probe (`GET /api/tags`) and capability handshake protocol (`POST /api/v1/mhac/handshake`).
+   - Three behavior modes: **Accelerated Workstation**, **Missing Model Handshake** (prompting to pull or falling back to host), and **Standalone Host Mode**.
+   - Verified dynamic routing in `ModelRouter` and gateway management endpoints (`/api/v1/mhac/status`, `/probe`, `/pull`, `/reset`).
+5. **Verification Status**:
+   - **194 / 194 automated tests passing** (100% green pass rate across 33 test modules).
 
