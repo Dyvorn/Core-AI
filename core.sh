@@ -133,6 +133,9 @@ case "$COMMAND" in
     autostart)
         "$PYTHON" -m core.service autostart "$2"
         ;;
+    fix-server|stabilize|server-mode)
+        sudo bash interfaces/install/fix_linux_server.sh
+        ;;
     watchdog)
         shift
         "$PYTHON" -m core.watchdog "$@"
