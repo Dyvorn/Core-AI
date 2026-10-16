@@ -6,7 +6,7 @@ import uuid
 import time
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
-from core.schemas import PipelinePlan, PipelineStep, UserProfile, DeviceTopologyRecord, ProactiveTriggerRule, ZoneRecord, AudioRouteRecord
+from core.schemas import PipelinePlan, PipelineStep, UserProfile, DeviceTopologyRecord, ProactiveTriggerRule, ZoneRecord, AudioRouteRecord, CalendarEventRecord
 
 
 logger = logging.getLogger(__name__)
@@ -28,16 +28,21 @@ class StateManager:
         self._init_db()
 
     def _get_connection(self):
-        conn = sqlite3.connect(self.db_path, uri=self._is_uri, check_same_thread=False)
+        conn = sqlite3.connect(self.db_path, uri=self._is_uri, check_same_thread=False, timeout=30.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA busy_timeout=30000")
+        except Exception:
+            pass
         return conn
 
     def _init_db(self):
         conn = self._get_connection()
         try:
-            # Enable WAL mode for better concurrency
+            # Enable WAL mode for better concurrency and prevent database locking
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA busy_timeout=30000")
             
             # 1. Pipelines
             conn.execute('''
@@ -203,9 +208,28 @@ class StateManager:
                 )
             ''')
 
+            # 13. Calendar & Proactive Appointments
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS calendar_events (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    start_time TIMESTAMP NOT NULL,
+                    end_time TIMESTAMP,
+                    location TEXT,
+                    preparation_notes TEXT,
+                    preparation_minutes INTEGER DEFAULT 30,
+                    prep_notified INTEGER DEFAULT 0,
+                    imminent_notified INTEGER DEFAULT 0,
+                    source TEXT DEFAULT 'user',
+                    evidence_text TEXT,
+                    created_at TIMESTAMP,
+                    updated_at TIMESTAMP
+                )
+            ''')
+
             conn.commit()
             self._run_migrations(conn)
-            logger.info("Database initialized successfully with pipeline, profile, dynamic zones, topology, audio routing, mesh offline queue, and migrations.")
+            logger.info("Database initialized successfully with pipeline, profile, dynamic zones, topology, audio routing, mesh offline queue, calendar events, and migrations.")
 
         except Exception as e:
             logger.error(f"Database initialization failed: {e}")
@@ -254,6 +278,32 @@ class StateManager:
                 logger.info("Database schema migration v3 applied successfully.")
             except Exception as me:
                 logger.warning(f"Notice during migration v3: {me}")
+
+        if current_version < 4:
+            try:
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS calendar_events (
+                        id TEXT PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        start_time TIMESTAMP NOT NULL,
+                        end_time TIMESTAMP,
+                        location TEXT,
+                        preparation_notes TEXT,
+                        preparation_minutes INTEGER DEFAULT 30,
+                        prep_notified INTEGER DEFAULT 0,
+                        imminent_notified INTEGER DEFAULT 0,
+                        source TEXT DEFAULT 'user',
+                        evidence_text TEXT,
+                        created_at TIMESTAMP,
+                        updated_at TIMESTAMP
+                    )
+                ''')
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_calendar_start_time ON calendar_events(start_time)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_calendar_prep_notified ON calendar_events(prep_notified)")
+                conn.execute("PRAGMA user_version = 4")
+                logger.info("Database schema migration v4 applied successfully.")
+            except Exception as me:
+                logger.warning(f"Notice during migration v4: {me}")
         conn.commit()
 
     def get_schema_version(self) -> int:
@@ -1195,6 +1245,153 @@ class StateManager:
                 counts["offline_tasks"] += 1
 
         return counts
+
+    # -------------------------------------------------------------
+    # Calendar & Proactive Appointment System
+    # -------------------------------------------------------------
+
+    def create_calendar_event(
+        self,
+        title: str,
+        start_time: str,
+        end_time: Optional[str] = None,
+        location: Optional[str] = None,
+        preparation_notes: Optional[str] = None,
+        preparation_minutes: int = 30,
+        source: str = "user",
+        evidence_text: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Creates or schedules a calendar appointment with preparation requirements.
+        """
+        event_id = str(uuid.uuid4())[:8]
+        now_iso = datetime.now(timezone.utc).isoformat()
+        conn = self._get_connection()
+        try:
+            conn.execute('''
+                INSERT INTO calendar_events (
+                    id, title, start_time, end_time, location,
+                    preparation_notes, preparation_minutes, prep_notified,
+                    imminent_notified, source, evidence_text, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?)
+            ''', (
+                event_id, title.strip(), start_time, end_time, location,
+                preparation_notes, preparation_minutes, source, evidence_text, now_iso, now_iso
+            ))
+            conn.commit()
+            return {
+                "id": event_id,
+                "title": title.strip(),
+                "start_time": start_time,
+                "end_time": end_time,
+                "location": location,
+                "preparation_notes": preparation_notes,
+                "preparation_minutes": preparation_minutes,
+                "prep_notified": False,
+                "imminent_notified": False,
+                "source": source,
+                "evidence_text": evidence_text,
+                "created_at": now_iso
+            }
+        finally:
+            conn.close()
+
+    def list_calendar_events(
+        self,
+        start_after: Optional[str] = None,
+        end_before: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Lists scheduled calendar events with optional time boundaries."""
+        conn = self._get_connection()
+        try:
+            query = "SELECT * FROM calendar_events"
+            params: List[Any] = []
+            conditions: List[str] = []
+            if start_after:
+                conditions.append("start_time >= ?")
+                params.append(start_after)
+            if end_before:
+                conditions.append("start_time <= ?")
+                params.append(end_before)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+            query += " ORDER BY start_time ASC LIMIT ?"
+            params.append(limit)
+
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    def get_calendar_event(self, event_id: str) -> Optional[Dict[str, Any]]:
+        """Fetches a specific calendar event by ID."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT * FROM calendar_events WHERE id = ?", (event_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def update_calendar_event(self, event_id: str, **kwargs) -> bool:
+        """Updates specific fields of a calendar event."""
+        if not kwargs:
+            return False
+        conn = self._get_connection()
+        try:
+            kwargs["updated_at"] = datetime.now(timezone.utc).isoformat()
+            set_clause = ", ".join([f"{k} = ?" for k in kwargs.keys()])
+            params = list(kwargs.values()) + [event_id]
+            cursor = conn.execute(f"UPDATE calendar_events SET {set_clause} WHERE id = ?", params)
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    def delete_calendar_event(self, identifier: str) -> bool:
+        """Deletes a calendar event by ID or exact title substring match."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "DELETE FROM calendar_events WHERE id = ? OR LOWER(title) = LOWER(?) OR LOWER(title) LIKE ?",
+                (identifier, identifier, f"%{identifier.lower()}%")
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+    def mark_event_notified(
+        self,
+        event_id: str,
+        prep_notified: Optional[bool] = None,
+        imminent_notified: Optional[bool] = None
+    ) -> bool:
+        """Sets the notification status flags to prevent duplicate proactive alerts."""
+        updates: Dict[str, Any] = {}
+        if prep_notified is not None:
+            updates["prep_notified"] = 1 if prep_notified else 0
+        if imminent_notified is not None:
+            updates["imminent_notified"] = 1 if imminent_notified else 0
+        if not updates:
+            return False
+        return self.update_calendar_event(event_id, **updates)
+
+    def find_calendar_events(self, query: str) -> List[Dict[str, Any]]:
+        """Searches events matching title, location, or notes."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "SELECT * FROM calendar_events WHERE LOWER(title) LIKE ? OR LOWER(location) LIKE ? OR LOWER(preparation_notes) LIKE ? ORDER BY start_time ASC",
+                (f"%{query.lower()}%", f"%{query.lower()}%", f"%{query.lower()}%")
+            )
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
 
 
 

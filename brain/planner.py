@@ -115,7 +115,8 @@ class Planner:
             "relocate_operator", "get_clipboard_text", "set_clipboard_text",
             "create_reminder", "create_vitals_watcher", "list_active_rules",
             "cancel_proactive_rule", "get_git_status", "manage_notes", "factory_reset",
-            "inspect_system_resources"
+            "inspect_system_resources",
+            "manage_calendar", "reconcile_schedule_evidence", "get_upcoming_schedule"
         }
         has_direct_heuristic = bool(heuristic_plan.context.get("direct_response"))
         is_routine_action = (
@@ -665,6 +666,47 @@ class Planner:
                     depends_on=[]
                 ))
 
+        # Pattern: Calendar, Appointments & Proactive Schedule Reconciliation
+        elif any(k in goal_lower for k in ["calendar", "kalender", "appointment", "appointments", "termin", "termine", "schedule", "reconcile schedule"]):
+            # Check for reconciliation intent
+            if any(k in goal_lower for k in ["reconcile", "check mentions", "gleiche ab", "prüfe termine", "reconciliation"]):
+                steps.append(PipelineStep(
+                    id="reconcile_schedule_step",
+                    name="Reconcile Schedule Evidence",
+                    tool_name="reconcile_schedule_evidence",
+                    arguments={"evidence_text": goal},
+                    depends_on=[]
+                ))
+            # Check for creating an appointment
+            elif any(k in goal_lower for k in ["add appointment", "create appointment", "schedule appointment", "neuer termin", "termin erstellen", "set appointment"]):
+                raw_app = re.sub(r"^(?:please\s+|bitte\s+)?(?:add appointment|create appointment|schedule appointment|neuer termin|termin erstellen|set appointment)\s*", "", goal, flags=re.IGNORECASE).strip()
+                steps.append(PipelineStep(
+                    id="create_calendar_event_step",
+                    name=f"Schedule Appointment: {raw_app[:30]}",
+                    tool_name="manage_calendar",
+                    arguments={"action": "create", "title": raw_app or "Appointment", "start_time": goal},
+                    depends_on=[]
+                ))
+            # Check for cancel/delete appointment
+            elif any(k in goal_lower for k in ["cancel appointment", "delete appointment", "remove appointment", "termin absagen", "lösche termin"]):
+                del_app = re.sub(r".*?\b(?:cancel appointment|delete appointment|remove appointment|termin absagen|lösche termin)\s+", "", goal, flags=re.IGNORECASE).strip(" .!?")
+                steps.append(PipelineStep(
+                    id="cancel_calendar_event_step",
+                    name=f"Cancel Appointment: {del_app}",
+                    tool_name="manage_calendar",
+                    arguments={"action": "delete", "title": del_app},
+                    depends_on=[]
+                ))
+            # Default: Inspect upcoming schedule
+            else:
+                steps.append(PipelineStep(
+                    id="get_schedule_step",
+                    name="Inspect Upcoming Schedule & Preparation Buffers",
+                    tool_name="get_upcoming_schedule",
+                    arguments={"horizon_hours": 24.0},
+                    depends_on=[]
+                ))
+
         # Pattern: System Clipboard Read / Write
         elif any(k in goal_lower for k in ["clipboard", "zwischenablage"]):
             if any(k in goal_lower for k in ["copy", "set", "kopiere", "schreibe"]):
@@ -826,7 +868,7 @@ Do NOT output any markdown formatting or commentary outside the JSON.
         call_timeout = 60.0 if is_ollama else 25.0
         kwargs: Dict[str, Any] = {"timeout": call_timeout, "num_retries": 0}
         if "ollama" in model.lower():
-            kwargs["api_base"] = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+            kwargs["api_base"] = self.model_router.get_ollama_api_base()
         response = completion(
             model=model,
             messages=[
@@ -1010,7 +1052,8 @@ Do NOT output any markdown formatting or commentary outside the JSON.
             "open_path_in_explorer", "lock_workstation", "take_screenshot",
             "relocate_operator", "open_youtube", "get_clipboard_text", "set_clipboard_text",
             "create_reminder", "create_vitals_watcher", "list_active_rules",
-            "cancel_proactive_rule", "get_git_status", "manage_notes", "factory_reset"
+            "cancel_proactive_rule", "get_git_status", "manage_notes", "factory_reset",
+            "manage_calendar", "reconcile_schedule_evidence", "get_upcoming_schedule"
         }
         is_pure_routine = bool(step_outputs) and all(t in routine_deterministic_tools for t in step_outputs.keys())
 
@@ -1029,7 +1072,7 @@ Do NOT output any markdown formatting or commentary outside the JSON.
                     "timeout": 30.0 if "ollama" in active_model.lower() else 15.0
                 }
                 if "ollama" in active_model.lower():
-                    call_kwargs["api_base"] = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+                    call_kwargs["api_base"] = self.model_router.get_ollama_api_base()
 
                 resp = completion(
                     model=active_model,
@@ -1368,6 +1411,32 @@ Do NOT output any markdown formatting or commentary outside the JSON.
 
         if "set_clipboard_text" in step_outputs:
             return f"Text wurde in die Zwischenablage kopiert, {name}." if language == "de" else f"Copied to clipboard, {name}."
+
+        # 20. Calendar, Appointments & Schedule Reconciliation
+        if "get_upcoming_schedule" in step_outputs:
+            sc_res = step_outputs["get_upcoming_schedule"]
+            if isinstance(sc_res, dict):
+                count = sc_res.get("count", 0)
+                apps = sc_res.get("appointments", [])
+                if count == 0:
+                    return f"Du hast in den nächsten 24 Stunden keine anstehenden Termine, {name}." if language == "de" else f"You have no upcoming appointments in the next 24 hours, {name}."
+                first = apps[0]
+                t_str = f"in {first.get('hours_remaining')}h" if first.get("hours_remaining", 0) >= 1 else f"in {first.get('minutes_remaining')}m"
+                prep = f" ({first.get('preparation_minutes')}m Vorbereitung)" if first.get("preparation_minutes") else ""
+                return f"Du hast {count} Termin(e), {name}: '{first.get('title')}' {t_str}{prep}." if language == "de" else f"You have {count} upcoming appointment(s), {name}: '{first.get('title')}' {t_str}{prep}."
+
+        if "manage_calendar" in step_outputs:
+            cal_res = step_outputs["manage_calendar"]
+            if isinstance(cal_res, dict):
+                if cal_res.get("message"):
+                    return f"{cal_res['message']}"
+                if cal_res.get("summary"):
+                    return f"{cal_res['summary']}, {name}."
+
+        if "reconcile_schedule_evidence" in step_outputs:
+            rec_res = step_outputs["reconcile_schedule_evidence"]
+            if isinstance(rec_res, dict) and rec_res.get("message"):
+                return f"{rec_res['message']}"
 
         # Fallback if no specific step outputs were generated (unregistered tool capability)
         if not step_outputs:

@@ -1,14 +1,14 @@
 # Core AI -- Session Handover & Action Plan
 
 ```text
-[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 180/180 TESTS PASSED ] [ PYTHON: 3.13+ ]
-[ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]      [ VERSION: v0.2.2-alpha ]
+[ SYSTEM: CORE-AI-KERNEL ]  [ STATUS: 187/187 TESTS PASSED ] [ PYTHON: 3.13+ ]
+[ LICENSE: AGPL-3.0-ONLY ]  [ ARCHITECTURE: ASYNC-DAG ]      [ VERSION: v0.2.3-alpha ]
 ```
 
-- **Date**: October 12, 2026  
+- **Date**: October 16, 2026  
 - **Lead Architect**: Dyvorn (*aka Vyrn / Refined*)  
-- **Release**: `v0.2.2-alpha` (Codename: "Distributed Voice Satellites & Mobile Mesh")  
-- **System Status**: All 180 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
+- **Release**: `v0.2.3-alpha` (Codename: "Proactive Anticipatory Agency & Master Troubleshooting Wiki")  
+- **System Status**: All 187 Automated Tests Green (100% Pass Rate) | Git Tree Clean  
 
 ---
 
@@ -176,3 +176,27 @@ Total: 180 passed / 180 collected across 31 test modules.
    - Intelligent non-destructive profile protection (prevents blank/default "User" from overwriting custom identities).
    - Inter-device message routing (`POST /api/v1/mesh/message`, `core mesh send <node> <type> <payload>`).
    - Real-time unified node matrix (`GET /api/v1/mesh/nodes`, `core mesh nodes`).
+
+---
+
+## Active Milestone Status (v0.2.3-alpha: Proactive Anticipatory Agency & Master Troubleshooting Wiki)
+
+1. **Anticipatory Intelligence & Schedule Evidence Reconciliation (`brain/proactive.py`, `tools/native/calendar_tools.py`, `core/state.py`)**:
+   - Eliminates passive questioning: Core AI continuously scans context and notes for implicit appointment mentions, checks if already on the calendar, and auto-schedules missing commitments with a verified evidence log.
+   - Dual-stage anticipatory notifications: Early **Preparation Buffer Warnings** based on required preparation minutes + **Imminent Notice** (10-15m prior).
+   - Non-looping persistent flags (`prep_notified`, `imminent_notified`) guaranteeing zero notification spam.
+   - Schema migration `v4` adding table `calendar_events` with indices on `start_time` and `prep_notified`.
+   - Native calendar tools: `manage_calendar`, `reconcile_schedule_evidence`, `get_upcoming_schedule`.
+2. **SQLite Non-Locking Concurrency Hardening (`core/state.py`)**:
+   - Configured `timeout=30.0` and `PRAGMA busy_timeout = 30000` in WAL mode, completely eliminating `sqlite3.OperationalError: database is locked`.
+   - Resolved flaky subprocess timeout in `tests/test_daily_driver.py` by setting 30.0s margin.
+3. **Master Knowledge Base & Troubleshooting Wiki (`docs/wiki/`)**:
+   - `docs/wiki/README.md`: Central knowledge portal and quick problem resolver index.
+   - `docs/wiki/TROUBLESHOOTING_AND_SOLUTIONS.md`: Exhaustive Problem $\to$ Symptom $\to$ Root Cause $\to$ Verified Solution ledger covering Audio/WASAPI -9997, IPv6 loopback, SQLite locks, LLM provider timeouts, and mesh networks.
+   - `docs/wiki/PROACTIVE_ENGINE.md`: Blueprint for anticipatory loops, preparation buffers, and non-intrusive etiquette.
+   - `docs/wiki/ARCHITECTURE_AND_SUBSYSTEMS.md`: Detailed microkernel and asynchronous DAG specification.
+   - `docs/wiki/CLI_AND_TOOLS_REFERENCE.md`: Complete operational dictionary of all CLI commands, flags, and native tools.
+   - `docs/wiki/SUBMITTING_ISSUES_AND_SOLUTIONS.md`: Operator workflow for documenting new edge cases and merging tested fixes into the Wiki.
+4. **Verification Status**:
+   - **187 / 187 automated tests passing** (100% green pass rate across 32 test modules).
+

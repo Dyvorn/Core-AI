@@ -70,6 +70,12 @@ from tools.native.dev_tools import (
     manage_notes, manage_notes_schema,
     set_state_manager as set_dev_sm
 )
+from tools.native.calendar_tools import (
+    manage_calendar, manage_calendar_schema,
+    reconcile_schedule_evidence, reconcile_schedule_evidence_schema,
+    get_upcoming_schedule, get_upcoming_schedule_schema,
+    set_state_manager as set_calendar_sm
+)
 from tools.remote_dispatcher import RemoteToolDispatcher
 from brain.dynamic_generator import DynamicGenerator
 from brain.pipeline_engine import PipelineEngine
@@ -431,6 +437,7 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
     if state:
         set_proactive_sm(state)
         set_dev_sm(state)
+        set_calendar_sm(state)
     registry.register_tool("create_reminder", create_reminder, create_reminder_schema)
     registry.register_tool("create_vitals_watcher", create_vitals_watcher, create_vitals_watcher_schema)
     registry.register_tool("list_active_rules", list_active_rules, list_active_rules_schema)
@@ -439,6 +446,11 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
     # Developer & Scratch Productivity Tools
     registry.register_tool("get_git_status", get_git_status, get_git_status_schema)
     registry.register_tool("manage_notes", manage_notes, manage_notes_schema)
+
+    # Calendar, Appointments & Proactive Schedule Reconciliation
+    registry.register_tool("manage_calendar", manage_calendar, manage_calendar_schema)
+    registry.register_tool("reconcile_schedule_evidence", reconcile_schedule_evidence, reconcile_schedule_evidence_schema)
+    registry.register_tool("get_upcoming_schedule", get_upcoming_schedule, get_upcoming_schedule_schema)
 
     registry.discover_dynamic_tools()
     return registry

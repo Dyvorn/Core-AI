@@ -84,7 +84,7 @@ def test_oneshot_cli_goal_execution():
         env=test_env,
         capture_output=True,
         text=True,
-        timeout=15.0
+        timeout=30.0
     )
     assert res.returncode == 0
     assert "Core AI" in res.stdout

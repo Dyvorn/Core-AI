@@ -15,6 +15,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [[0.2.3-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.2.3-alpha) — 2026-10-16
+### Codename: "Proactive Anticipatory Agency & Master Troubleshooting Wiki"
+
+| Kernel | Status | Verification | Ethos |
+| :---: | :---: | :---: | :---: |
+| **`v0.2.3-alpha`** | 🟢 **OPERATIONAL** | 🧪 **187 / 187 PASSED** | 🛡️ **#ANTISLOP** |
+
+Proactive Anticipatory Agency, Calendar & Schedule Reconciliation Engine, pre-event Preparation Buffer warnings, unscheduled note/evidence scanning, SQLite non-locking WAL & 30-second busy timeout hardening, and the Master Troubleshooting Wiki knowledge base in `docs/wiki/`.
+
+### 🌟 Added & Enhanced
+
+#### 🧠 Proactive Anticipatory Agency & Schedule Evidence Reconciliation (`brain/proactive.py`, `tools/native/calendar_tools.py`, `core/state.py`)
+- **Anticipatory Intelligence vs. Passive Chatbots**: Eliminates the need to ask *"Do I have appointments?"*. Core AI proactively detects implicit commitments from notes and conversation, confirms evidence, adds missing events to the calendar, and configures preparation reminders autonomously.
+- **Dual-Stage Anticipatory Notifications**: Pre-event **Preparation Warnings** fire dynamically when `remaining_time <= preparation_minutes` with custom preparation instructions (*"Review architectural RFC and benchmark slides"*), followed by an **Imminent Notice** (10-15m prior).
+- **Persistent Notification Acknowledgment (`prep_notified`, `imminent_notified`)**: Persistent SQLite state flags ensure proactive warnings fire exactly once and never loop or nag the operator.
+- **Unscheduled Note & Evidence Scanner (`_check_unreconciled_notes`)**: Automatically evaluates scratch notes for implicit appointment mentions, cross-checks the calendar, auto-schedules missing commitments, and alerts the operator transparently.
+- **Calendar & Appointment Subsystem (Migration `v4`, `calendar_events`)**: High-performance SQLite calendar table with indices on `start_time` and `prep_notified`.
+- **Native Calendar & Schedule Tools**:
+  - `manage_calendar`: Full CRUD for appointments and preparation requirements.
+  - `reconcile_schedule_evidence`: Natural language evidence extraction, deduplication, and auto-scheduling.
+  - `get_upcoming_schedule`: Horizon-based schedule inspection with countdowns and preparation buffer metrics.
+
+#### 🛡️ SQLite Concurrency & Database Locking Elimination (`core/state.py`)
+- **30-Second Busy Timeout Hardening**: Set `timeout=30.0` in `_get_connection()` and `PRAGMA busy_timeout = 30000` in WAL mode, completely eliminating `sqlite3.OperationalError: database is locked` during concurrent daemon execution, test runs, and CLI invocations.
+- **Flaky Subprocess Timeout Resolution (`tests/test_daily_driver.py`)**: Increased timeout in `test_oneshot_cli_goal_execution` to 30.0s to accommodate heavy concurrent test runs on Windows without false timeouts.
+
+#### 📚 Comprehensive Master Wiki & Troubleshooting Knowledge Base (`docs/wiki/`)
+- **`docs/wiki/README.md`**: Master Wiki portal, navigation matrix, and quick problem resolver index.
+- **`docs/wiki/TROUBLESHOOTING_AND_SOLUTIONS.md`**: Comprehensive Problem $\to$ Symptom $\to$ Root Cause $\to$ Verified Fix catalog covering Audio/WASAPI -9997, Windows IPv6 loopback delay, SQLite locking, LLM timeouts, and distributed satellites.
+- **`docs/wiki/PROACTIVE_ENGINE.md`**: Technical blueprint of the anticipatory reasoning loop, preparation buffers, and non-intrusive etiquette.
+- **`docs/wiki/ARCHITECTURE_AND_SUBSYSTEMS.md`**: Architectural dossier covering Microkernel, StateManager, EventBus, Spoken-To Pragmatics, and Sovereign Mesh.
+- **`docs/wiki/CLI_AND_TOOLS_REFERENCE.md`**: Complete dictionary of all CLI commands, flags, and native tools.
+- **`docs/wiki/SUBMITTING_ISSUES_AND_SOLUTIONS.md`**: Standardized workflow and templates for operators to record new problems and contribute verified solutions.
+
+---
+
 ## [[0.2.2-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.2.2-alpha) — 2026-10-12
 ### Codename: "Distributed Voice Satellites & Mobile Mesh"
 

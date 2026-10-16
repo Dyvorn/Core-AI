@@ -134,6 +134,18 @@ class ModelRouter:
 
         return goal, None
 
+    def get_ollama_api_base(self) -> str:
+        """Returns active Ollama API base URL, dynamically checking MHAC delegation first."""
+        try:
+            from brain.mhac import get_mhac_broker
+            broker = get_mhac_broker()
+            delegated = broker.get_delegated_endpoint()
+            if delegated:
+                return delegated
+        except Exception:
+            pass
+        return os.getenv("OLLAMA_API_BASE", "http://127.0.0.1:11434")
+
     def check_model_availability(self, model: str) -> bool:
         """Verifies if the model's provider and endpoint are reachable."""
         if model in self._status_cache:
@@ -161,7 +173,7 @@ class ModelRouter:
             try:
                 import urllib.request
                 import json
-                api_base = os.getenv("OLLAMA_API_BASE", "http://127.0.0.1:11434")
+                api_base = self.get_ollama_api_base()
                 with urllib.request.urlopen(f"{api_base}/api/tags", timeout=0.3) as resp:
                     if resp.status == 200:
                         data = json.loads(resp.read().decode("utf-8"))
@@ -264,6 +276,19 @@ class ModelRouter:
             else:
                 logger.warning(f"Runtime model override '{prompt_override}' from prompt is offline. Falling back to defaults.")
 
+        # 2.5 MHAC Opportunistic Accelerated Compute Delegation
+        try:
+            from brain.mhac import get_mhac_broker
+            broker = get_mhac_broker()
+            delegated_model = broker.get_delegated_model()
+            if delegated_model and broker.get_delegated_endpoint():
+                mhac_candidate = f"ollama/{delegated_model}"
+                if self.check_model_availability(mhac_candidate):
+                    logger.info(f"[MHAC] Dynamically offloading role '{role}' to accelerated client model: '{mhac_candidate}' on {broker.get_delegated_endpoint()}")
+                    return clean_goal, mhac_candidate
+        except Exception:
+            pass
+
         # 3. User preference for specified role
         prefs = self.get_model_preferences()
         preferred_model = prefs.get(role, self.DEFAULT_ROLES.get(role))
@@ -312,9 +337,17 @@ class ModelRouter:
                 "online": self.check_model_availability(model)
             }
 
+        mhac_data = {}
+        try:
+            from brain.mhac import get_mhac_broker
+            mhac_data = get_mhac_broker().get_status()
+        except Exception:
+            pass
+
         return {
             "configured_providers": providers,
             "roles": active_roles,
             "ollama_models": self.get_installed_ollama_models(),
-            "offline_heuristic_available": True
+            "offline_heuristic_available": True,
+            "mhac": mhac_data
         }

@@ -490,4 +490,74 @@ class MeshDeviceMessageResponse(BaseModel):
     message: str = "Message routed."
 
 
+class CalendarEventRecord(BaseModel):
+    """
+    Structured calendar and appointment record for anticipatory scheduling and preparation.
+    """
+    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    title: str
+    start_time: str  # ISO-8601 string or timestamp
+    end_time: Optional[str] = None
+    location: Optional[str] = None
+    preparation_notes: Optional[str] = None
+    preparation_minutes: int = 30
+    prep_notified: bool = False
+    imminent_notified: bool = False
+    source: str = "user"  # 'user', 'reconciliation', 'note_evidence', 'voice_mention'
+    evidence_text: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+# --- Multiple Hardware-Aware Computing (MHAC) Schemas ---
+
+class ClientComputeSignature(BaseModel):
+    """Compute capabilities reported by or probed from a mesh client device."""
+    node_id: str
+    device_name: str
+    device_type: str = "workstation"  # 'workstation', 'desktop', 'laptop', 'phone', 'server'
+    cpu_cores: int = 4
+    ram_total_gb: float = 16.0
+    has_gpu: bool = False
+    gpu_name: Optional[str] = None  # e.g., 'NVIDIA GeForce RTX 4080'
+    vram_gb: Optional[float] = None  # e.g., 16.0
+    ollama_endpoint: Optional[str] = None  # e.g., 'http://192.168.1.150:11434'
+    installed_models: List[str] = Field(default_factory=list)
+    compute_score: float = 0.0
+
+    def calculate_score(self) -> float:
+        """
+        Computes dynamic compute score:
+        Score = (CPU Cores * 1.0) + (RAM GB * 0.5) + (Has GPU * 50.0) + (VRAM GB * 5.0)
+        """
+        score = (self.cpu_cores * 1.0) + (self.ram_total_gb * 0.5)
+        if self.has_gpu:
+            score += 50.0
+            if self.vram_gb:
+                score += (self.vram_gb * 5.0)
+        self.compute_score = round(score, 1)
+        return self.compute_score
+
+
+class MHACHandshakeRequest(BaseModel):
+    """Handshake request sent by client or initiated by gateway upon client connection."""
+    client_signature: ClientComputeSignature
+    preferred_models: List[str] = Field(default_factory=lambda: ["llama3.1:8b", "llama3.2:3b", "qwen2.5:7b"])
+
+
+class MHACHandshakeResponse(BaseModel):
+    """Response returned by Central Host following MHAC capability evaluation."""
+    status: str  # 'accelerated_workstation', 'standalone', 'missing_model_handshake', 'error'
+    active_compute_node: str  # 'host' or client node_id
+    host_score: float
+    client_score: float
+    delegated_endpoint: Optional[str] = None
+    target_model: Optional[str] = None
+    notice_message: str
+    installed_on_client: List[str] = Field(default_factory=list)
+    missing_models: List[str] = Field(default_factory=list)
+
+
+
+
 
