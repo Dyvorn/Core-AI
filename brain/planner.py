@@ -358,7 +358,27 @@ class Planner:
                 ))
             # 3. Create timer / reminder
             else:
-                dur_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(sekunden?|sec|seconds?|s|minuten?|min|minutes?|m|stunden?|std|hours?|h)\b", goal_lower)
+                norm_goal = goal_lower
+                word_numbers = [
+                    (r"\b(?:viertelstunde|viertel stunde)\b", "15 minuten"),
+                    (r"\b(?:halbe stunde|halb stunde)\b", "30 minuten"),
+                    (r"\b(?:dreiviertelstunde|dreiviertel stunde)\b", "45 minuten"),
+                    (r"\b(?:eine[rnms]?|ein)\b", "1"),
+                    (r"\b(?:one|a|an)\b", "1"),
+                    (r"\b(?:zwei|two)\b", "2"),
+                    (r"\b(?:drei|three)\b", "3"),
+                    (r"\b(?:vier|four)\b", "4"),
+                    (r"\b(?:fünf|fuenf|five)\b", "5"),
+                    (r"\b(?:sechs|six)\b", "6"),
+                    (r"\b(?:sieben|seven)\b", "7"),
+                    (r"\b(?:acht|eight)\b", "8"),
+                    (r"\b(?:neun|nine)\b", "9"),
+                    (r"\b(?:zehn|ten)\b", "10")
+                ]
+                for pat, rep in word_numbers:
+                    norm_goal = re.sub(pat, rep, norm_goal)
+
+                dur_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(sekunden?|sec|seconds?|s|minuten?|min|minutes?|m|stunden?|std|hours?|h)\b", norm_goal)
                 if dur_match:
                     val = float(dur_match.group(1).replace(",", "."))
                     unit = dur_match.group(2).lower()
