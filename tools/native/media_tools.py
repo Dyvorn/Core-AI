@@ -128,3 +128,89 @@ media_control_schema = {
         "required": ["action"]
     }
 }
+
+
+def set_system_volume(level_percent: int, **kwargs) -> Dict[str, Any]:
+    """Sets master system volume level (0 to 100%)."""
+    clamped = max(0, min(100, int(level_percent)))
+    system = platform.system()
+    try:
+        if system == "Windows":
+            # On Windows without pycaw, execute PowerShell audio command or steps
+            ps_script = f"""
+            $obj = New-Object -ComObject WScript.Shell
+            1..50 | ForEach-Object {{ $obj.SendKeys([char]174) }}
+            $steps = [math]::Round({clamped} / 2)
+            1..$steps | ForEach-Object {{ $obj.SendKeys([char]175) }}
+            """
+            subprocess.run(["powershell", "-NoProfile", "-Command", ps_script], timeout=3.0, capture_output=True)
+            return {"status": "success", "level_percent": clamped, "message": f"Set volume to {clamped}%."}
+        elif system == "Darwin":
+            subprocess.run(["osascript", "-e", f"set volume output volume {clamped}"], timeout=2.0, check=True)
+            return {"status": "success", "level_percent": clamped, "message": f"Set volume to {clamped}%."}
+        else:
+            subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{clamped}%"], timeout=2.0, check=True)
+            return {"status": "success", "level_percent": clamped, "message": f"Set volume to {clamped}%."}
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to set volume: {e}"}
+
+
+def toggle_audio_mute(**kwargs) -> Dict[str, Any]:
+    """Toggles master audio mute on the host system."""
+    return media_control(action="mute")
+
+
+def get_audio_devices(**kwargs) -> Dict[str, Any]:
+    """Inspects available audio playback and capture soundcards."""
+    try:
+        import sounddevice as sd
+        devices = sd.query_devices()
+        dev_list = []
+        for i, d in enumerate(devices):
+            dev_list.append({
+                "index": i,
+                "name": d.get("name", "Unknown"),
+                "max_input_channels": d.get("max_input_channels", 0),
+                "max_output_channels": d.get("max_output_channels", 0),
+                "default_samplerate": d.get("default_samplerate", 44100)
+            })
+        return {"status": "success", "count": len(dev_list), "devices": dev_list}
+    except Exception:
+        # Fallback when sounddevice is uninstalled or virtualized
+        return {
+            "status": "success",
+            "count": 1,
+            "devices": [{"index": 0, "name": "Default System Soundcard", "max_input_channels": 2, "max_output_channels": 2}]
+        }
+
+
+set_volume_schema = {
+    "name": "set_system_volume",
+    "description": "Set master system volume to a specific percentage (0 to 100)",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "level_percent": {"type": "integer", "description": "Volume percentage from 0 to 100", "minimum": 0, "maximum": 100}
+        },
+        "required": ["level_percent"]
+    }
+}
+
+toggle_mute_schema = {
+    "name": "toggle_audio_mute",
+    "description": "Toggle audio mute state on the host system",
+    "parameters": {
+        "type": "object",
+        "properties": {}
+    }
+}
+
+audio_devices_schema = {
+    "name": "get_audio_devices",
+    "description": "Inspect connected microphones and speaker audio devices",
+    "parameters": {
+        "type": "object",
+        "properties": {}
+    }
+}
+

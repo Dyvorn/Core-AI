@@ -1,5 +1,6 @@
 import os
 import sys
+import platform
 import socket
 import subprocess
 import logging
@@ -165,3 +166,172 @@ inspect_lan_device_schema = {
         }
     }
 }
+
+
+def ping_host(host: str, count: int = 2, timeout_sec: float = 2.0, **kwargs) -> Dict[str, Any]:
+    """Pings a remote or local IP/hostname to measure latency and packet reachability."""
+    clean_host = host.strip()
+    system = platform.system() if "platform" in sys.modules else ("Windows" if os.name == "nt" else "Linux")
+    cmd = ["ping", "-n", str(count), "-w", str(int(timeout_sec * 1000)), clean_host] if system == "Windows" else ["ping", "-c", str(count), "-W", str(int(timeout_sec)), clean_host]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec * count + 2.0)
+        is_reachable = proc.returncode == 0
+        return {
+            "status": "success",
+            "host": clean_host,
+            "reachable": is_reachable,
+            "output_summary": "Host is online and responding." if is_reachable else "Host unreachable or dropped packets.",
+            "raw_output": proc.stdout.strip()
+        }
+    except Exception:
+        # Fallback to direct TCP socket ping on common ports (80, 443, 22)
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout_sec)
+            sock.connect((clean_host, 80))
+            sock.close()
+            return {"status": "success", "host": clean_host, "reachable": True, "output_summary": "TCP socket connected on port 80."}
+        except Exception as e:
+            return {"status": "success", "host": clean_host, "reachable": False, "output_summary": f"Unreachable: {e}"}
+
+
+def check_port_open(host: str, port: int, timeout_sec: float = 1.5, **kwargs) -> Dict[str, Any]:
+    """Tests if a specific TCP port is listening on a host."""
+    clean_host = host.strip()
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout_sec)
+        result = sock.connect_ex((clean_host, int(port)))
+        sock.close()
+        is_open = (result == 0)
+        return {
+            "status": "success",
+            "host": clean_host,
+            "port": int(port),
+            "is_open": is_open,
+            "message": f"Port {port} on '{clean_host}' is {'OPEN / LISTENING' if is_open else 'CLOSED / FILTERED'}."
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Port check failed: {e}"}
+
+
+def get_public_ip(timeout_sec: float = 3.0, **kwargs) -> Dict[str, Any]:
+    """Resolves the external public WAN IP address of the central host."""
+    import urllib.request
+    endpoints = [
+        "https://api.ipify.org",
+        "https://ifconfig.me/ip",
+        "https://icanhazip.com"
+    ]
+    for url in endpoints:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "CoreAI/0.3"})
+            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                if resp.status == 200:
+                    ip = resp.read().decode("utf-8").strip()
+                    return {"status": "success", "public_ip": ip, "provider": url}
+        except Exception:
+            continue
+    return {"status": "error", "message": "Could not determine public IP (all external providers unreachable)."}
+
+
+def dns_lookup(domain: str, **kwargs) -> Dict[str, Any]:
+    """Resolves hostname/domain to IPv4 addresses."""
+    clean_domain = domain.strip().replace("http://", "").replace("https://", "").split("/")[0]
+    try:
+        infos = socket.getaddrinfo(clean_domain, None, socket.AF_INET)
+        ips = list({info[4][0] for info in infos})
+        return {
+            "status": "success",
+            "domain": clean_domain,
+            "ips": ips,
+            "primary_ip": ips[0] if ips else None
+        }
+    except Exception as e:
+        return {"status": "error", "domain": clean_domain, "message": f"DNS resolution failed: {e}"}
+
+
+def wake_on_lan(mac_address: str, broadcast_ip: str = "255.255.255.255", port: int = 9, **kwargs) -> Dict[str, Any]:
+    """Sends a Wake-On-LAN (WOL) magic packet to boot up sleeping desktop workstations."""
+    clean_mac = mac_address.replace(":", "").replace("-", "").replace(".", "").upper()
+    if len(clean_mac) != 12:
+        return {"status": "error", "message": f"Invalid MAC address format: '{mac_address}'. Expected 12 hexadecimal digits."}
+    try:
+        mac_bytes = bytes.fromhex(clean_mac)
+        magic_payload = (b'\xFF' * 6) + (mac_bytes * 16)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.sendto(magic_payload, (broadcast_ip, int(port)))
+        sock.close()
+        return {
+            "status": "success",
+            "mac_address": mac_address,
+            "broadcast_ip": broadcast_ip,
+            "port": int(port),
+            "message": f"Dispatched WOL magic packet to '{mac_address}'."
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to send Wake-On-LAN packet: {e}"}
+
+
+ping_host_schema = {
+    "name": "ping_host",
+    "description": "Ping a remote or local IP/hostname to test connectivity and response latency",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "host": {"type": "string", "description": "Target hostname or IP address"},
+            "count": {"type": "integer", "default": 2}
+        },
+        "required": ["host"]
+    }
+}
+
+check_port_schema = {
+    "name": "check_port_open",
+    "description": "Test if a specific network TCP port (e.g. 8000, 11434, 22) is open on a host",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "host": {"type": "string", "description": "Target IP or hostname"},
+            "port": {"type": "integer", "description": "Port number to test"}
+        },
+        "required": ["host", "port"]
+    }
+}
+
+public_ip_schema = {
+    "name": "get_public_ip",
+    "description": "Lookup external public WAN IP address of the server",
+    "parameters": {
+        "type": "object",
+        "properties": {}
+    }
+}
+
+dns_lookup_schema = {
+    "name": "dns_lookup",
+    "description": "Resolve a domain name to its associated IPv4 addresses",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "domain": {"type": "string", "description": "Domain name (e.g. 'google.com', 'ollama.com')"}
+        },
+        "required": ["domain"]
+    }
+}
+
+wake_on_lan_schema = {
+    "name": "wake_on_lan",
+    "description": "Send Wake-on-LAN (WOL) magic packet to power on a sleeping PC or server",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "mac_address": {"type": "string", "description": "Physical MAC address of target workstation"},
+            "broadcast_ip": {"type": "string", "default": "255.255.255.255"},
+            "port": {"type": "integer", "default": 9}
+        },
+        "required": ["mac_address"]
+    }
+}
+

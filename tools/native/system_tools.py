@@ -155,3 +155,111 @@ factory_reset_schema = {
         "required": ["confirm"]
     }
 }
+
+
+def get_disk_usage(path: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+    """
+    Returns storage metrics for the specified path or primary system drive.
+    Includes total capacity, used gigabytes, free gigabytes, and usage percentage.
+    """
+    import shutil
+    target_path = path or (os.path.abspath(os.sep) if os.name != "nt" else "C:\\")
+    try:
+        total, used, free = shutil.disk_usage(target_path)
+        return {
+            "status": "success",
+            "path": target_path,
+            "total_gb": round(total / (1024**3), 2),
+            "used_gb": round(used / (1024**3), 2),
+            "free_gb": round(free / (1024**3), 2),
+            "used_percent": round((used / total) * 100, 1)
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to inspect disk usage for '{target_path}': {e}"}
+
+
+def get_battery_status(**kwargs) -> Dict[str, Any]:
+    """
+    Returns hardware battery charge percentage, charging state, and remaining life.
+    Useful for laptop-based homelab servers and mobile workstations.
+    """
+    try:
+        import psutil
+        battery = psutil.sensors_battery()
+        if battery is None:
+            return {
+                "status": "success",
+                "has_battery": False,
+                "message": "No hardware battery detected (running on AC desktop or VM)."
+            }
+        return {
+            "status": "success",
+            "has_battery": True,
+            "percent": round(battery.percent, 1),
+            "power_plugged": battery.power_plugged,
+            "seconds_left": battery.secsleft if battery.secsleft != psutil.POWER_TIME_UNLIMITED else None,
+            "status_text": "Charging / AC Connected" if battery.power_plugged else f"{battery.percent}% Battery Remaining"
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Could not query battery status: {e}"}
+
+
+def get_network_interfaces(**kwargs) -> Dict[str, Any]:
+    """
+    Lists physical and virtual network adapters, active IP addresses, and interface status.
+    """
+    try:
+        import psutil
+        addrs = psutil.net_if_addrs()
+        stats = psutil.net_if_stats()
+        interfaces = []
+        for iface_name, iface_addrs in addrs.items():
+            ipv4_list = [a.address for a in iface_addrs if a.family.name in ("AF_INET", "address_family.AF_INET") or str(a.family) == "2"]
+            stat = stats.get(iface_name)
+            is_up = stat.isup if stat else True
+            speed_mb = stat.speed if stat else 0
+            if ipv4_list:
+                interfaces.append({
+                    "name": iface_name,
+                    "is_up": is_up,
+                    "speed_mb": speed_mb,
+                    "ipv4": ipv4_list
+                })
+        return {
+            "status": "success",
+            "count": len(interfaces),
+            "interfaces": interfaces
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Could not inspect network interfaces: {e}"}
+
+
+disk_usage_schema = {
+    "name": "get_disk_usage",
+    "description": "Get disk storage usage, total, used, and free capacity for a directory or drive",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Optional drive letter or directory path"}
+        }
+    }
+}
+
+battery_status_schema = {
+    "name": "get_battery_status",
+    "description": "Inspect battery percentage, charging status, and remaining power for laptops/portables",
+    "parameters": {
+        "type": "object",
+        "properties": {}
+    }
+}
+
+network_interfaces_schema = {
+    "name": "get_network_interfaces",
+    "description": "Inspect active network adapters, LAN IP addresses, and link status",
+    "parameters": {
+        "type": "object",
+        "properties": {}
+    }
+}
+

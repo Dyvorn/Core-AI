@@ -23,7 +23,8 @@ from core.schemas import (
     MobileEnrollmentRequest, MobileEnrollmentResponse, GlyphPattern, GlyphTriggerRequest, MobileGlanceStatus,
     MeshSyncPullRequest, MeshSyncPullResponse, MeshSyncPushRequest, MeshSyncPushResponse,
     MeshSyncFullRequest, MeshSyncFullResponse, MeshDeviceMessage, MeshDeviceMessageResponse, MeshSyncPayload,
-    ClientComputeSignature, MHACHandshakeRequest, MHACHandshakeResponse, MHACProbeRequest, MHACPullRequest
+    ClientComputeSignature, MHACHandshakeRequest, MHACHandshakeResponse, MHACProbeRequest, MHACPullRequest,
+    TraceInteractiveRequest
 )
 from core.state import StateManager
 from core.bus import EventBus
@@ -351,11 +352,23 @@ def create_gateway_app(
     bus: EventBus,
     remote_dispatcher: Optional[Any] = None,
     spoken_to: Optional[Any] = None,
-    mhac_broker: Optional[MHACBroker] = None
+    mhac_broker: Optional[MHACBroker] = None,
+    trace_engine: Optional[Any] = None
 ) -> FastAPI:
     """Factory creating the configured FastAPI Gateway Application."""
 
     active_mhac_broker = mhac_broker or get_mhac_broker()
+
+    if trace_engine is None:
+        from brain.trace import get_trace_engine
+        active_trace_engine = get_trace_engine(
+            state_manager=state_manager,
+            pipeline_engine=pipeline_engine,
+            planner=planner,
+            bus=bus
+        )
+    else:
+        active_trace_engine = trace_engine
 
     if remote_dispatcher is None:
         from tools.remote_dispatcher import RemoteToolDispatcher
@@ -419,6 +432,11 @@ def create_gateway_app(
                 beacon.stop()
             except Exception:
                 pass
+        try:
+            active_trace_engine.stop_sentinel()
+            active_trace_engine.stop_daemons()
+        except Exception:
+            pass
         logger.info("Gateway shutting down")
 
     app = FastAPI(
@@ -1296,6 +1314,35 @@ def create_gateway_app(
         active_mhac_broker.reset_delegation()
         await connection_manager.broadcast_event("MHAC_RESET", {"status": "reset", "active_compute_node": "host"})
         return {"status": "ok", "message": "Compute delegation reset to central host.", "active_compute_node": "host"}
+
+    # =========================================================================
+    # TRACE (Tri-Track Asynchronous Concurrent Execution) Routes
+    # =========================================================================
+
+    @app.get("/api/v1/trace/status")
+    def get_trace_status():
+        """Returns TRACE status, metrics, and health across Track 1, 2, and 3."""
+        return active_trace_engine.get_status()
+
+    @app.get("/api/v1/trace/context")
+    def get_trace_context():
+        """Returns the latest SentinelContext snapshot cached by Track 2."""
+        return active_trace_engine.get_sentinel_context().to_dict()
+
+    @app.post("/api/v1/trace/sentinel/scan")
+    def trigger_sentinel_scan():
+        """Triggers an on-demand Track 2 Sentinel scan of workspace, git status, and vitals."""
+        ctx = active_trace_engine.run_sentinel_scan()
+        return {
+            "status": "success",
+            "context": ctx.to_dict(),
+            "summary": ctx.get_summary_prompt()
+        }
+
+    @app.post("/api/v1/trace/interactive")
+    def execute_trace_interactive(req: TraceInteractiveRequest):
+        """Executes a foreground interactive request through Track 1 with non-blocking sentinel context."""
+        return active_trace_engine.execute_interactive(goal=req.goal, context=req.context, timeout=req.timeout)
 
     @app.websocket("/ws/mobile/{client_id}")
     async def websocket_mobile_companion(websocket: WebSocket, client_id: str):

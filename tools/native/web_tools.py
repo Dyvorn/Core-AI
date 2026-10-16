@@ -135,3 +135,152 @@ open_youtube_schema = {
         }
     }
 }
+
+
+def fetch_url_text(url: str, max_chars: int = 5000, timeout_sec: float = 8.0, **kwargs) -> Dict[str, Any]:
+    """Downloads webpage content, strips HTML tags, and extracts clean readable text."""
+    import urllib.request
+    import re
+    clean_url = url.strip()
+    if not clean_url.startswith(("http://", "https://")):
+        clean_url = f"https://{clean_url}"
+    try:
+        req = urllib.request.Request(
+            clean_url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) CoreAI/0.3"}
+        )
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            content_type = resp.headers.get("Content-Type", "")
+            raw = resp.read()
+            charset = resp.headers.get_content_charset() or "utf-8"
+            html_text = raw.decode(charset, errors="replace")
+
+        # Strip scripts, styles, and tags
+        text = re.sub(r'<script.*?</script>', '', html_text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'<style.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'<[^>]+>', ' ', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        truncated = len(text) > max_chars
+        preview = text[:max_chars]
+        return {
+            "status": "success",
+            "url": clean_url,
+            "text": preview,
+            "char_count": len(preview),
+            "truncated": truncated
+        }
+    except Exception as e:
+        return {"status": "error", "url": clean_url, "message": f"Failed to fetch webpage text: {e}"}
+
+
+def http_request_json(
+    url: str,
+    method: str = "GET",
+    headers: Optional[Dict[str, str]] = None,
+    json_data: Optional[Dict[str, Any]] = None,
+    timeout_sec: float = 10.0,
+    **kwargs
+) -> Dict[str, Any]:
+    """Lightweight REST client for querying or posting JSON to external APIs."""
+    import urllib.request
+    import json
+    clean_method = method.upper().strip()
+    clean_url = url.strip()
+    req_headers = {"User-Agent": "CoreAI/0.3", "Accept": "application/json"}
+    if headers:
+        req_headers.update(headers)
+
+    data_bytes = None
+    if json_data is not None:
+        data_bytes = json.dumps(json_data).encode("utf-8")
+        req_headers["Content-Type"] = "application/json"
+
+    try:
+        req = urllib.request.Request(clean_url, data=data_bytes, headers=req_headers, method=clean_method)
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            try:
+                parsed = json.loads(raw)
+            except Exception:
+                parsed = raw
+            return {
+                "status": "success",
+                "http_status": resp.status,
+                "url": clean_url,
+                "data": parsed
+            }
+    except Exception as e:
+        return {"status": "error", "url": clean_url, "message": f"HTTP request failed: {e}"}
+
+
+def download_file(
+    url: str,
+    destination_path: str,
+    timeout_sec: float = 30.0,
+    **kwargs
+) -> Dict[str, Any]:
+    """Downloads a file directly from a URL to a local destination."""
+    import urllib.request
+    import os
+    clean_url = url.strip()
+    try:
+        parent = os.path.dirname(os.path.abspath(destination_path))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        req = urllib.request.Request(clean_url, headers={"User-Agent": "CoreAI/0.3"})
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp, open(destination_path, "wb") as out_file:
+            while chunk := resp.read(65536):
+                out_file.write(chunk)
+        size_bytes = os.path.getsize(destination_path)
+        return {
+            "status": "success",
+            "url": clean_url,
+            "destination": destination_path,
+            "size_bytes": size_bytes,
+            "message": f"Successfully downloaded {size_bytes} bytes to '{destination_path}'."
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Download failed: {e}"}
+
+
+fetch_url_text_schema = {
+    "name": "fetch_url_text",
+    "description": "Fetch and extract readable plain text content from a web URL",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "description": "Web URL to fetch"},
+            "max_chars": {"type": "integer", "default": 5000}
+        },
+        "required": ["url"]
+    }
+}
+
+http_request_json_schema = {
+    "name": "http_request_json",
+    "description": "Send a lightweight HTTP request (GET/POST/PUT/DELETE) and parse JSON response",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "description": "API endpoint URL"},
+            "method": {"type": "string", "enum": ["GET", "POST", "PUT", "DELETE"], "default": "GET"},
+            "json_data": {"type": "object", "description": "JSON payload for POST/PUT"}
+        },
+        "required": ["url"]
+    }
+}
+
+download_file_schema = {
+    "name": "download_file",
+    "description": "Download a remote file or image to a local file path",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "description": "Direct file URL to download"},
+            "destination_path": {"type": "string", "description": "Target file destination"}
+        },
+        "required": ["url", "destination_path"]
+    }
+}
+

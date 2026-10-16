@@ -15,6 +15,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [[0.3.0-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.3.0-alpha) — 2026-10-16
+### Codename: "Omnipotent Matrix & TRACE Pipelines"
+
+| Kernel | Status | Verification | Ethos |
+| :---: | :---: | :---: | :---: |
+| **`v0.3.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **215 / 215 PASSED** | 🛡️ **#ANTISLOP** |
+
+Tri-Track Asynchronous Concurrent Execution (TRACE) Engine with decoupled Foreground Spoken-To (<50ms), 24/7 Context Sentinel awareness loop, and Background Daemon workers. Quadrillion Tool Matrix (QTM) native expansion delivering 35+ pre-compiled zero-latency capabilities across OS, Dev Workspace, Media, Homelab/Networking, and Web Automation. Repository reorganization and hygiene.
+
+### 🌟 Added & Enhanced
+
+#### ⚡ TRACE: Tri-Track Asynchronous Concurrent Execution (`brain/trace.py`, `core/gateway.py`, `core/schemas.py`)
+- **Tri-Track Concurrency Architecture**: Decouples microkernel execution into three distinct, non-blocking tracks:
+  - **Track 1 (Foreground / Spoken-To)**: Reactive interactive path (<50ms fastpath) with zero thread-blocking. Dynamically merges pre-computed `SentinelContext` into system prompts and plans, allowing instantaneous, context-aware execution without stalling on git, disk, or network queries.
+  - **Track 2 (Context Sentinel)**: 24/7 silent background awareness loop scanning *"What is the operator working on? What needs attention or preventive maintenance right now?"*. Gathers git branch, clean/dirty working tree status, uncommitted changes, active scratch notes in SQLite, upcoming calendar appointments, and system hardware vitals.
+  - **Track 3 (Daemons & Background Workers)**: Persistent daemon scheduler coordinating recurring background workers (countdown timers, hardware watchdogs, mesh synchronization, and MHAC model pulls).
+- **Universal Sentinel Context (`SentinelContext`)**: Real-time snapshot of operator state (`active_workspace_branch`, `git_dirty`, `git_status_summary`, `pending_notes_count`, `recent_notes`, `upcoming_event`, `system_vitals`, `active_node`). Provides `get_summary_prompt()` for high-density, low-token context injection.
+- **REST & Gateway Integration**:
+  - `GET /api/v1/trace/status`: Full telemetry and health metrics across Track 1, 2, and 3.
+  - `GET /api/v1/trace/context`: Snapshot of cached Track 2 SentinelContext.
+  - `POST /api/v1/trace/sentinel/scan`: On-demand trigger for immediate background sentinel evaluation.
+  - `POST /api/v1/trace/interactive`: Direct foreground invocation with automatic non-blocking context injection.
+
+#### 🧰 QTM: Quadrillion Tool Matrix Substrate (`tools/native/`, `main.py`)
+- **Pre-Compiled Zero-Latency Native Arsenal**: Massive expansion of deterministic tools so 99% of tasks execute with zero latency without invoking LLM code generation, keeping dynamic synthesis strictly as an emergent Tier-4 fallback.
+- **Automated Native Substrate Auto-Loader (`tools/native/__init__.py:register_all_native_tools`)**: Automatically registers 35+ native tools into any `ToolRegistry` with state management and bus binding in a single call.
+- **Expanded Native Tool Domains**:
+  - **System & OS Tools (`tools/native/system_tools.py`)**: `get_disk_usage` (total/used/free storage metrics), `get_battery_status` (charge % and plugged state), `get_network_interfaces` (IP and interface inspection).
+  - **Developer Workspace Tools (`tools/native/dev_tools.py`)**: `compute_file_hash` (cryptographic SHA-256, MD5, SHA-1 digests), `find_files_by_pattern` (recursive glob search with size metadata), `read_json_file` & `write_json_file` (safe JSON config I/O), `git_diff_summary` (staged/unstaged diff inspector), `git_commit_changes` (automated commits).
+  - **Media & Audio Automation (`tools/native/media_tools.py`)**: `set_system_volume` (cross-platform volume adjustment), `toggle_audio_mute` (system-wide mute toggle), `get_audio_devices` (audio hardware introspection).
+  - **Homelab & Network Tools (`tools/native/network_tools.py`)**: `ping_host` (latency and reachability probe), `check_port_open` (TCP port tester), `get_public_ip` (WAN IP resolver), `dns_lookup` (DNS hostname resolution), `wake_on_lan` (WOL magic packet dispatcher).
+  - **Web & Browser Tools (`tools/native/web_tools.py`)**: `fetch_url_text` (clean web page text extractor), `http_request_json` (REST API consumer), `download_file` (stream downloader).
+
+#### 🧹 Repository Architecture & Hygiene Reorganization
+- **Community Standards**: Moved `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, and `SECURITY.md` to `.github/` conforming to standard GitHub best practices.
+- **Document Categorization**: Reorganized documentation into `docs/guides/` (installation, mesh setup, customization) and `docs/specs/` (roadmap, problems & debt, v0.3.0 specifications), while maintaining the living Master Troubleshooting Wiki in `docs/wiki/`.
+- **Cleaned Build Artifacts**: Removed transient `.pyc`, `.pytest_cache`, and debug files.
+
+#### 🧪 Verification & Test Suite (`tests/test_qtm_and_trace.py`)
+- Added 21 automated end-to-end unit and integration tests covering the QTM tool catalog, TRACE Sentinel scans, non-blocking Track 1 execution, Track 3 daemon supervision, and Gateway REST endpoints.
+- **Total Test Count**: **215 / 215 tests passing 100% green**.
+
+---
+
 ## [[0.2.3-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.2.3-alpha) — 2026-10-16
 ### Codename: "Proactive Anticipatory Agency, Master Troubleshooting Wiki & Multiple Hardware-Aware Computing (MHAC)"
 

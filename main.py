@@ -31,51 +31,7 @@ from core.schemas import TextEvent, CommandEvent, AdaptiveResponseEvent, TTSRequ
 from core.context import ContextManager
 from core.state import StateManager
 from tools.registry import ToolRegistry
-from tools.native.system_tools import (
-    get_time, time_schema,
-    get_system_status, system_status_schema,
-    inspect_system_resources, system_resources_schema,
-    factory_reset, factory_reset_schema
-)
-from tools.native.file_tools import read_text_file, read_file_schema, write_text_file, write_file_schema, list_dir_contents, list_dir_schema
-from tools.native.math_tools import calculate_math, calculate_math_schema, summarize_numbers, summarize_numbers_schema
-from tools.native.network_tools import scan_local_network, scan_local_network_schema, inspect_lan_device, inspect_lan_device_schema
-from tools.native.weather_tools import get_weather, weather_schema
-from tools.native.knowledge_tools import lookup_knowledge, knowledge_schema
-from tools.native.web_tools import open_url, open_url_schema, search_web_query, search_web_query_schema, open_youtube, open_youtube_schema
-from tools.native.desktop_tools import (
-    launch_application, launch_application_schema,
-    open_path_in_explorer, open_path_in_explorer_schema,
-    take_screenshot, take_screenshot_schema,
-    get_clipboard_text, get_clipboard_text_schema,
-    set_clipboard_text, set_clipboard_text_schema
-)
-from tools.native.media_tools import media_control, media_control_schema
-from tools.native.process_tools import (
-    list_running_processes, list_running_processes_schema,
-    kill_process, kill_process_schema,
-    get_hardware_metrics, get_hardware_metrics_schema,
-    lock_workstation, lock_workstation_schema
-)
-from tools.native.shell_tools import run_shell_command, run_shell_command_schema
-from tools.native.proactive_tools import (
-    create_reminder, create_reminder_schema,
-    create_vitals_watcher, create_vitals_watcher_schema,
-    list_active_rules, list_active_rules_schema,
-    cancel_proactive_rule, cancel_proactive_rule_schema,
-    set_state_manager as set_proactive_sm
-)
-from tools.native.dev_tools import (
-    get_git_status, get_git_status_schema,
-    manage_notes, manage_notes_schema,
-    set_state_manager as set_dev_sm
-)
-from tools.native.calendar_tools import (
-    manage_calendar, manage_calendar_schema,
-    reconcile_schedule_evidence, reconcile_schedule_evidence_schema,
-    get_upcoming_schedule, get_upcoming_schedule_schema,
-    set_state_manager as set_calendar_sm
-)
+from tools.native import register_all_native_tools
 from tools.remote_dispatcher import RemoteToolDispatcher
 from brain.dynamic_generator import DynamicGenerator
 from brain.pipeline_engine import PipelineEngine
@@ -227,41 +183,11 @@ class OperatorRelocator:
 def setup_tools(state: Optional[StateManager] = None, relocator: Optional[OperatorRelocator] = None) -> ToolRegistry:
     registry = ToolRegistry(dynamic_dir="tools/dynamic")
     
-    registry.register_tool("get_time", get_time, time_schema)
-    registry.register_tool("get_system_status", get_system_status, system_status_schema)
-    registry.register_tool("inspect_system_resources", inspect_system_resources, system_resources_schema)
-    registry.register_tool("factory_reset", factory_reset, factory_reset_schema)
-    
-    registry.register_tool("read_text_file", read_text_file, read_file_schema)
-    registry.register_tool("write_text_file", write_text_file, write_file_schema)
-    registry.register_tool("list_dir_contents", list_dir_contents, list_dir_schema)
-    registry.register_tool("calculate_math", calculate_math, calculate_math_schema)
-    registry.register_tool("summarize_numbers", summarize_numbers, summarize_numbers_schema)
+    # 1. Register complete Quadrillion Tool Matrix (QTM) native tool arsenal
+    register_all_native_tools(registry, state_manager=state)
     registry.register_tool("route_spatial_audio", route_spatial_audio, route_spatial_audio_schema)
 
-    # Network & Device Topology Introspection Tools
-    registry.register_tool("scan_local_network", scan_local_network, scan_local_network_schema)
-    registry.register_tool("inspect_lan_device", inspect_lan_device, inspect_lan_device_schema)
-
-    # Real-Time Weather and Encyclopedic Knowledge Tools
-    registry.register_tool("get_weather", get_weather, weather_schema)
-    registry.register_tool("lookup_knowledge", lookup_knowledge, knowledge_schema)
-
-    # Sovereign Desktop & OS Automation Tools
-    registry.register_tool("open_url", open_url, open_url_schema)
-    registry.register_tool("search_web_query", search_web_query, search_web_query_schema)
-    registry.register_tool("open_youtube", open_youtube, open_youtube_schema)
-    registry.register_tool("launch_application", launch_application, launch_application_schema)
-    registry.register_tool("open_path_in_explorer", open_path_in_explorer, open_path_in_explorer_schema)
-    registry.register_tool("take_screenshot", take_screenshot, take_screenshot_schema)
-    registry.register_tool("get_clipboard_text", get_clipboard_text, get_clipboard_text_schema)
-    registry.register_tool("set_clipboard_text", set_clipboard_text, set_clipboard_text_schema)
-    registry.register_tool("media_control", media_control, media_control_schema)
-    registry.register_tool("list_running_processes", list_running_processes, list_running_processes_schema)
-    registry.register_tool("kill_process", kill_process, kill_process_schema)
-    registry.register_tool("get_hardware_metrics", get_hardware_metrics, get_hardware_metrics_schema)
-    registry.register_tool("lock_workstation", lock_workstation, lock_workstation_schema)
-    registry.register_tool("run_shell_command", run_shell_command, run_shell_command_schema)
+    # 2. Sovereign Desktop & Topology Introspection Tools
 
     def list_registered_devices(zone_filter: Optional[str] = None):
         mgr = state or StateManager()
@@ -432,25 +358,6 @@ def setup_tools(state: Optional[StateManager] = None, relocator: Optional[Operat
             }
         }
     })
-
-    # Proactive Supervision & Reminder Tools
-    if state:
-        set_proactive_sm(state)
-        set_dev_sm(state)
-        set_calendar_sm(state)
-    registry.register_tool("create_reminder", create_reminder, create_reminder_schema)
-    registry.register_tool("create_vitals_watcher", create_vitals_watcher, create_vitals_watcher_schema)
-    registry.register_tool("list_active_rules", list_active_rules, list_active_rules_schema)
-    registry.register_tool("cancel_proactive_rule", cancel_proactive_rule, cancel_proactive_rule_schema)
-
-    # Developer & Scratch Productivity Tools
-    registry.register_tool("get_git_status", get_git_status, get_git_status_schema)
-    registry.register_tool("manage_notes", manage_notes, manage_notes_schema)
-
-    # Calendar, Appointments & Proactive Schedule Reconciliation
-    registry.register_tool("manage_calendar", manage_calendar, manage_calendar_schema)
-    registry.register_tool("reconcile_schedule_evidence", reconcile_schedule_evidence, reconcile_schedule_evidence_schema)
-    registry.register_tool("get_upcoming_schedule", get_upcoming_schedule, get_upcoming_schedule_schema)
 
     registry.discover_dynamic_tools()
     return registry

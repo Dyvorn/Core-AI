@@ -408,7 +408,7 @@ class MobileGlanceStatus(BaseModel):
     system_vitals: Dict[str, Any] = Field(default_factory=dict)
     active_satellites_count: int = 0
     server_time: float = Field(default_factory=lambda: time.time())
-    version: str = "0.2.3-alpha"
+    version: str = "0.3.0-alpha"
 
 
 # --- Phase 5: Sovereign Mesh State Sync & Inter-Device Communication ---
@@ -568,6 +568,13 @@ class MHACPullRequest(BaseModel):
     """Request to instruct a client Ollama instance to pull a missing model."""
     endpoint: str
     model_name: str
+
+
+class TraceInteractiveRequest(BaseModel):
+    """Request payload for TRACE Track 1 interactive foreground execution."""
+    goal: str
+    context: Optional[Dict[str, Any]] = None
+    timeout: float = 30.0
 
 
 

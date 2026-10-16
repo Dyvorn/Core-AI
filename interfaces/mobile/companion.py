@@ -390,7 +390,7 @@ class MobileCompanionClient:
             ("System Hardware:", f"CPU: {cpu}% | RAM: {ram}%"),
             ("Active Reminders:", f"{MAGENTA}{rem_str}{RESET}"),
             ("Voice Satellites:", f"{GREEN}{glance.get('active_satellites_count', 0)} Online{RESET}"),
-            ("Kernel Protocol:", f"{CYAN}v{glance.get('version', '0.2.3-alpha')}{RESET}")
+            ("Kernel Protocol:", f"{CYAN}v{glance.get('version', '0.3.0-alpha')}{RESET}")
         ]
 
         card = render_box(
