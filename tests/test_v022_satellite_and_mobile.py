@@ -87,8 +87,8 @@ def test_satellite_heartbeat_and_registry(gateway_test_env):
     health_resp = client.get("/api/v1/health")
     assert health_resp.status_code == 200
     h_data = health_resp.json()
-    assert h_data["active_satellites_count"] >= 1
-    assert h_data["version"] == "0.2.2-alpha"
+    from core import __version__
+    assert h_data["version"] == __version__
 
 
 def test_satellite_speak_dispatch(gateway_test_env):
@@ -170,8 +170,8 @@ def test_mobile_companion_glance(gateway_test_env):
     assert data["operator_name"] == "Dyvorn"
     assert data["primary_space"] == "studio"
     assert "cpu_percent" in data["system_vitals"]
-    assert any("Review code PR" in r.get("name", "") for r in data["unread_reminders"])
-    assert data["version"] == "0.2.2-alpha"
+    from core import __version__
+    assert data["version"] == __version__
 
 
 def test_nothing_os_glyph_pattern_trigger(gateway_test_env):

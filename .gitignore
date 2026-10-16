@@ -23,6 +23,7 @@ config/.env
 
 # Logs and runtime artifacts
 logs/*.log
+logs/*.log.*
 logs/*.txt
 logs/pipelines.jsonl
 *.pid

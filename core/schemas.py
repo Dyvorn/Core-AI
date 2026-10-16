@@ -408,7 +408,7 @@ class MobileGlanceStatus(BaseModel):
     system_vitals: Dict[str, Any] = Field(default_factory=dict)
     active_satellites_count: int = 0
     server_time: float = Field(default_factory=lambda: time.time())
-    version: str = "0.2.2-alpha"
+    version: str = "0.2.3-alpha"
 
 
 # --- Phase 5: Sovereign Mesh State Sync & Inter-Device Communication ---
