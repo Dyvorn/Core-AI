@@ -24,7 +24,7 @@ from core.schemas import (
     MeshSyncPullRequest, MeshSyncPullResponse, MeshSyncPushRequest, MeshSyncPushResponse,
     MeshSyncFullRequest, MeshSyncFullResponse, MeshDeviceMessage, MeshDeviceMessageResponse, MeshSyncPayload,
     ClientComputeSignature, MHACHandshakeRequest, MHACHandshakeResponse, MHACProbeRequest, MHACPullRequest,
-    TraceInteractiveRequest
+    MHACConnectRequest, TraceInteractiveRequest
 )
 from core.state import StateManager
 from core.bus import EventBus
@@ -1320,6 +1320,33 @@ def create_gateway_app(
         active_mhac_broker.reset_delegation()
         await connection_manager.broadcast_event("MHAC_RESET", {"status": "reset", "active_compute_node": "host"})
         return {"status": "ok", "message": "Compute delegation reset to central host.", "active_compute_node": "host"}
+
+    @app.get("/api/v1/mhac/workload")
+    def get_mhac_workload_matrix():
+        """Returns asymmetric workload distribution between Central Host (server) and Workstation (PC)."""
+        return active_mhac_broker.get_workload_matrix()
+
+    @app.post("/api/v1/mhac/heartbeat")
+    async def mhac_heartbeat_trigger():
+        """Evaluates client liveness and performs graceful failover or recovery."""
+        res = await asyncio.to_thread(active_mhac_broker.heartbeat_step)
+        return res
+
+    @app.post("/api/v1/mhac/connect", response_model=MHACHandshakeResponse)
+    async def mhac_connect_workstation(req: MHACConnectRequest):
+        """Directly pairs an external high-compute workstation by endpoint IP."""
+        response = await asyncio.to_thread(
+            active_mhac_broker.connect_workstation_by_endpoint,
+            req.endpoint,
+            req.device_name,
+            req.gpu_name,
+            req.vram_gb,
+            req.cpu_cores,
+            req.ram_gb,
+            req.preferred_models
+        )
+        await connection_manager.broadcast_event("MHAC_HANDSHAKE", response.model_dump())
+        return response
 
     # =========================================================================
     # TRACE (Tri-Track Asynchronous Concurrent Execution) Routes

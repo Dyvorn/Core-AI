@@ -168,10 +168,11 @@ def test_model_router_mhac_dynamic_routing(tmp_path):
     broker._delegated_model = "llama3.1:8b"
 
     try:
-        assert router.get_ollama_api_base() == "http://192.168.1.200:11434"
-        clean_goal, resolved_model = router.resolve_model("analyze log files")
-        assert resolved_model == "ollama/llama3.1:8b"
-        assert clean_goal == "analyze log files"
+        with patch.object(broker, "check_client_liveness", return_value=True):
+            assert router.get_ollama_api_base() == "http://192.168.1.200:11434"
+            clean_goal, resolved_model = router.resolve_model("analyze log files")
+            assert resolved_model == "ollama/llama3.1:8b"
+            assert clean_goal == "analyze log files"
     finally:
         broker.reset_delegation()
 
@@ -274,3 +275,184 @@ def test_gateway_mhac_endpoints(mhac_test_app):
     h3 = client.get("/api/v1/health").json()
     assert h3["mhac_mode"] == "standalone"
     assert h3["mhac_active_node"] == "host"
+
+
+# 5. Workload Matrix & Asymmetric Transition Tests
+def test_mhac_workload_matrix():
+    broker = MHACBroker(host_score_override=10.0)
+    matrix = broker.get_workload_matrix()
+
+    assert matrix["mode"] == "standalone"
+    assert matrix["active_compute_node"] == "host"
+    assert "proactive_watcher_daemon" in matrix["server_node"]["workloads"]
+    assert "context_sentinel_track2" in matrix["server_node"]["workloads"]
+    assert len(matrix["pc_node"]["workloads"]) == 0
+
+    # Accelerate with a workstation
+    workstation_sig = ClientComputeSignature(
+        node_id="studio-pc",
+        device_name="Studio Workstation",
+        cpu_cores=16,
+        ram_total_gb=64.0,
+        has_gpu=True,
+        gpu_name="RTX 4090",
+        vram_gb=24.0,
+        ollama_endpoint="http://192.168.1.199:11434"
+    )
+    with patch.object(broker, "probe_client_models", return_value=["llama3.1:8b"]):
+        broker.evaluate_handshake(workstation_sig)
+        acc_matrix = broker.get_workload_matrix()
+        assert acc_matrix["mode"] == "accelerated"
+        assert acc_matrix["active_compute_node"] == "studio-pc"
+        assert "interactive_llm_reasoning" in acc_matrix["pc_node"]["workloads"]
+        assert "foreground_spoken_to_track1" in acc_matrix["pc_node"]["workloads"]
+        assert acc_matrix["pc_node"]["target_model"] == "llama3.1:8b"
+
+
+def test_mhac_failover_and_recovery():
+    import time
+    bus = EventBus()
+    transitions = []
+    bus.subscribe("mhac_events", lambda e: transitions.append(e))
+    bus.start_listening()
+
+    try:
+        broker = MHACBroker(host_score_override=10.0, bus=bus)
+        workstation_sig = ClientComputeSignature(
+            node_id="dev-rig",
+            device_name="Developer Rig RTX",
+            cpu_cores=12,
+            ram_total_gb=32.0,
+            has_gpu=True,
+            gpu_name="RTX 3090",
+            vram_gb=24.0,
+            ollama_endpoint="http://192.168.1.77:11434"
+        )
+
+        with patch.object(broker, "probe_client_models", return_value=["llama3.1:8b"]):
+            broker.evaluate_handshake(workstation_sig)
+            assert broker.get_status()["mode"] == "accelerated"
+            assert broker.get_active_devices_count() == 1
+
+            # Simulate workstation sleep / network drop -> failover
+            failover_res = broker.failover_to_host(reason="Workstation went to sleep")
+            assert failover_res["status"] == "failed_over"
+            assert failover_res["active_compute_node"] == "host"
+            assert broker.get_status()["mode"] == "standalone"
+            assert "dev-rig" in broker._dormant_clients
+
+            # Verify event was published
+            time.sleep(0.05)
+            assert any(t.get("event_type") == "mhac_transition" for t in transitions)
+
+            # Simulate workstation waking back up -> recovery
+            with patch.object(broker, "check_client_liveness", return_value=True):
+                recovered = broker.recover_delegation("dev-rig")
+                assert recovered is True
+                assert broker.get_status()["mode"] == "accelerated"
+                assert broker.get_status()["active_compute_node"] == "dev-rig"
+    finally:
+        bus.stop_listening()
+
+
+def test_mhac_heartbeat_step():
+    broker = MHACBroker(host_score_override=10.0)
+    workstation_sig = ClientComputeSignature(
+        node_id="dev-rig",
+        device_name="Developer Rig RTX",
+        cpu_cores=12,
+        ram_total_gb=32.0,
+        has_gpu=True,
+        gpu_name="RTX 3090",
+        vram_gb=24.0,
+        ollama_endpoint="http://192.168.1.77:11434"
+    )
+
+    with patch.object(broker, "probe_client_models", return_value=["llama3.1:8b"]):
+        broker.evaluate_handshake(workstation_sig)
+
+        # 1. Heartbeat healthy
+        with patch.object(broker, "check_client_liveness", return_value=True):
+            hb = broker.heartbeat_step()
+            assert hb["status"] == "healthy"
+            assert hb["mode"] == "accelerated"
+
+        # 2. Heartbeat detects unreachable -> failover
+        with patch.object(broker, "check_client_liveness", return_value=False):
+            hb_fail = broker.heartbeat_step()
+            assert hb_fail["status"] == "failed_over"
+            assert broker.get_status()["mode"] == "standalone"
+
+        # 3. Heartbeat in standalone detects dormant node back online -> recovery
+        with patch.object(broker, "check_client_liveness", return_value=True):
+            hb_rec = broker.heartbeat_step()
+            assert hb_rec["status"] == "recovered"
+            assert hb_rec["mode"] == "accelerated"
+
+
+def test_model_router_failover_when_workstation_unreachable(tmp_path):
+    db_file = os.path.join(tmp_path, "router_failover.db")
+    sm = StateManager(db_path=db_file)
+    router = ModelRouter(state_manager=sm)
+    broker = get_mhac_broker()
+
+    workstation_sig = ClientComputeSignature(
+        node_id="pc-unreachable",
+        device_name="Unreachable Rig",
+        cpu_cores=16,
+        ram_total_gb=32.0,
+        has_gpu=True,
+        gpu_name="RTX 4080",
+        vram_gb=16.0,
+        ollama_endpoint="http://192.168.1.250:11434"
+    )
+
+    try:
+        with patch.object(broker, "probe_client_models", return_value=["llama3.1:8b"]):
+            broker.evaluate_handshake(workstation_sig)
+            assert broker.get_delegated_endpoint() == "http://192.168.1.250:11434"
+
+            # Workstation goes offline / liveness returns False
+            with patch.object(broker, "check_client_liveness", return_value=False):
+                # resolve_model should detect liveness failure, trigger failover, and NOT raise
+                clean_goal, model = router.resolve_model("calculate fast fibonacci")
+                # Broker must have failed over to host
+                assert broker.get_delegated_endpoint() is None
+                assert broker.get_status()["mode"] == "standalone"
+    finally:
+        broker.reset_delegation()
+
+
+def test_gateway_workload_and_connect_endpoints(mhac_test_app):
+    client, broker = mhac_test_app
+
+    # 1. Workload matrix endpoint
+    wl_resp = client.get("/api/v1/mhac/workload")
+    assert wl_resp.status_code == 200
+    wl_data = wl_resp.json()
+    assert "server_node" in wl_data
+    assert "pc_node" in wl_data
+    assert "proactive_watcher_daemon" in wl_data["server_node"]["workloads"]
+
+    # 2. Heartbeat trigger endpoint
+    hb_resp = client.post("/api/v1/mhac/heartbeat")
+    assert hb_resp.status_code == 200
+    assert "status" in hb_resp.json()
+
+    # 3. Direct connect endpoint
+    with patch.object(broker, "probe_client_models", return_value=["llama3.1:8b"]):
+        connect_payload = {
+            "endpoint": "http://192.168.1.155:11434",
+            "device_name": "Studio Laptop",
+            "gpu_name": "NVIDIA RTX 4070",
+            "vram_gb": 8.0,
+            "cpu_cores": 14,
+            "ram_gb": 32.0,
+            "preferred_models": ["llama3.1:8b"]
+        }
+        conn_resp = client.post("/api/v1/mhac/connect", json=connect_payload)
+        assert conn_resp.status_code == 200
+        c_data = conn_resp.json()
+        assert c_data["status"] == "accelerated_workstation"
+        assert c_data["target_model"] == "llama3.1:8b"
+

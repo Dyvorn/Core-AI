@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import logging
 import urllib.request
 import urllib.error
@@ -17,15 +18,19 @@ class MHACBroker:
     - Decoupled intelligence: orchestrator state, memory, and proactive hooks stay centralized on core.
     - Evaluates compute score: ComputeScore = (CPU * 1.0) + (RAM * 0.5) + (GPU * 50.0) + (VRAM * 5.0).
     - Probes client Ollama model inventory and negotiates placement.
+    - Automatic liveness monitoring, graceful zero-downtime failover to host, and auto-recovery.
     """
 
-    def __init__(self, host_score_override: Optional[float] = None):
+    def __init__(self, host_score_override: Optional[float] = None, bus: Optional[Any] = None):
         self.host_score_override = host_score_override
+        self.bus = bus
         self._connected_clients: Dict[str, ClientComputeSignature] = {}
+        self._dormant_clients: Dict[str, ClientComputeSignature] = {}
         self._active_compute_node: str = "host"
         self._delegated_endpoint: Optional[str] = None
         self._delegated_model: Optional[str] = None
         self._last_notice: Optional[str] = None
+        self._transitions_history: List[Dict[str, Any]] = []
 
     def get_host_compute_signature(self) -> ClientComputeSignature:
         """Inspects local host vitals and computes host compute signature."""
@@ -227,10 +232,207 @@ class MHACBroker:
         """Returns the active delegated model or None."""
         return self._delegated_model
 
+    @property
+    def delegated_routes(self) -> Dict[str, Any]:
+        """Returns active delegated routing targets."""
+        if self._delegated_endpoint and self._delegated_model:
+            return {
+                "planner": self._delegated_endpoint,
+                "model": self._delegated_model,
+                "endpoint": self._delegated_endpoint
+            }
+        return {}
+
+    def get_active_devices_count(self) -> int:
+        """Returns count of active compute clients."""
+        return len(self._connected_clients)
+
+    def check_client_liveness(self, endpoint: Optional[str] = None, timeout: float = 0.5) -> bool:
+        """
+        Fast non-blocking probe to verify if a client workstation is reachable and awake.
+        Returns True if endpoint responds with 200, False if unreachable or asleep.
+        """
+        target = endpoint or self._delegated_endpoint
+        if not target:
+            return False
+        clean_ep = target.rstrip("/")
+        url = f"{clean_ep}/api/tags"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "CoreAI-MHAC-Liveness/1.0"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+
+    def failover_to_host(self, reason: str = "Client workstation unreachable or asleep") -> Dict[str, Any]:
+        """
+        Seamless zero-downtime failover to host compute:
+        Preserves client metadata in _dormant_clients for auto-recovery when the PC wakes up,
+        and switches active compute node back to host immediately.
+        """
+        prev_node = self._active_compute_node
+        prev_endpoint = self._delegated_endpoint
+        prev_model = self._delegated_model
+
+        if prev_node != "host" and prev_node in self._connected_clients:
+            self._dormant_clients[prev_node] = self._connected_clients.pop(prev_node)
+
+        self._active_compute_node = "host"
+        self._delegated_endpoint = None
+        self._delegated_model = None
+        notice = f"Compute failover to central host: {reason}. Running on host internal processor."
+        self._last_notice = notice
+        logger.warning(f"[MHAC Failover] {notice}")
+
+        transition_record = {
+            "event": "failover_to_host",
+            "previous_node": prev_node,
+            "previous_endpoint": prev_endpoint,
+            "previous_model": prev_model,
+            "reason": reason,
+            "timestamp": time.time()
+        }
+        self._transitions_history.append(transition_record)
+
+        if self.bus:
+            try:
+                self.bus.publish("mhac_events", {
+                    "event_type": "mhac_transition",
+                    "mode": "standalone",
+                    "active_compute_node": "host",
+                    "reason": reason,
+                    "notice": notice
+                })
+            except Exception:
+                pass
+
+        return {
+            "status": "failed_over",
+            "active_compute_node": "host",
+            "reason": reason,
+            "notice": notice
+        }
+
+    def recover_delegation(self, node_id: Optional[str] = None) -> bool:
+        """
+        Checks if a dormant workstation has awakened or reconnected, and seamlessly
+        restores accelerated compute delegation.
+        """
+        candidates = [node_id] if node_id else list(self._dormant_clients.keys())
+        for cid in candidates:
+            sig = self._dormant_clients.get(cid)
+            if sig and sig.ollama_endpoint:
+                if self.check_client_liveness(sig.ollama_endpoint, timeout=0.8):
+                    logger.info(f"[MHAC Recovery] Dormant workstation '{sig.device_name}' is reachable again. Re-negotiating...")
+                    self._dormant_clients.pop(cid, None)
+                    res = self.evaluate_handshake(sig)
+                    if res.status == "accelerated_workstation":
+                        logger.info(f"[MHAC Recovery] Accelerated compute restored to '{sig.device_name}'.")
+                        record = {
+                            "event": "recovered_delegation",
+                            "node_id": sig.node_id,
+                            "endpoint": sig.ollama_endpoint,
+                            "model": res.target_model,
+                            "timestamp": time.time()
+                        }
+                        self._transitions_history.append(record)
+                        return True
+        return False
+
+    def heartbeat_step(self) -> Dict[str, Any]:
+        """
+        Periodic heartbeat evaluation (executed in Track 3 Daemons):
+        - If accelerated: checks liveness of delegated client. If unreachable, triggers seamless failover.
+        - If standalone: checks dormant clients for recovery.
+        """
+        if self._delegated_endpoint:
+            is_alive = self.check_client_liveness(self._delegated_endpoint, timeout=0.6)
+            if not is_alive:
+                return self.failover_to_host(reason="Heartbeat probe timed out (workstation asleep or disconnected)")
+            return {"status": "healthy", "mode": "accelerated", "node": self._active_compute_node}
+        else:
+            if self._dormant_clients:
+                recovered = self.recover_delegation()
+                if recovered:
+                    return {"status": "recovered", "mode": "accelerated", "node": self._active_compute_node}
+            return {"status": "healthy", "mode": "standalone", "node": "host"}
+
+    def get_workload_matrix(self) -> Dict[str, Any]:
+        """
+        Returns asymmetric workload distribution between Central Host and Operator PC:
+        - Server: Handles background, slow, and persistent workloads.
+        - PC: Handles fast, low-latency foreground and interactive LLM workloads.
+        """
+        is_acc = bool(self._delegated_endpoint)
+        return {
+            "mode": "accelerated" if is_acc else "standalone",
+            "active_compute_node": self._active_compute_node,
+            "server_node": {
+                "id": "host",
+                "role": "Sovereign Central Host (core)",
+                "workloads": [
+                    "proactive_watcher_daemon",
+                    "context_sentinel_track2",
+                    "sqlite_state_persistence",
+                    "track_3_background_daemons",
+                    "memory_consolidation_and_indexing",
+                    "offline_heuristic_dag_fallback"
+                ]
+            },
+            "pc_node": {
+                "id": self._active_compute_node if is_acc else None,
+                "role": "High-Compute Operator Workstation / GPU",
+                "endpoint": self._delegated_endpoint,
+                "target_model": self._delegated_model,
+                "workloads": [
+                    "interactive_llm_reasoning",
+                    "foreground_spoken_to_track1",
+                    "heavy_dag_planning",
+                    "fastpath_code_synthesis"
+                ] if is_acc else []
+            },
+            "transitions_count": len(self._transitions_history),
+            "last_notice": self._last_notice
+        }
+
+    def connect_workstation_by_endpoint(
+        self,
+        endpoint: str,
+        device_name: str = "Operator Workstation",
+        gpu_name: str = "NVIDIA RTX",
+        vram_gb: float = 16.0,
+        cpu_cores: int = 16,
+        ram_gb: float = 32.0,
+        preferred_models: Optional[List[str]] = None
+    ) -> MHACHandshakeResponse:
+        """
+        Convenience helper to connect and evaluate a remote workstation by its endpoint.
+        """
+        clean_ep = endpoint.strip()
+        if not clean_ep.startswith("http"):
+            clean_ep = f"http://{clean_ep}"
+        if ":" not in clean_ep.split("//", 1)[-1]:
+            clean_ep = f"{clean_ep}:11434"
+
+        sig = ClientComputeSignature(
+            node_id=f"workstation-{abs(hash(clean_ep)) % 10000}",
+            device_name=device_name,
+            device_type="workstation",
+            cpu_cores=cpu_cores,
+            ram_total_gb=ram_gb,
+            has_gpu=True,
+            gpu_name=gpu_name,
+            vram_gb=vram_gb,
+            ollama_endpoint=clean_ep
+        )
+        sig.calculate_score()
+        return self.evaluate_handshake(sig, preferred_models=preferred_models)
+
     def get_status(self) -> Dict[str, Any]:
         """Returns the complete MHAC runtime status matrix."""
         host_sig = self.get_host_compute_signature()
         clients = [c.model_dump() for c in self._connected_clients.values()]
+        dormant = [c.model_dump() for c in self._dormant_clients.values()]
         return {
             "mode": "accelerated" if self._delegated_endpoint else "standalone",
             "active_compute_node": self._active_compute_node,
@@ -239,6 +441,10 @@ class MHACBroker:
             "delegated_model": self._delegated_model,
             "connected_clients_count": len(self._connected_clients),
             "connected_clients": clients,
+            "dormant_clients_count": len(self._dormant_clients),
+            "dormant_clients": dormant,
+            "workload_distribution": self.get_workload_matrix(),
+            "transitions_history": self._transitions_history[-5:],
             "last_notice": self._last_notice
         }
 

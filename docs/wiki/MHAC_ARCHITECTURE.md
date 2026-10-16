@@ -175,3 +175,54 @@ In alignment with Core AI's voice responsiveness directives:
 * All HTTP probes and network handshakes are executed via `asyncio.to_thread` or non-blocking HTTP clients.
 * Proactive background agents, health monitors, and calendar reconcilers run concurrently on separate asynchronous threads.
 * Foreground voice conversation with Core AI remains instant and uninterrupted while background compute negotiation takes place.
+
+---
+
+## 8. Asymmetric Workload Matrix (Server vs. PC)
+
+To optimize hardware resources without sacrificing real-time conversational snappiness, Core AI partitions compute dynamically into asymmetric workload tiers:
+
+| Tier | Host Node | Workload Type | Responsibilities | Latency Profile |
+| :--- | :--- | :--- | :--- | :--- |
+| **Sovereign Backbone** | **Central Server (`core`)** | Background / Persistent | • 24/7 Proactive Watcher Daemon<br>• Context Sentinel (Track 2 Workspace/Git Scan)<br>• SQLite WAL State & Memory Persistence<br>• Track 3 Background Daemons & Watchdogs<br>• Embedding & Historical Note Consolidation<br>• Offline Heuristic DAG Fallback | Non-critical background (1s – 60s) |
+| **High-Compute Tier** | **Operator Workstation (PC / GPU)** | Urgent / Interactive | • Track 1 Foreground Spoken-To (<50ms)<br>• Interactive LLM DAG Planning & Reasoning<br>• Emergent Dynamic Code Synthesis<br>• Heavy Vision / Multimodal Generation | Low latency (<50ms – 1.5s) |
+
+```
+┌────────────────────────────────────────────────────────┐
+│ CENTRAL SERVER ("core")                                │
+│  • Proactive Daemon (watches calendar, notes, vitals)  │
+│  • Track 2 Context Sentinel (workspace awareness)      │
+│  • SQLite WAL State & Audit Logs                       │
+│  • Track 3 Daemons (Heartbeat, consolidation)          │
+└───────────────────────────┬────────────────────────────┘
+                            │
+               Continuous   │  Dynamic
+               Background   │  Foreground
+               Coordination │  Inference
+                            │
+┌───────────────────────────▼────────────────────────────┐
+│ OPERATOR WORKSTATION PC (RTX GPU / VRAM)               │
+│  • High-Speed Interactive LLM Inference                │
+│  • Foreground Spoken-To (<50ms fastpath)               │
+│  • Heavy Multi-Step DAG Planning                       │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 9. Seamless Zero-Downtime Transition & Auto-Recovery
+
+If the operator's PC goes to sleep, shuts down, or disconnects from the LAN, Core AI maintains 100% operational continuity:
+
+1. **Continuous Liveness Heartbeat (Track 3)**:
+   A dedicated daemon (`mhac_liveness_heartbeat`) runs every 15s in the background on the central server, performing a lightweight probe to the PC's Ollama port.
+2. **Graceful Failover to Host**:
+   If the PC fails to respond within 500ms, the broker preserves the PC's configuration in `_dormant_clients`, resets active delegation to `"host"`, and routes ongoing interactive requests to the server's internal model or instant deterministic DAG without raising errors or dropping user prompts.
+3. **Automatic Reconnection & Recovery**:
+   When the workstation wakes up and responds to probes, the server automatically renegotiates model placement and seamlessly restores accelerated GPU offload.
+4. **Operator CLI Controls**:
+   - `mhac` or `compute`: Displays live Asymmetric Computing Matrix and workload distribution.
+   - `connect-pc <endpoint>`: Directly pairs an external workstation (e.g. `connect-pc 192.168.1.150:11434`).
+   - `mhac heartbeat`: Manually triggers liveness evaluation and state transition reconciliation.
+   - `mhac reset`: Reverts compute delegation back to central host.
+

@@ -572,6 +572,17 @@ class MHACPullRequest(BaseModel):
     model_name: str
 
 
+class MHACConnectRequest(BaseModel):
+    """Direct connect request for pairing an external PC or workstation."""
+    endpoint: str = "http://127.0.0.1:11434"
+    device_name: str = "External Workstation"
+    gpu_name: str = "NVIDIA RTX"
+    vram_gb: float = 16.0
+    cpu_cores: int = 16
+    ram_gb: float = 32.0
+    preferred_models: Optional[List[str]] = None
+
+
 class TraceInteractiveRequest(BaseModel):
     """Request payload for TRACE Track 1 interactive foreground execution."""
     goal: str

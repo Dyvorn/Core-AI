@@ -128,6 +128,27 @@ class TraceEngine:
             "total_daemon_executions": 0
         }
 
+        # Automatically register default Track 3 sovereign daemons
+        self._register_default_daemons()
+
+    def _register_default_daemons(self):
+        """Registers default Track 3 background daemons (MHAC heartbeat, memory watchdogs)."""
+        def _mhac_heartbeat_worker():
+            try:
+                from brain.mhac import get_mhac_broker
+                broker = get_mhac_broker()
+                return broker.heartbeat_step()
+            except Exception as e:
+                logger.debug(f"[TRACE Track 3] MHAC heartbeat skipped: {e}")
+                return {"status": "skipped", "error": str(e)}
+
+        self.register_daemon(
+            name="mhac_liveness_heartbeat",
+            fn=_mhac_heartbeat_worker,
+            interval_seconds=15.0,
+            metadata={"description": "Monitors PC workstation liveness and triggers auto-failover/recovery"}
+        )
+
     # =========================================================================
     # TRACK 1: Foreground Spoken-To / Interactive Pipeline
     # =========================================================================
@@ -316,8 +337,11 @@ class TraceEngine:
             active_node = {
                 "role": "mhac_broker",
                 "state": "active",
+                "mode": "accelerated" if broker.get_delegated_endpoint() else "standalone",
+                "active_compute_node": broker._active_compute_node,
                 "active_devices": broker.get_active_devices_count(),
-                "delegated_models": len(broker.delegated_routes)
+                "delegated_models": len(broker.delegated_routes),
+                "workload_distribution": broker.get_workload_matrix()
             }
         except Exception:
             pass

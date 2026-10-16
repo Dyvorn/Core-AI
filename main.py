@@ -938,6 +938,62 @@ def run_interactive_repl(
                 print(f"  Notes:   {ctx.pending_notes_count} scratch note(s)")
                 print(f"  Vitals:  CPU {ctx.system_vitals.get('cpu_percent')}% | RAM {ctx.system_vitals.get('memory_percent')}%\n")
 
+            elif cmd_lower in ["mhac", "compute", "workload", "hardware"]:
+                from brain.mhac import get_mhac_broker
+                broker = get_mhac_broker()
+                wm = broker.get_workload_matrix()
+                mode_col = GREEN if wm["mode"] == "accelerated" else YELLOW
+                print(f"\n{BRIGHT}======================================================================={RESET}")
+                print(f"{CYAN}  C.O.R.E. AI :: ASYMMETRIC HARDWARE-AWARE COMPUTING MATRIX (MHAC){RESET}")
+                print(f"{BRIGHT}======================================================================={RESET}")
+                print(f"  Mode:               {mode_col}{wm['mode'].upper()}{RESET}")
+                print(f"  Active Compute Node: {BRIGHT}{wm['active_compute_node']}{RESET}")
+                print(f"  Delegated Model:    {CYAN}{wm['pc_node'].get('target_model') or 'None (Host Heuristic)'}{RESET}")
+                print(f"  Delegated Endpoint: {wm['pc_node'].get('endpoint') or 'Local / Internal'}")
+                print(f"\n  {YELLOW}▶ Central Host (Server) Workloads [Background & Persistence]:{RESET}")
+                for wl in wm["server_node"]["workloads"]:
+                    print(f"    • {wl}")
+                print(f"\n  {GREEN}▶ Operator Workstation (PC) Workloads [Urgent & Low-Latency]:{RESET}")
+                if wm["pc_node"]["workloads"]:
+                    for wl in wm["pc_node"]["workloads"]:
+                        print(f"    • {wl}")
+                else:
+                    print(f"    {DIM}(Standby: No external high-compute PC connected){RESET}")
+                if wm.get("last_notice"):
+                    print(f"\n  Notice: {MAGENTA}{wm['last_notice']}{RESET}")
+                print(f"{BRIGHT}======================================================================={RESET}\n")
+
+            elif cmd_lower.startswith("connect-pc ") or cmd_lower.startswith("mhac pair "):
+                ep = user_input.split(" ", 2)[-1].strip()
+                from brain.mhac import get_mhac_broker
+                broker = get_mhac_broker()
+                print(f"{YELLOW}[*] Probing and pairing workstation at {ep}...{RESET}")
+                res = broker.connect_workstation_by_endpoint(ep)
+                if res.status == "accelerated_workstation":
+                    print(f"{GREEN}[SUCCESS] Accelerated Workstation paired!{RESET}")
+                    print(f"  Node:     {CYAN}{res.active_compute_node}{RESET}")
+                    print(f"  Model:    {YELLOW}{res.target_model}{RESET}")
+                    print(f"  Endpoint: {res.delegated_endpoint}")
+                    print(f"  Score:    Client {res.client_score} vs Host {res.host_score}\n")
+                elif res.status == "missing_model_handshake":
+                    print(f"{YELLOW}[HANDSHAKE] High-spec PC detected, but missing model '{res.target_model}'!{RESET}")
+                    print(f"  Missing: {res.missing_models}")
+                    print(f"  {res.notice_message}\n")
+                else:
+                    print(f"{YELLOW}[INFO] {res.notice_message}{RESET}\n")
+
+            elif cmd_lower in ["mhac heartbeat", "heartbeat"]:
+                from brain.mhac import get_mhac_broker
+                broker = get_mhac_broker()
+                hb = broker.heartbeat_step()
+                print(f"{GREEN}[OK] Heartbeat evaluated:{RESET} Status={hb.get('status')} | Mode={hb.get('mode')} | Active Node={hb.get('node')}\n")
+
+            elif cmd_lower in ["mhac reset", "compute reset"]:
+                from brain.mhac import get_mhac_broker
+                broker = get_mhac_broker()
+                broker.reset_delegation()
+                print(f"{YELLOW}[OK] Compute delegation reset to host internal processor.{RESET}\n")
+
             elif cmd_lower in ["harness", "eval", "diag", "selftest"]:
                 print(f"\n{CYAN}======================================================================={RESET}")
                 print(f"{CYAN}  CORE AI :: SOVEREIGN REASONING & EXECUTION HARNESS DIAGNOSTIC{RESET}")
@@ -1049,6 +1105,14 @@ def run_interactive_repl(
                 sent_ctx = te.get_sentinel_context()
                 if sent_ctx.active_workspace_branch != "unknown":
                     print(f"  {CYAN}[TRACE Sentinel]{RESET} {sent_ctx.get_summary_prompt()}")
+
+                try:
+                    from brain.mhac import get_mhac_broker
+                    broker = get_mhac_broker()
+                    node_desc = f"{GREEN}PC: {broker._active_compute_node} ({broker._delegated_model}){RESET}" if broker._delegated_endpoint else f"{YELLOW}Central Server (Host Internal){RESET}"
+                    print(f"  {CYAN}[Compute Layer]{RESET} {node_desc}")
+                except Exception:
+                    pass
 
                 print(f"\n{CYAN}[*] Decomposing goal with Planner:{RESET} '{goal}'")
 

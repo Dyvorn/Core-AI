@@ -20,11 +20,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 | Kernel | Status | Verification | Ethos |
 | :---: | :---: | :---: | :---: |
-| **`v0.3.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **217 / 217 PASSED** | 🛡️ **#ANTISLOP** |
+| **`v0.3.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **222 / 222 PASSED** | 🛡️ **#ANTISLOP** |
 
-Tri-Track Asynchronous Concurrent Execution (TRACE) Engine with decoupled Foreground Spoken-To (<50ms), 24/7 Context Sentinel awareness loop, and Background Daemon workers. Quadrillion Tool Matrix (QTM) native expansion delivering 35+ pre-compiled zero-latency capabilities with instant deterministic heuristic DAG routing across OS, Dev Workspace, Media, Homelab/Networking, and Web Automation. Mobile Glance lock-screen telemetry integration. Repository reorganization and hygiene.
+Tri-Track Asynchronous Concurrent Execution (TRACE) Engine with decoupled Foreground Spoken-To (<50ms), 24/7 Context Sentinel awareness loop, and Background Daemon workers. Multiple Hardware-Aware Computing (MHAC) Asymmetric Server vs. PC compute delegation with zero-downtime failover and auto-recovery. Quadrillion Tool Matrix (QTM) native expansion delivering 35+ pre-compiled zero-latency capabilities with instant deterministic heuristic DAG routing across OS, Dev Workspace, Media, Homelab/Networking, and Web Automation. Repository reorganization and hygiene.
 
 ### 🌟 Added & Enhanced
+
+#### 🖥️ Server vs. PC Asymmetric Computing & Seamless Transition (`brain/mhac.py`, `brain/model_router.py`, `brain/trace.py`, `core/gateway.py`, `main.py`)
+- **Asymmetric Workload Partitioning**: Cleanly divides workloads by urgency and latency profile:
+  - **Central Server (Host)**: Handles persistent, non-latency-critical background compute: 24/7 Proactive Watcher Daemon, Track 2 Context Sentinel (workspace/git monitoring), Track 3 Daemons, SQLite WAL state persistence, note indexing & memory consolidation, and offline heuristic DAG fallback.
+  - **Operator Workstation (PC / GPU)**: Handles fast, low-latency foreground compute: Track 1 Spoken-To (<50ms fastpath), interactive LLM DAG planning, heavy reasoning, and fast dynamic code synthesis.
+- **Track 3 Liveness Heartbeat Daemon (`mhac_liveness_heartbeat`)**: Automatically registered background daemon pinging the delegated PC workstation every 15s.
+- **Zero-Downtime Failover & Auto-Recovery**:
+  - When the workstation goes to sleep or disconnects, `failover_to_host()` preserves PC metadata in `_dormant_clients` and instantly redirects subsequent interactive queries to the server's internal model or deterministic heuristic DAG without dropping prompts or raising errors.
+  - When the workstation wakes up and responds to probes, `recover_delegation()` automatically re-negotiates model placement and seamlessly restores GPU acceleration.
+- **Interactive REPL & CLI Controls (`main.py`)**:
+  - `mhac` / `compute` / `workload`: Displays high-contrast Asymmetric Computing Matrix and workload distribution.
+  - `connect-pc <endpoint>` / `mhac pair <ip>`: 1-step pairing of external workstations.
+  - `mhac heartbeat`: Manual liveness evaluation and state transition reconciliation.
+  - `mhac reset`: Reverts compute delegation back to host.
+  - `[Compute Layer]`: Live banner displayed before goal execution indicating whether compute is running on PC GPU or Central Server.
+- **Universal Gateway Endpoints (`core/gateway.py`)**:
+  - `GET /api/v1/mhac/workload`: Returns the complete workload matrix.
+  - `POST /api/v1/mhac/heartbeat`: On-demand liveness probe and transition trigger.
+  - `POST /api/v1/mhac/connect`: Direct pairing request for external workstations.
 
 #### ⚡ TRACE: Tri-Track Asynchronous Concurrent Execution (`brain/trace.py`, `core/gateway.py`, `core/schemas.py`, `interfaces/mobile/companion.py`)
 - **Tri-Track Concurrency Architecture**: Decouples microkernel execution into three distinct, non-blocking tracks:
@@ -58,9 +77,9 @@ Tri-Track Asynchronous Concurrent Execution (TRACE) Engine with decoupled Foregr
 - **Document Categorization**: Reorganized documentation into `docs/guides/` (installation, mesh setup, customization) and `docs/specs/` (roadmap, problems & debt, v0.3.0 specifications), while maintaining the living Master Troubleshooting Wiki in `docs/wiki/`.
 - **Cleaned Build Artifacts**: Removed transient `.pyc`, `.pytest_cache`, and debug files.
 
-#### 🧪 Verification & Test Suite (`tests/test_qtm_and_trace.py`)
-- Added 23 automated end-to-end unit and integration tests covering the QTM tool catalog, TRACE Sentinel scans, non-blocking Track 1 execution, Track 3 daemon supervision, Gateway REST endpoints, Mobile glance card sentinel telemetry, and instant deterministic heuristic routing.
-- **Total Test Count**: **217 / 217 tests passing 100% green**.
+#### 🧪 Verification & Test Suite (`tests/test_qtm_and_trace.py`, `tests/test_mhac.py`)
+- Added 28 automated end-to-end unit and integration tests covering the QTM tool catalog, TRACE Sentinel scans, non-blocking Track 1 execution, Track 3 daemon supervision, Gateway REST endpoints, Mobile glance card sentinel telemetry, instant deterministic heuristic routing, and MHAC Asymmetric workload transition with zero-downtime failover and auto-recovery.
+- **Total Test Count**: **222 / 222 tests passing 100% green**.
 
 ---
 

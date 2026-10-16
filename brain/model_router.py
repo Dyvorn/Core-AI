@@ -283,11 +283,15 @@ class ModelRouter:
             delegated_model = broker.get_delegated_model()
             delegated_endpoint = broker.get_delegated_endpoint()
             if delegated_model and delegated_endpoint:
-                mhac_candidate = f"ollama/{delegated_model}"
-                logger.info(f"[MHAC] Dynamically offloading role '{role}' to accelerated client model: '{mhac_candidate}' on {delegated_endpoint}")
-                return clean_goal, mhac_candidate
-        except Exception:
-            pass
+                if broker.check_client_liveness(delegated_endpoint):
+                    mhac_candidate = f"ollama/{delegated_model}"
+                    logger.info(f"[MHAC] Dynamically offloading role '{role}' to accelerated client model: '{mhac_candidate}' on {delegated_endpoint}")
+                    return clean_goal, mhac_candidate
+                else:
+                    logger.warning(f"[MHAC] Workstation at {delegated_endpoint} unreachable or sleeping. Initiating seamless failover to host.")
+                    broker.failover_to_host(reason="Workstation unreachable or sleeping")
+        except Exception as e:
+            logger.debug(f"[MHAC] Delegation check skipped: {e}")
 
         # 3. User preference for specified role
         prefs = self.get_model_preferences()
