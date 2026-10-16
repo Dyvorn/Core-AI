@@ -17,8 +17,21 @@ from core.bus import EventBus
 logger = logging.getLogger("CoreAI.VoiceOut")
 
 # Default Neural Voices
-DEFAULT_DE_VOICE = "de-DE-FlorianMultilingualNeural"
+DEFAULT_DE_VOICE = os.getenv("CORE_DEFAULT_DE_VOICE", "de-DE-KillianNeural")
 DEFAULT_EN_VOICE = "en-US-ChristopherNeural"
+
+VOICE_ALIASES = {
+    "killian": "de-DE-KillianNeural",
+    "florian": "de-DE-FlorianMultilingualNeural",
+    "seraphina": "de-DE-SeraphinaMultilingualNeural",
+    "conrad": "de-DE-ConradNeural",
+    "katja": "de-DE-KatjaNeural",
+    "amala": "de-DE-AmalaNeural",
+    "christopher": "en-US-ChristopherNeural",
+    "aria": "en-US-AriaNeural",
+    "guy": "en-US-GuyNeural",
+    "jenny": "en-US-JennyNeural"
+}
 
 GERMAN_INDICATORS = {
     "der", "die", "das", "ein", "eine", "einer", "und", "ist", "sind",
@@ -47,12 +60,12 @@ class VoiceOutEngine:
         self,
         default_voice: str = "auto",
         output_device: Optional[Any] = None,
-        rate: str = "+0%",
+        rate: str = "+15%",
         volume: str = "+0%"
     ):
         self.default_voice = default_voice
         self.output_device = output_device
-        self.rate = rate
+        self.rate = os.getenv("CORE_TTS_RATE", rate)
         self.volume = volume
 
         # Sequential playback worker thread
@@ -138,10 +151,12 @@ class VoiceOutEngine:
     def select_voice(self, text: str, voice_override: Optional[str] = None) -> str:
         """Determines the neural voice based on override or detected language."""
         if voice_override and voice_override != "default" and voice_override != "auto":
-            return voice_override
+            clean_ov = voice_override.strip().lower()
+            return VOICE_ALIASES.get(clean_ov, voice_override)
 
         if self.default_voice not in ("auto", "default", None):
-            return self.default_voice
+            clean_def = self.default_voice.strip().lower()
+            return VOICE_ALIASES.get(clean_def, self.default_voice)
 
         lang = self.detect_language(text)
         return DEFAULT_DE_VOICE if lang == "de" else DEFAULT_EN_VOICE
@@ -189,13 +204,22 @@ class VoiceOutEngine:
         Default is non-blocking (blocking=False) for fluid voice interactions.
         If blocking=True, waits until this specific sentence finishes or is interrupted.
         """
-        if not text or not text.strip():
+        clean = text.strip()
+        if not clean:
             return
+
+        # Streaming sentence chunking: start speaking first sentence immediately while others buffer
+        if not blocking:
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", clean) if s.strip()]
+            if len(sentences) > 1:
+                for s in sentences:
+                    self.synthesize_and_play(s, voice=voice, device=device, blocking=False)
+                return
 
         self._interrupted.clear()
         done_event = threading.Event() if blocking else None
         item = {
-            "text": text.strip(),
+            "text": clean,
             "voice": voice,
             "device": device or self.output_device,
             "done_event": done_event

@@ -339,6 +339,55 @@ class SettingsCLI:
         except Exception as e:
             print(f"{RED}[!] Microphone test error: {e}{RESET}")
 
+    def set_voice(self, voice_name: str):
+        """Sets active neural voice by short alias or full name."""
+        from engines.voice_out import VOICE_ALIASES
+        clean = voice_name.strip().lower()
+        resolved = VOICE_ALIASES.get(clean, voice_name.strip())
+        profile = self.state_manager.get_user_profile()
+        if "audio" not in profile.preferences:
+            profile.preferences["audio"] = {}
+        profile.preferences["audio"]["voice"] = resolved
+        self.state_manager.save_user_profile(profile)
+        self.set_env_key("CORE_VOICE", resolved)
+        self.set_env_key("CORE_DEFAULT_DE_VOICE", resolved)
+        print(f"{GREEN}[OK] Neural voice set to '{resolved}'.{RESET}")
+
+    def set_rate(self, rate_str: str):
+        """Sets speech playback speed (e.g. '+15%', '+20%')."""
+        clean = rate_str.strip()
+        if not clean.startswith(("+", "-")):
+            clean = f"+{clean}"
+        if not clean.endswith("%"):
+            clean = f"{clean}%"
+        profile = self.state_manager.get_user_profile()
+        if "audio" not in profile.preferences:
+            profile.preferences["audio"] = {}
+        profile.preferences["audio"]["tts_rate"] = clean
+        self.state_manager.save_user_profile(profile)
+        self.set_env_key("CORE_TTS_RATE", clean)
+        print(f"{GREEN}[OK] Neural speech rate set to '{clean}'.{RESET}")
+
+    def list_voices(self):
+        """Lists recommended high-fidelity neural voices."""
+        print(f"\n{CYAN}+=====================================================================+{RESET}")
+        print(f"{CYAN}|{BRIGHT}   CORE AI :: RECOMMENDED HIGH-FIDELITY NEURAL VOICES                {RESET}{CYAN}|{RESET}")
+        print(f"{CYAN}+=====================================================================+{RESET}")
+        voices = [
+            ("killian", "de-DE-KillianNeural", "Männlich (Dynamisch, modern, reaktiv - Empfohlen)"),
+            ("florian", "de-DE-FlorianMultilingualNeural", "Männlich (Natürlich, multilingual)"),
+            ("seraphina", "de-DE-SeraphinaMultilingualNeural", "Weiblich (Modern, warm, ultra-realistisch)"),
+            ("conrad", "de-DE-ConradNeural", "Männlich (Tief, ruhig, autoritär - Jarvis-Stil)"),
+            ("katja", "de-DE-KatjaNeural", "Weiblich (Klar, professionell)"),
+            ("amala", "de-DE-AmalaNeural", "Weiblich (Jugendlich, frisch)"),
+            ("christopher", "en-US-ChristopherNeural", "Englisch Männlich (Tech Lead)"),
+            ("aria", "en-US-AriaNeural", "Englisch Weiblich (Expressive)")
+        ]
+        for alias, full, desc in voices:
+            print(f"  {BRIGHT}{alias:<14}{RESET} -> {full:<36} | {desc}")
+        print(f"\nVerwende: core config voice <alias> (z.B. core config voice killian)")
+        print(f"Geschwindigkeit: core config speed <rate> (z.B. core config speed +20%)\n")
+
     def set_env_key(self, key: str, value: str):
         """Updates or sets an environment key in config/.env."""
         root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -387,6 +436,16 @@ def main():
             cli.set_speaker(" ".join(args[2:]))
         elif len(args) >= 2:
             cli.set_speaker(" ".join(args[1:]))
+    elif args[0] in ["voice", "voices"]:
+        if len(args) >= 2:
+            cli.set_voice(args[1])
+        else:
+            cli.list_voices()
+    elif args[0] in ["speed", "rate"]:
+        if len(args) >= 2:
+            cli.set_rate(args[1])
+        else:
+            print("Usage: core config speed <+15%|+20%|+25%>")
     elif args[0] in ["model", "models"]:
         if len(args) == 1 or args[1] in ["select", "picker", "choose"]:
             cli.interactive_model_selector()

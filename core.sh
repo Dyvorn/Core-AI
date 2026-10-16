@@ -61,6 +61,14 @@ case "$COMMAND" in
         shift
         "$PYTHON" interfaces/cli/settings.py speaker "$@"
         ;;
+    voice|voices)
+        shift
+        "$PYTHON" interfaces/cli/settings.py voice "$@"
+        ;;
+    speed|rate)
+        shift
+        "$PYTHON" interfaces/cli/settings.py speed "$@"
+        ;;
     satellite|voice-satellite)
         shift
         "$PYTHON" interfaces/voice/satellite.py "$@"

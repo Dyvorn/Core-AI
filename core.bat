@@ -83,6 +83,16 @@ shift
 "%PYTHON%" interfaces\cli\settings.py speaker %1 %2 %3 %4 %5
 goto :eof
 
+:voice
+shift
+"%PYTHON%" interfaces\cli\settings.py voice %1 %2 %3 %4 %5
+goto :eof
+
+:speed
+shift
+"%PYTHON%" interfaces\cli\settings.py speed %1 %2 %3 %4 %5
+goto :eof
+
 :satellite
 shift
 "%PYTHON%" interfaces\voice\satellite.py %1 %2 %3 %4 %5 %6 %7 %8 %9

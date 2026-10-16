@@ -47,7 +47,9 @@ class VoiceSatellite:
         speaker_device: Optional[Any] = None,
         model_size: str = "small",
         state_manager: Optional[StateManager] = None,
-        mode: str = "auto"
+        mode: str = "auto",
+        voice_name: Optional[str] = None,
+        tts_rate: Optional[str] = None
     ):
         self.state_manager = state_manager or StateManager()
         profile = self.state_manager.get_user_profile()
@@ -67,6 +69,8 @@ class VoiceSatellite:
         audio_prefs = prefs.get("audio", {})
         self.mic_device = mic_device if mic_device is not None else os.getenv("CORE_MIC_DEVICE", audio_prefs.get("mic_device"))
         self.speaker_device = speaker_device if speaker_device is not None else os.getenv("CORE_SPEAKER_DEVICE", audio_prefs.get("speaker_device"))
+        self.voice_name = voice_name if voice_name else os.getenv("CORE_VOICE", audio_prefs.get("voice", "auto"))
+        self.tts_rate = tts_rate if tts_rate else os.getenv("CORE_TTS_RATE", audio_prefs.get("tts_rate", "+15%"))
         self.model_size = model_size
 
         # Mesh transport
@@ -438,7 +442,8 @@ class VoiceSatellite:
             try:
                 self.voice_out = VoiceOutEngine(
                     output_device=self.speaker_device,
-                    default_voice="auto"
+                    default_voice=self.voice_name,
+                    rate=self.tts_rate
                 )
             except Exception as out_err:
                 logger.warning(f"VoiceOut initialization warning ({out_err}). Speech playback disabled.")
@@ -689,6 +694,8 @@ def main():
     parser.add_argument("--listen-only", action="store_true", help="Run satellite as listen-only microphone sensor")
     parser.add_argument("--mic", type=str, help="Microphone device index or substring name")
     parser.add_argument("--speaker", type=str, help="Speaker device index or substring name")
+    parser.add_argument("--voice", type=str, help="Neural voice name or alias (e.g. killian, seraphina, florian, conrad)")
+    parser.add_argument("--rate", type=str, help="Speech rate (e.g. +15%, +20%)")
     parser.add_argument("--model-size", type=str, default="small", help="Whisper model size (tiny, base, small)")
     parser.add_argument("--headless", action="store_true", help="Run without terminal status card")
 
@@ -707,7 +714,9 @@ def main():
         mode=mode,
         mic_device=mic_dev,
         speaker_device=spk_dev,
-        model_size=args.model_size
+        model_size=args.model_size,
+        voice_name=args.voice,
+        tts_rate=args.rate
     )
 
     sys.exit(satellite.run(headless=args.headless))
