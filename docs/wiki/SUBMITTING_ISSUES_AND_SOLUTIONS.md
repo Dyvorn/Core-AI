@@ -2,7 +2,7 @@
 
 ```text
 ========================================================================================
-[ WORKFLOW: PROBLEM & SOLUTION SUBMISSION ]   [ TARGET: docs/wiki/ & docs/PROBLEMS_AND_DEBT.md ]
+[ WORKFLOW: PROBLEM & SOLUTION SUBMISSION ]   [ TARGET: docs/wiki/ & docs/specs/PROBLEMS_AND_DEBT.md ]
 [ STANDARD: #ANTISLOP TEST-DRIVEN ]            [ STATUS: ACTIVE ]
 ========================================================================================
 ```
@@ -55,7 +55,7 @@ graph LR
     A[Operator Submits Problem] --> B[Reproduce & Write Failing Test in tests/]
     B --> C[Implement Non-Locking Architecture Fix]
     C --> D[Run 100% Test Suite & Verify Fix]
-    D --> E[Record Solution Permanently in docs/wiki/ & PROBLEMS_AND_DEBT.md]
+    D --> E[Record Solution Permanently in docs/wiki/ & docs/specs/PROBLEMS_AND_DEBT.md]
 ```
 
 1. **Reproduce & Codify**: We create a dedicated reproduction test in `tests/` that reliably triggers the failure.

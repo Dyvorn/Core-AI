@@ -51,8 +51,8 @@ All technical fat and legacy prototype mocks have been eliminated in strict adhe
 
 ### 5. Documentation & Zero-Emoji Standardization
 - `README.md`: Polished into a minimalist, pure ASCII architectural dossier with system flowcharts, terminal transcripts, and diagnostic specimens.
-- `docs/CUSTOMIZATION_AND_MODELS.md`: Comprehensive tutorial on API keys, model configuration, local Ollama, Gemini, and prompt overrides.
-- `docs/INTERCONTINENTAL_MESH.md`: Architectural blueprint for planetary mesh, offline fallback, and machine migration.
+- `docs/guides/CUSTOMIZATION_AND_MODELS.md`: Comprehensive tutorial on API keys, model configuration, local Ollama, Gemini, and prompt overrides.
+- `docs/guides/INTERCONTINENTAL_MESH.md`: Architectural blueprint for planetary mesh, offline fallback, and machine migration.
 - `interfaces/cli/setup_wizard.py`: Upgraded with AI provider selection and mesh role configuration.
 
 ### 6. Process Lifecycle, Self-Updater & Zero-Residue Removal

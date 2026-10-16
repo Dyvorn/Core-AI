@@ -57,7 +57,7 @@ Core AI is built around a non-negotiable sovereign identity and purpose:
 | Role | Identity | Profile / Contact | Focus Areas |
 | :--- | :--- | :--- | :--- |
 | **Lead Architect & Maintainer** | **Dyvorn** *(aka Vyrn / Refined)* | [@Dyvorn](https://github.com/Dyvorn) | Core Microkernel, DAG Engine, Spatial Mesh, Voice Pipeline |
-| **Open Source Community** | *Community Contributors* | [CONTRIBUTING.md](CONTRIBUTING.md) | Device Drivers, Edge Adapters, Hardware Plugins, Test Coverage |
+| **Open Source Community** | *Community Contributors* | [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) | Device Drivers, Edge Adapters, Hardware Plugins, Test Coverage |
 
 ---
 
@@ -327,12 +327,24 @@ Core AI/
 |   +-- service.py              # Service & process suite controller (start, stop, RAM/GPU free)
 |   +-- state.py                # SQLite WAL-mode state manager (pipelines, audio routes, profiles)
 |   +-- updater.py              # Self-updater with automated test-guard & rollback
-+-- docs/                       # Project Documentation & Issue Tracking
-|   +-- CUSTOMIZATION_AND_MODELS.md # AI provider setup, model roles, & per-task overrides
-|   +-- INTERCONTINENTAL_MESH.md    # Global mesh architecture, offline fallback, & migration
-|   +-- ROADMAP.md              # Long-term multi-year milestone roadmap (Phases 1-6)
-|   +-- PROBLEMS_AND_DEBT.md    # Dedicated ledger tracking known bugs, edge cases & debt
-|   +-- SESSION_HANDOVER.md     # Engineering handovers, architecture decisions, & session context
++-- docs/                       # Project Documentation, Guides, Specs & Wiki
+|   +-- guides/                 # Architectural & Operational Deployment Guides
+|   |   +-- CUSTOMIZATION_AND_MODELS.md # AI provider setup, model roles, & per-task overrides
+|   |   +-- INTERCONTINENTAL_MESH.md    # Global mesh architecture, offline fallback, & migration
+|   |   +-- SERVER_SETUP_AND_AUTOSTART.md # 24/7 Sovereign Server, autostart, & laptop lid guide
+|   +-- specs/                  # Strategic Roadmaps, Specifications & Session Context
+|   |   +-- ROADMAP.md          # Long-term multi-year milestone roadmap (Phases 1-6)
+|   |   +-- v0.3.0_SPECIFICATION.md # TRACE Engine & QTM Architecture Blueprint
+|   |   +-- SESSION_HANDOVER.md # Engineering handovers, architecture decisions, & session context
+|   |   +-- PROBLEMS_AND_DEBT.md# Dedicated ledger tracking known bugs, edge cases & debt
+|   +-- wiki/                   # Master Troubleshooting & Subsystem Knowledge Base
+|       +-- README.md           # Knowledge base index & quick problem resolver
+|       +-- TROUBLESHOOTING_AND_SOLUTIONS.md # Tested solutions for audio, SQLite, IPv6, & mesh
+|       +-- MHAC_ARCHITECTURE.md # Multiple Hardware-Aware Computing framework
+|       +-- PROACTIVE_ENGINE.md # Anticipatory intelligence & calendar reconciliation
+|       +-- ARCHITECTURE_AND_SUBSYSTEMS.md # Microkernel, StateManager, DAG engine
+|       +-- CLI_AND_TOOLS_REFERENCE.md # Complete CLI and native tools dictionary
+|       +-- SUBMITTING_ISSUES_AND_SOLUTIONS.md # Community error and solution submission
 +-- engines/                    # Audio & Perception Processing Engines
 |   +-- audio_router.py         # Dynamic spatial audio hardware introspection & route binding
 |   +-- voice_in.py             # Silero-VAD + faster-whisper STT audio capture
@@ -564,7 +576,7 @@ Real-time audio route binding stored in SQLite and managed on the fly:
 
 To ensure issues and edge-cases are **never lost** over this multi-year initiative, all bugs, limitations, and architectural debts are logged in:
 
-**[docs/PROBLEMS_AND_DEBT.md](docs/PROBLEMS_AND_DEBT.md)**
+**[docs/specs/PROBLEMS_AND_DEBT.md](docs/specs/PROBLEMS_AND_DEBT.md)**
 
 Whenever you discover a bug or limitation, record:
 1. Issue ID & Component.
@@ -753,7 +765,7 @@ Core AI is designed to run 24/7 as a dependable sovereign daemon on your main ma
   ./core.sh uninstall
   ```
 
-> 📖 **Comprehensive Server Guide**: For headless setup, laptop-as-server lid management, systemd units, and local Ollama routing, see the [24/7 Sovereign Server & Autostart Guide](docs/SERVER_SETUP_AND_AUTOSTART.md).
+> 📖 **Comprehensive Server Guide**: For headless setup, laptop-as-server lid management, systemd units, and local Ollama routing, see the [24/7 Sovereign Server & Autostart Guide](docs/guides/SERVER_SETUP_AND_AUTOSTART.md).
 
 ---
 

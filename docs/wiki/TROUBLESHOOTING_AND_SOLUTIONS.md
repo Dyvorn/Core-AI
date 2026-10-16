@@ -322,4 +322,4 @@ If you encountered a bug, hardware quirk, or edge case that is **not** covered i
    - **Fix Applied**: [Exact code edit and unit test]
    ```
 4. **Permanent Inclusion**:  
-   Every verified submission is merged directly into this Wiki and recorded in `docs/PROBLEMS_AND_DEBT.md`.
+   Every verified submission is merged directly into this Wiki and recorded in `docs/specs/PROBLEMS_AND_DEBT.md`.
