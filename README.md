@@ -12,13 +12,13 @@
 ```
 
 ```text
-[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.2.1-alpha ]  [ TESTS: 144/144 PASSED (100%) ]
+[ SYSTEM: C.O.R.E.-KERNEL ]  [ VERSION: v0.3.1 ]  [ TESTS: 206/206 PASSED (100%) ]
 [ LICENSE: AGPL-3.0-ONLY ]   [ ARCHITECTURE: ASYNC-DAG ] [ ETHOS: #ANTISLOP ]
 ```
 
 > **A self-hosted, sovereign, and privacy-first AI companion built to integrate into daily life across your workspace, living spaces, grounds, vehicle, bicycle, wearables, and mobile devices. Zero big-tech cloud lock-in, zero hardcoded assumptions, and engineered for multi-year evolution.**
 >
-> 🚀 **Release v0.2.1-alpha is LIVE!** Explore the full [Release Notes](RELEASE_NOTES.md) and [Changelog](CHANGELOG.md).
+> 🚀 **Release v0.3.1 is LIVE!** Explore the full [Release Notes](RELEASE_NOTES.md) and [Changelog](CHANGELOG.md).
 
 ---
 

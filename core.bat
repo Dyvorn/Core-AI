@@ -33,14 +33,17 @@ if /i "%~1"=="settings" goto config
 if /i "%~1"=="edit" goto edit
 if /i "%~1"=="audio" goto audio
 if /i "%~1"=="mics" goto audio
-if /i "%~1"=="speakers" goto audio
+if /i "%~1"=="mute" goto mute
+if /i "%~1"=="unmute" goto unmute
+if /i "%~1"=="listen" goto listen
 if /i "%~1"=="mic" goto mic
 if /i "%~1"=="speaker" goto speaker
 if /i "%~1"=="voice" goto voice
 if /i "%~1"=="voices" goto voice
 if /i "%~1"=="speed" goto speed
 if /i "%~1"=="rate" goto speed
-if /i "%~1"=="satellite" goto satellite
+if /i "%~1"=="app" goto app
+if /i "%~1"=="chat" goto app
 if /i "%~1"=="dashboard" goto dashboard
 if /i "%~1"=="ui" goto dashboard
 if /i "%~1"=="models" goto models
@@ -61,8 +64,6 @@ if /i "%~1"=="factory-reset" goto clean
 if /i "%~1"=="version" goto version
 if /i "%~1"=="-v" goto version
 if /i "%~1"=="--version" goto version
-if /i "%~1"=="mobile" goto mobile
-if /i "%~1"=="glyph" goto glyph
 if /i "%~1"=="speak" goto speak
 if /i "%~1"=="uninstall" goto uninstall
 
@@ -75,6 +76,19 @@ goto :eof
 
 :audio
 "%PYTHON%" interfaces\cli\settings.py audio
+goto :eof
+
+:mute
+"%PYTHON%" interfaces\cli\settings.py mute
+goto :eof
+
+:unmute
+"%PYTHON%" interfaces\cli\settings.py unmute
+goto :eof
+
+:listen
+shift
+"%PYTHON%" interfaces\cli\settings.py listen %1 %2 %3 %4 %5
 goto :eof
 
 :mic
@@ -95,21 +109,6 @@ goto :eof
 :speed
 shift
 "%PYTHON%" interfaces\cli\settings.py speed %1 %2 %3 %4 %5
-goto :eof
-
-:satellite
-shift
-"%PYTHON%" interfaces\voice\satellite.py %1 %2 %3 %4 %5 %6 %7 %8 %9
-goto :eof
-
-:mobile
-shift
-"%PYTHON%" -m interfaces.mobile.companion %1 %2 %3 %4 %5 %6 %7 %8 %9
-goto :eof
-
-:glyph
-shift
-"%PYTHON%" -m interfaces.mobile.companion glyph %1 %2 %3 %4 %5 %6 %7 %8 %9
 goto :eof
 
 :speak
@@ -167,10 +166,12 @@ shift
 "%PYTHON%" interfaces\cli\settings.py %1 %2 %3 %4 %5 %6
 goto :eof
 
-:dashboard
-echo [*] Launching Sovereign Mesh Master Dashboard at http://localhost:8000 ...
-"%PYTHON%" -m webbrowser "http://localhost:8000"
+:app
+"%PYTHON%" interfaces\app\app.py
 goto :eof
+
+:dashboard
+goto app
 
 :models
 shift
@@ -252,7 +253,7 @@ echo     status      - Inspect running server status card, PID, and health
 echo     metrics     - Inspect full server telemetry ^& hardware vitals (RAM/CPU/DB/LAN)
 echo     config      - System settings, operator identity, tone, ^& custom preferences
 echo     models      - Dedicated easy AI model selector (interactive picker ^& roles)
-echo     dashboard   - Launch dedicated Sovereign Mesh Master Dashboard in browser
+echo     app / chat  - Launch Core AI Desktop Application
 echo     scan        - Scan local network for active Sovereign Main Servers
 echo     version     - Display kernel version, codename, node role, and commit
 echo     clean       - Clean server state wipe (delete DB, config, logs; keep files/venv)
@@ -264,9 +265,6 @@ echo     autostart   - Configure 24/7 boot autostart (core autostart on^|off^|st
 echo     watchdog    - Run self-healing supervisor (auto-revives crashes with backoff)
 echo     setup       - Run interactive bootstrap ^& autostart setup
 echo     mesh        - Sovereign Mesh state sync ^& node matrix (core mesh sync^|nodes^|send^|ping)
-echo     satellite   - Run distributed voice satellite perception daemon
-echo     mobile      - Mobile Companion operations (core mobile glance^|sync^|nodes^|send^|glyph)
-echo     glyph       - Trigger Nothing OS rear Glyph LED patterns (core glyph reasoning_pulse)
 echo     speak       - Synthesize and speak text locally or across mesh
 echo     uninstall   - Clean zero-residue uninstallation
 echo.

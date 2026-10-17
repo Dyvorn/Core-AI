@@ -1,5 +1,5 @@
 # C.O.R.E. AI :: SYSTEM RELEASE PROTOCOL
-### KERNEL PROTOCOL v0.3.0-alpha // CODENAME: "OMNIPOTENT MATRIX & TRACE PIPELINES"
+### KERNEL PROTOCOL v0.3.1 // CODENAME: "NOTHING OS GLYPH COMPANION & PURE DESKTOP MATRIX"
 
 ```text
    ______ ____  ____  ______   ___    ____
@@ -13,7 +13,7 @@ CONCURRENT OMNIPRESENT REASONING ENGINE // SOVEREIGN LIFE OS
 
 | Kernel Version | Operational Status | Verification | Sovereign Ethos |
 | :---: | :---: | :---: | :---: |
-| **`v0.3.0-alpha`** | 🟢 **OPERATIONAL** | 🧪 **215 / 215 PASSED** | 🛡️ **#ANTISLOP** |
+| **`v0.3.1`** | 🟢 **OPERATIONAL** | 🧪 **206 / 206 PASSED** | 🛡️ **#ANTISLOP** |
 
 | Mesh Storage | Cryptography | Telemetry | License |
 | :---: | :---: | :---: | :---: |

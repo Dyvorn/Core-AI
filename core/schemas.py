@@ -590,6 +590,61 @@ class TraceInteractiveRequest(BaseModel):
     timeout: float = 30.0
 
 
+# --- Companion Chatbot & Quota Schemas ---
+
+class ChatRequest(BaseModel):
+    """Interactive chat query from companion app."""
+    message: str
+    session_id: Optional[str] = None
+    model: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+    history: Optional[List[Dict[str, Any]]] = None
+    stream: bool = False
+
+
+class ChatResponse(BaseModel):
+    """Rich structured response for companion chat app."""
+    session_id: str
+    message_id: str
+    status: str
+    content: str
+    spoken_response: Optional[str] = None
+    steps: List[Dict[str, Any]] = Field(default_factory=list)
+    active_model: str
+    pipeline_id: Optional[str] = None
+    latency_ms: float = 0.0
+    timestamp: float = Field(default_factory=lambda: time.time())
+
+
+class ChatSessionRecord(BaseModel):
+    """Chat session metadata and message history."""
+    id: str
+    title: str
+    created_at: float = Field(default_factory=lambda: time.time())
+    updated_at: float = Field(default_factory=lambda: time.time())
+    messages: List[Dict[str, Any]] = Field(default_factory=list)
+    model: Optional[str] = None
+
+
+class APIKeyUpdateRequest(BaseModel):
+    """Dynamic API key submission for AI providers."""
+    provider: str
+    api_key: str
+    persist_to_env: bool = True
+
+
+class QuotaStatusResponse(BaseModel):
+    """Quota, token usage, and provider rate limits telemetry."""
+    total_requests: int
+    tokens_estimated: Dict[str, int]
+    providers: Dict[str, Dict[str, Any]]
+    rate_limits: Dict[str, str]
+    active_model: str
+    mhac_mode: str
+    system_vitals: Dict[str, Any]
+
+
+
 
 
 

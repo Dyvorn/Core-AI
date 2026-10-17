@@ -840,7 +840,7 @@ class StateManager:
             conn.execute('''
                 INSERT OR REPLACE INTO kv_state (key, value, updated_at)
                 VALUES (?, ?, ?)
-            ''', (key, json.dumps(value), now_iso))
+            ''', (key, json.dumps(value, default=str), now_iso))
             conn.commit()
         finally:
             conn.close()

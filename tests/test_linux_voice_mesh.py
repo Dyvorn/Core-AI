@@ -3,12 +3,11 @@ Core AI :: Automated Tests for Linux Terminal Alignment, Voice Satellites & Dist
 """
 
 import os
-import pytest
 from starlette.testclient import TestClient
-
 from core.terminal import render_box, strip_ansi, make_readline_safe_prompt, visible_len
-from interfaces.voice.satellite import VoiceSatellite
 from core.state import StateManager
+
+
 from tools.registry import ToolRegistry
 from tools.native.system_tools import get_time, time_schema
 from brain.planner import Planner
@@ -55,23 +54,6 @@ def test_render_box_alignment():
         assert clean_line.endswith("+") or clean_line.endswith("|")
 
 
-def test_voice_satellite_initialization(tmp_path):
-    """Verify VoiceSatellite initializes with custom parameters and builds status card."""
-    db_file = os.path.join(tmp_path, "satellite_test.db")
-    sm = StateManager(db_path=db_file)
-    sat = VoiceSatellite(
-        node_id="test_satellite_1",
-        server_url="http://127.0.0.1:8000",
-        zone="workshop",
-        mic_device="TestMic",
-        speaker_device="TestSpeaker",
-        state_manager=sm
-    )
-    assert sat.node_id == "test_satellite_1"
-    assert sat.server_url == "http://127.0.0.1:8000"
-    assert sat.zone == "workshop"
-    assert sat.mic_device == "TestMic"
-    assert sat.speaker_device == "TestSpeaker"
 
 
 def test_gateway_voice_transcription_endpoint(tmp_path):

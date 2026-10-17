@@ -41,7 +41,7 @@ def test_settings_cli_getters_and_setters(tmp_path):
     assert "cloud" in avail
     assert len(avail["ollama"]) >= 1
 
-def test_sovereign_mesh_dashboard_serving(tmp_path):
+def test_gateway_headless_root_status(tmp_path):
     os.environ["CORE_DISABLE_DISCOVERY"] = "1"
     db_path = str(tmp_path / "test_dash.db")
     state = StateManager(db_path=db_path)
@@ -60,24 +60,10 @@ def test_sovereign_mesh_dashboard_serving(tmp_path):
     )
 
     with TestClient(app) as client:
-        # 1. GET / (Dashboard Index)
+        # GET / (Headless API Root)
         resp = client.get("/")
         assert resp.status_code == 200
-        assert "text/html" in resp.headers["content-type"]
-        assert "Sovereign Mesh Master Dashboard" in resp.text
-        assert "Connected Mesh Topology &amp; Devices" in resp.text or "Connected Mesh Topology & Devices" in resp.text
-
-        # 2. GET /dashboard
-        resp_dash = client.get("/dashboard")
-        assert resp_dash.status_code == 200
-        assert "text/html" in resp_dash.headers["content-type"]
-
-        # 3. GET /static/dashboard.css
-        resp_css = client.get("/static/dashboard.css")
-        assert resp_css.status_code == 200
-        assert "glass-panel" in resp_css.text
-
-        # 4. GET /static/dashboard.js
-        resp_js = client.get("/static/dashboard.js")
-        assert resp_js.status_code == 200
-        assert "connectWebSocket" in resp_js.text
+        data = resp.json()
+        assert data["status"] == "online"
+        assert "Core AI Universal Gateway" in data["name"]
+        assert data["architecture"] == "headless_api"

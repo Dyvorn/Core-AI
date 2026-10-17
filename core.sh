@@ -53,6 +53,16 @@ case "$COMMAND" in
     audio|mics|speakers)
         "$PYTHON" interfaces/cli/settings.py audio
         ;;
+    mute)
+        "$PYTHON" interfaces/cli/settings.py mute
+        ;;
+    unmute)
+        "$PYTHON" interfaces/cli/settings.py unmute
+        ;;
+    listen)
+        shift
+        "$PYTHON" interfaces/cli/settings.py listen "$@"
+        ;;
     mic)
         shift
         "$PYTHON" interfaces/cli/settings.py mic "$@"
@@ -69,18 +79,6 @@ case "$COMMAND" in
         shift
         "$PYTHON" interfaces/cli/settings.py speed "$@"
         ;;
-    satellite|voice-satellite)
-        shift
-        "$PYTHON" interfaces/voice/satellite.py "$@"
-        ;;
-    mobile)
-        shift
-        "$PYTHON" -m interfaces.mobile.companion "$@"
-        ;;
-    glyph)
-        shift
-        "$PYTHON" -m interfaces.mobile.companion glyph "$@"
-        ;;
     speak)
         shift
         "$PYTHON" interfaces/cli/client.py speak "$@"
@@ -89,9 +87,8 @@ case "$COMMAND" in
         shift
         "$PYTHON" interfaces/cli/settings.py model "$@"
         ;;
-    dashboard|ui)
-        echo "[*] Launching Sovereign Mesh Master Dashboard at http://localhost:8000 ..."
-        "$PYTHON" -m webbrowser "http://localhost:8000"
+    app|chat|dashboard|ui)
+        "$PYTHON" interfaces/app/app.py
         ;;
     account)
         if [ "$2" = "setup" ] || [ "$2" = "init" ]; then
@@ -164,7 +161,7 @@ case "$COMMAND" in
         echo "    metrics     - Inspect full server telemetry & hardware vitals (RAM/CPU/DB/LAN)"
         echo "    config      - System settings, operator identity, tone, & custom preferences"
         echo "    models      - Dedicated easy AI model selector (interactive picker & roles)"
-        echo "    dashboard   - Launch dedicated Sovereign Mesh Master Dashboard in browser"
+        echo "    app / chat  - Launch Core AI Desktop Application"
         echo "    scan        - Scan local network for active Sovereign Main Servers"
         echo "    version     - Display kernel version, codename, node role, and commit"
         echo "    account     - View Sovereign Operator Account identity & security card"
@@ -177,9 +174,6 @@ case "$COMMAND" in
         echo "    watchdog    - Run self-healing supervisor (auto-revives crashes with backoff)"
         echo "    mesh        - Intercontinental mesh pairing (./core.sh mesh connect <url> | status)"
         echo "    setup       - Run interactive bootstrap & autostart setup"
-        echo "    satellite   - Run distributed voice satellite perception daemon"
-        echo "    mobile      - Mobile Companion operations (./core.sh mobile glance|enroll|ask|glyph)"
-        echo "    glyph       - Trigger Nothing OS rear Glyph LED patterns (./core.sh glyph reasoning_pulse)"
         echo "    speak       - Synthesize and speak text locally or across mesh"
         echo "    uninstall   - Clean zero-residue uninstallation"
         echo ""

@@ -100,35 +100,42 @@ def main() -> int:
         run_clean_setup(interactive=True)
         return 0
 
-    if goal_text.lower().startswith("satellite"):
-        from interfaces.voice.satellite import VoiceSatellite
-        extra = args.goal[1:] if len(args.goal) > 1 else []
-        mode = "auto"
-        zone = None
-        node_id = None
-        server_url = None
-        headless = False
-        if "--speak-only" in extra:
-            mode = "speak_only"
-        elif "--listen-only" in extra:
-            mode = "listen_only"
-        for i, a in enumerate(extra):
-            if a == "--zone" and i + 1 < len(extra):
-                zone = extra[i + 1]
-            elif a == "--mode" and i + 1 < len(extra):
-                mode = extra[i + 1]
-            elif a == "--node-id" and i + 1 < len(extra):
-                node_id = extra[i + 1]
-            elif a == "--server" and i + 1 < len(extra):
-                server_url = extra[i + 1]
-            elif a == "--headless":
-                headless = True
-        sat = VoiceSatellite(mode=mode, zone=zone, node_id=node_id, server_url=server_url)
-        return sat.run(headless=headless)
+    if goal_text.lower() in ("app", "chat", "ui", "companion"):
+        from interfaces.app.app import launch_app
+        return launch_app(port=args.port)
 
     if goal_text.lower().startswith("audio") or goal_text.lower().startswith("mics") or goal_text.lower().startswith("speakers"):
         from interfaces.cli.settings import SettingsCLI
         SettingsCLI().list_audio_devices()
+        return 0
+
+    if goal_text.lower() in ("mute", "mic off", "voice off", "listen off"):
+        from interfaces.cli.settings import SettingsCLI
+        SettingsCLI().set_listening(enabled=False)
+        return 0
+
+    if goal_text.lower() in ("unmute", "mic on", "voice on", "listen on"):
+        from interfaces.cli.settings import SettingsCLI
+        SettingsCLI().set_listening(enabled=True)
+        return 0
+
+    if goal_text.lower() in ("mic status", "listen status", "voice status", "mic state", "listen state"):
+        from interfaces.cli.settings import SettingsCLI
+        SettingsCLI().get_listening_status()
+        return 0
+
+    if goal_text.lower().startswith("listen"):
+        from interfaces.cli.settings import SettingsCLI
+        cli = SettingsCLI()
+        parts = goal_text.split(maxsplit=2)
+        if len(parts) > 1 and parts[1].lower() in ("off", "pause", "mute", "disable", "deactivate", "stop"):
+            cli.set_listening(enabled=False)
+        elif len(parts) > 1 and parts[1].lower() in ("on", "resume", "unmute", "enable", "activate", "start"):
+            cli.set_listening(enabled=True)
+        elif len(parts) > 1 and parts[1].lower() == "toggle":
+            cli.set_listening(action="toggle")
+        else:
+            cli.get_listening_status()
         return 0
 
     if goal_text.lower().startswith("mic"):
@@ -137,6 +144,14 @@ def main() -> int:
         parts = goal_text.split(maxsplit=2)
         if len(parts) == 1:
             cli.list_audio_devices()
+        elif parts[1].lower() in ("off", "pause", "mute", "disable", "deactivate", "stop"):
+            cli.set_listening(enabled=False)
+        elif parts[1].lower() in ("on", "resume", "unmute", "enable", "activate", "start"):
+            cli.set_listening(enabled=True)
+        elif parts[1].lower() in ("toggle",):
+            cli.set_listening(action="toggle")
+        elif parts[1].lower() in ("status", "state"):
+            cli.get_listening_status()
         elif parts[1] == "test":
             cli.test_mic()
         elif parts[1] == "set" and len(parts) > 2:
@@ -162,27 +177,6 @@ def main() -> int:
         parts = goal_text.split(maxsplit=1)
         target = parts[1] if len(parts) > 1 else "config"
         SettingsCLI().edit_file(target)
-        return 0
-
-    if goal_text.lower().startswith("mobile"):
-        from interfaces.mobile.companion import main as mobile_main
-        old_argv = sys.argv
-        try:
-            parts = goal_text.split()
-            sys.argv = ["mobile_companion"] + parts[1:]
-            mobile_main()
-            return 0
-        finally:
-            sys.argv = old_argv
-
-    if goal_text.lower().startswith("glyph"):
-        from interfaces.mobile.companion import MobileCompanionClient, render_glyph_matrix
-        parts = goal_text.split(maxsplit=2)
-        pattern = parts[1] if len(parts) > 1 else "reasoning_pulse"
-        client = MobileCompanionClient()
-        print("\n" + render_glyph_matrix(pattern) + "\n")
-        res = client.trigger_glyph(pattern=pattern)
-        print(f"[*] Glyph matrix pattern '{pattern}' dispatched: {res.get('status', 'ok')}")
         return 0
 
     if goal_text.lower().startswith("mesh"):

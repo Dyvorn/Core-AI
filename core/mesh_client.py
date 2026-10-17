@@ -613,9 +613,33 @@ def main():
         client.save_configuration(role="main_server", main_server_url="http://localhost:8000")
         print(f"{G}[OK] Reset to standalone MAIN_SERVER mode.{RST}")
 
+    elif args[0] in ["deactivate", "halt", "kill-satellite"]:
+        if len(args) > 1:
+            target_node = args[1]
+            print(f"\n{C}[*] Sending deactivation directive to satellite '{target_node}'...{RST}")
+            try:
+                import urllib.request
+                import json
+                req = urllib.request.Request(
+                    f"{client.main_server_url}/api/v1/mesh/satellites/{target_node}/deactivate",
+                    data=b"{}",
+                    headers={"Content-Type": "application/json", "User-Agent": "CoreAI-MeshCLI"},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=3.0) as resp:
+                    res = json.loads(resp.read().decode())
+                    print(f"{G}[OK] Voice satellite '{target_node}' deactivated successfully.{RST}")
+                    if res.get("message"):
+                        print(f"     {res.get('message')}")
+            except Exception as e:
+                print(f"{R}[!] Failed to deactivate satellite '{target_node}': {e}{RST}")
+        else:
+            print("Usage: core mesh deactivate <node_id|all>")
+
     else:
         print(f"Unknown mesh command: {args[0]}")
-        print("Valid commands: status, sync, nodes, send, scan, ping, connect, role, disconnect")
+        print("Valid commands: status, sync, nodes, deactivate, send, scan, ping, connect, role, disconnect")
+
 
 
 if __name__ == "__main__":

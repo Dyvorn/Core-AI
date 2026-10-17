@@ -36,3 +36,5 @@ core_state_bundle.json
 .DS_Store
 Thumbs.db
 dist/
+interfaces/mobile/
+interfaces/dashboard/

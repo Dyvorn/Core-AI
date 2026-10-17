@@ -23,6 +23,14 @@ try:
 except ImportError:
     CYAN = GREEN = YELLOW = RED = MAGENTA = BRIGHT = RESET = ""
 
+# Windows console UTF-8 setup
+if sys.platform == "win32":
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 class SettingsCLI:
     """
@@ -339,6 +347,101 @@ class SettingsCLI:
         except Exception as e:
             print(f"{RED}[!] Microphone test error: {e}{RESET}")
 
+    def set_listening(self, enabled: Optional[bool] = None, action: Optional[str] = None) -> bool:
+        """
+        Activates, deactivates, or toggles Core AI room microphone listening.
+        Sends directive to background daemon if running, and persists in user profile state.
+        """
+        target_enabled = enabled
+        if target_enabled is None and action:
+            act = action.lower()
+            if act in ("pause", "stop", "mute", "off", "disable", "deactivate"):
+                target_enabled = False
+            elif act in ("resume", "start", "unmute", "on", "enable", "activate"):
+                target_enabled = True
+
+        port = int(os.getenv("CORE_PORT", 8000))
+        url = f"http://127.0.0.1:{port}/api/v1/voice/listening"
+        payload = {}
+        if target_enabled is not None:
+            payload["enabled"] = target_enabled
+        if action:
+            payload["action"] = action
+
+        daemon_contacted = False
+        new_state = target_enabled
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json", "User-Agent": "CoreAI-CLI/2.0"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=3.0) as resp:
+                res = json.loads(resp.read().decode("utf-8"))
+                daemon_contacted = True
+                new_state = res.get("listening_enabled", target_enabled)
+        except Exception:
+            # Daemon offline: apply directly to local StateManager
+            profile = self.state_manager.get_user_profile()
+            if "audio" not in profile.preferences:
+                profile.preferences["audio"] = {}
+            if target_enabled is not None:
+                new_state = target_enabled
+            elif action == "toggle":
+                new_state = not profile.preferences["audio"].get("listening_enabled", True)
+            else:
+                new_state = False
+            profile.preferences["audio"]["listening_enabled"] = new_state
+            self.state_manager.save_user_profile(profile)
+
+        if not new_state:
+            print(f"\n{RED}[MUTED] Core AI microphone room listening DEACTIVATED.{RESET}")
+            print(f"  Microphone capture is halted. Core will NOT listen or record room audio.")
+            if daemon_contacted:
+                print(f"  {GREEN}[OK] Daemon microphone stream closed & satellites notified.{RESET}\n")
+            else:
+                print(f"  {YELLOW}[OK] Preference saved. Daemon will start in muted mode.{RESET}\n")
+        else:
+            print(f"\n{GREEN}[LISTENING] Core AI microphone room listening ACTIVATED.{RESET}")
+            print(f"  Microphone capture is live and listening for wake words.")
+            if daemon_contacted:
+                print(f"  {GREEN}[OK] Daemon microphone stream active.{RESET}\n")
+            else:
+                print(f"  {YELLOW}[OK] Preference saved. Daemon will listen when launched.{RESET}\n")
+
+        return bool(new_state)
+
+    def get_listening_status(self) -> bool:
+        """Checks and displays whether Core AI is listening to room audio."""
+        port = int(os.getenv("CORE_PORT", 8000))
+        url = f"http://127.0.0.1:{port}/api/v1/voice/status"
+        daemon_online = False
+        is_listening = True
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={"User-Agent": "CoreAI-CLI/2.0"})
+            with urllib.request.urlopen(req, timeout=2.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                is_listening = data.get("listening_enabled", True)
+                daemon_online = True
+        except Exception:
+            profile = self.state_manager.get_user_profile()
+            is_listening = profile.preferences.get("audio", {}).get("listening_enabled", True)
+
+        daemon_tag = f"{GREEN}[DAEMON ONLINE]{RESET}" if daemon_online else f"{YELLOW}[STANDALONE / SAVED PREF]{RESET}"
+        if is_listening:
+            print(f"\n{GREEN}[LISTENING]{RESET} Core AI microphone listening is {GREEN}ACTIVE{RESET}. {daemon_tag}")
+            print(f"  Wake word detection and room speech perception are enabled.")
+            print(f"  To deactivate: run {BRIGHT}'core mute'{RESET} or {BRIGHT}'core mic off'{RESET}.\n")
+        else:
+            print(f"\n{RED}[MUTED]{RESET} Core AI microphone listening is {RED}DEACTIVATED (MUTED){RESET}. {daemon_tag}")
+            print(f"  Microphone stream is stopped. Core is NOT listening to the room.")
+            print(f"  To activate: run {BRIGHT}'core unmute'{RESET} or {BRIGHT}'core mic on'{RESET}.\n")
+
+        return bool(is_listening)
+
     def set_voice(self, voice_name: str):
         """Sets active neural voice by short alias or full name."""
         from engines.voice_out import VOICE_ALIASES
@@ -421,14 +524,35 @@ def main():
     elif args[0] in ["audio", "mics", "speakers"]:
         cli.list_audio_devices()
     elif args[0] in ["mic"]:
-        if len(args) == 1 or args[1] in ["list", "show"]:
+        if len(args) == 1 or args[1] in ["list", "show", "devices"]:
             cli.list_audio_devices()
         elif args[1] in ["test"]:
             cli.test_mic()
+        elif args[1] in ["off", "pause", "mute", "disable", "deactivate", "stop"]:
+            cli.set_listening(enabled=False)
+        elif args[1] in ["on", "resume", "unmute", "enable", "activate", "start"]:
+            cli.set_listening(enabled=True)
+        elif args[1] in ["toggle"]:
+            cli.set_listening(action="toggle")
+        elif args[1] in ["status", "state"]:
+            cli.get_listening_status()
         elif args[1] in ["set"] and len(args) >= 3:
             cli.set_mic(" ".join(args[2:]))
         elif len(args) >= 2:
             cli.set_mic(" ".join(args[1:]))
+    elif args[0] in ["mute"]:
+        cli.set_listening(enabled=False)
+    elif args[0] in ["unmute"]:
+        cli.set_listening(enabled=True)
+    elif args[0] in ["listen", "listening"]:
+        if len(args) >= 2 and args[1] in ["off", "pause", "mute", "disable", "deactivate", "stop"]:
+            cli.set_listening(enabled=False)
+        elif len(args) >= 2 and args[1] in ["on", "resume", "unmute", "enable", "activate", "start"]:
+            cli.set_listening(enabled=True)
+        elif len(args) >= 2 and args[1] in ["toggle"]:
+            cli.set_listening(action="toggle")
+        else:
+            cli.get_listening_status()
     elif args[0] in ["speaker"]:
         if len(args) == 1 or args[1] in ["list", "show"]:
             cli.list_audio_devices()

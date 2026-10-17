@@ -15,6 +15,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [[0.3.1]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.3.1) — 2026-10-17
+### Codename: "Nothing OS Glyph Companion & Pure Desktop Matrix"
+
+| Kernel | Status | Verification | Ethos |
+| :---: | :---: | :---: | :---: |
+| **`v0.3.1`** | 🟢 **OPERATIONAL** | 🧪 **206 / 206 PASSED** | 🛡️ **#ANTISLOP** |
+
+Pure native PyQt6 Desktop Companion designed with strict Nothing OS / Teenage Engineering industrial aesthetics. Elimination of all web and WebView frontend slop in favor of a 100% native Python desktop interface with obsidian void styling, architectural blueprint grid canvas, retro pixel art avatar, custom dot-ring glyph hardware status indicators, and zero bloat.
+
+### 🌟 Added & Enhanced
+
+#### 🖥️ Native Nothing OS Industrial Desktop Companion (`interfaces/app/qt_app.py`, `interfaces/app/app.py`)
+- **Nothing OS & Teenage Engineering Aesthetic**:
+  - Pure obsidian matte void (`#0B0B0B`), deep charcoal sidebar (`#111111`), card containers (`#151515`), and Nothing Signal Red hardware accents (`#D71921`).
+  - Architectural blueprint grid canvas (`#161616`) rendered across the main chat arena with crisp high-DPI font rendering.
+  - Custom visual QPainter widgets:
+    - `DotRingGlyph`: 8-dot circular LED glyph indicator reflecting live system gateway status.
+    - `PixelAvatar`: 10x10 retro operator portrait with dark rounded container.
+    - `UserSilhouetteAvatar`: Minimalist user silhouette avatar.
+    - `GridContainerWidget`: 28px square blueprint precision background grid.
+- **Slop-Free 100% Native Architecture**:
+  - Zero HTML, zero JavaScript, zero WebView, zero Electron.
+  - Native PyQt6 execution with instantaneous startup, hardware acceleration, and minimal memory footprint.
+  - Purged obsolete web dashboards, HTML mockups, and mobile mocks, unifying all user interactions into the sovereign desktop app.
+- **Conversational Arena & Model Selection**:
+  - Multi-model quick picker (`Qwen 2.5`, `Gemini 2.5 Flash`, `GPT-4o`, `Claude 3.7 Sonnet`) with dynamic model badge indicators.
+  - Session history sidebar (`Recents`) with real-time SQLite persistence, date grouping, and instant session switching.
+  - Rich markdown parsing with code block formatting, syntax styling, copy-to-clipboard, and collapsible autonomous execution traces.
+  - Neural text-to-speech read aloud synthesis button (`[🔊 Speak]`) and speech dictation button (`[🎙 Voice Dictate]`).
+- **Sovereign System Control & Settings (`Ctrl+,` & Account Modal)**:
+  - 1-click room microphone listening toggle pill (green when active, red when muted) with real-time status reflection.
+  - System Settings modal with dynamic Quota & Token usage monitors (Gemini, OpenAI, Anthropic, Ollama), live API key editor, audio input/output device selector, and connected device nodes.
+  - Local Sovereign Account modal with operator handle customization, persona communication tone, and secure sovereign pairing secret copy.
+
+### 🛡️ Bug Fixes & Code Hygiene
+- **PyQt6 `paintEvent` Overrides**: Resolved all 4 parameter name mismatch diagnostics across custom paint widgets (`DotRingGlyph`, `UserSilhouetteAvatar`, `PixelAvatar`, `GridContainerWidget`) by aligning parameter signatures to `a0: Optional[QPaintEvent]`.
+- **Clean Gateway Coupling**: Microkernel gateway runs 100% headless JSON/REST and WebSocket streaming with no web assets required.
+- **Test Suite**: Verified all 206 tests passing with 100% green status.
+
+---
+
 ## [[0.3.0-alpha]](https://github.com/Dyvorn/Core-AI/releases/tag/v0.3.0-alpha) — 2026-10-16
 ### Codename: "Omnipotent Matrix & TRACE Pipelines"
 
@@ -25,6 +66,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 Tri-Track Asynchronous Concurrent Execution (TRACE) Engine with decoupled Foreground Spoken-To (<50ms), 24/7 Context Sentinel awareness loop, and Background Daemon workers. Multiple Hardware-Aware Computing (MHAC) Asymmetric Server vs. PC compute delegation with zero-downtime failover and auto-recovery. Quadrillion Tool Matrix (QTM) native expansion delivering 35+ pre-compiled zero-latency capabilities with instant deterministic heuristic DAG routing across OS, Dev Workspace, Media, Homelab/Networking, and Web Automation. Repository reorganization and hygiene.
 
 ### 🌟 Added & Enhanced
+
+#### 🖥️ Native PC Desktop Chat App & Frontend Purge (`interfaces/app/qt_app.py`, `interfaces/app/app.py`, `core/gateway.py`)
+- **Complete Elimination of Web/Online Frontend Slop**:
+  - Removed all obsolete web frontend files (`interfaces/app/index.html`, `app.css`, `app.js`, `interfaces/dashboard/`, and `interfaces/mobile/android/`).
+  - Removed all static file mounts (`/static`, `/app_static`) and HTML endpoints from the Universal Gateway (`core/gateway.py`). The microkernel gateway is now 100% headless JSON/REST and WebSocket streaming.
+- **Dedicated Native PC Desktop Chat Companion (`interfaces/app/qt_app.py`)**:
+  - **Clean Obsidian Dark Aesthetics**: Obsidian void (`#080808`), Nothing Signal Red accents (`#D71921`), refined typography, and removal of awkward phone widgets to maximize screen utility.
+  - **Full Conversation Arena**: Multi-model query (`Qwen 2.5`, `Gemini 2.5 Flash`, `GPT-4o`, `Claude 3.7 Sonnet`), session history list, Markdown formatting with code copy, and collapsible autonomous DAG reasoning traces.
+  - **Voice & Speech ("Where you can speak")**: Integrated `[🎙 VOICE DICTATE]` input on the prompt deck and `[🔊 SPEAK]` button on assistant responses for real-time neural speech synthesis playback.
+  - **Sovereign System Control & Settings ("Where you can activate/deactivate stuff")**: 1-click room microphone listening mute/unmute pill, 1-click satellite deactivator, and comprehensive modular dialogs for Settings & Sound Cards, System Daemon & Hardware Vitals, and Live Logs & Diagnostics.
+- **Autonomous Multi-Model Chatbot**:
+  - Full session history management with dynamic date grouping (`Recents`), persistent SQLite synchronization, and inline session renaming.
+  - Autonomous DAG Execution Trace: collapsible accordion drawer rendering every executed pipeline step, tool invoked, duration, and output.
+  - Rich Markdown renderer with syntax-highlighted code blocks, copy buttons, tables, and lists.
+  - Neural text-to-speech read aloud synthesis button.
+  - Integrated voice dictation via Web Speech API with pulsing recording indicator.
+- **System Config & Quotas Modal (`Ctrl+,`)**:
+  - **Quota & Tokens Tab**: Lifetime token usage, request counters, MHAC compute mode, and rate limit cards for Google Gemini, OpenAI, Anthropic Claude, and local Ollama.
+  - **API Keys Tab**: Dynamic form to configure and update `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `OLLAMA_API_BASE` directly to `config/.env` and live memory.
+  - **Connected Mesh Tab**: Live overview of connected edge devices, satellites, spatial zones, and audio routing hardware.
+- **Local Sovereign Account Modal**:
+  - View and customize Operator handle/name, persona communication tone, and primary spatial zone.
+  - Secure Sovereign Pairing Secret display with 1-click clipboard copy for device enrollment.
+- **Comprehensive Help Center (`Ctrl+H`)**:
+  - Quick-start guide, natural language overrides (`using ollama/llama3`), tool matrix reference, and complete keyboard shortcuts cheat sheet.
 
 #### 🖥️ Server vs. PC Asymmetric Computing & Seamless Transition (`brain/mhac.py`, `brain/model_router.py`, `brain/trace.py`, `core/gateway.py`, `main.py`)
 - **Asymmetric Workload Partitioning**: Cleanly divides workloads by urgency and latency profile:

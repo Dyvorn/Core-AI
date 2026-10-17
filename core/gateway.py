@@ -24,7 +24,8 @@ from core.schemas import (
     MeshSyncPullRequest, MeshSyncPullResponse, MeshSyncPushRequest, MeshSyncPushResponse,
     MeshSyncFullRequest, MeshSyncFullResponse, MeshDeviceMessage, MeshDeviceMessageResponse, MeshSyncPayload,
     ClientComputeSignature, MHACHandshakeRequest, MHACHandshakeResponse, MHACProbeRequest, MHACPullRequest,
-    MHACConnectRequest, TraceInteractiveRequest
+    MHACConnectRequest, TraceInteractiveRequest,
+    ChatRequest, ChatResponse, ChatSessionRecord, APIKeyUpdateRequest, QuotaStatusResponse
 )
 from core.state import StateManager
 from core.bus import EventBus
@@ -454,18 +455,17 @@ def create_gateway_app(
         allow_headers=["*"],
     )
 
-    dashboard_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "interfaces", "dashboard"))
-    if os.path.exists(dashboard_dir):
-        app.mount("/static", StaticFiles(directory=dashboard_dir), name="static")
-
-    @app.get("/", response_class=HTMLResponse)
-    @app.get("/dashboard", response_class=HTMLResponse)
-    def serve_dashboard():
-        """Serves the dedicated Sovereign Mesh Master Dashboard."""
-        index_file = os.path.join(dashboard_dir, "index.html")
-        if os.path.exists(index_file):
-            return FileResponse(index_file)
-        return HTMLResponse("<h1>Core AI Universal Gateway Online</h1>")
+    @app.get("/")
+    def root_status():
+        """Returns headless Gateway operational status (Zero Web Frontend)."""
+        return {
+            "status": "online",
+            "name": "Core AI Universal Gateway",
+            "version": __version__,
+            "codename": __codename__,
+            "architecture": "headless_api",
+            "docs": "/docs"
+        }
 
     # --- REST Endpoints ---
 
@@ -595,6 +595,203 @@ def create_gateway_app(
             return {"status": "success", "models": updated}
         return {"status": "error", "message": "ModelRouter not initialized on planner."}
 
+    @app.post("/api/v1/models/api-key")
+    def update_api_key(req: APIKeyUpdateRequest, x_trust_tier: Optional[str] = Header(default="owner")):
+        """Dynamically configures API key for an AI provider, persisting to config/.env."""
+        if x_trust_tier and x_trust_tier.lower() != "owner":
+            raise HTTPException(status_code=403, detail="Security Protection: Only owner can modify API keys.")
+        if hasattr(planner, "model_router"):
+            env_var = planner.model_router.set_api_key(req.provider, req.api_key, persist_to_env=req.persist_to_env)
+            active = planner.get_active_model()
+            return {
+                "status": "success",
+                "provider": req.provider.upper(),
+                "env_var": env_var,
+                "active_model": active,
+                "message": f"Saved API key for '{req.provider}' to {env_var}."
+            }
+        raise HTTPException(status_code=500, detail="ModelRouter not available on planner.")
+
+    @app.get("/api/v1/quota")
+    def get_quota_status():
+        """Returns AI provider quotas, token counters, rate limits, and compute vitals."""
+        from tools.native.system_tools import inspect_system_resources
+        vitals = inspect_system_resources()
+
+        logs = state_manager.get_recent_execution_logs(limit=200)
+        total_requests = len(logs)
+        estimated_prompt_tokens = sum(len(l.get("message", "")) // 4 for l in logs) + 1200
+        estimated_completion_tokens = sum(len(str(l.get("payload", ""))) // 4 for l in logs) + 2400
+
+        providers = {
+            "gemini": {
+                "name": "Google Gemini",
+                "configured": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
+                "tier": "Pay-As-You-Go / Free Tier",
+                "rate_limit_rpm": 15,
+                "daily_request_count": min(total_requests, 1500),
+                "daily_limit": 1500,
+                "status": "Available" if bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")) else "Unconfigured"
+            },
+            "openai": {
+                "name": "OpenAI (GPT-4o)",
+                "configured": bool(os.getenv("OPENAI_API_KEY")),
+                "tier": "Usage-Based",
+                "rate_limit_rpm": 500,
+                "status": "Available" if bool(os.getenv("OPENAI_API_KEY")) else "Unconfigured"
+            },
+            "anthropic": {
+                "name": "Anthropic (Claude 3.5)",
+                "configured": bool(os.getenv("ANTHROPIC_API_KEY")),
+                "tier": "Usage-Based",
+                "rate_limit_rpm": 50,
+                "status": "Available" if bool(os.getenv("ANTHROPIC_API_KEY")) else "Unconfigured"
+            },
+            "ollama": {
+                "name": "Ollama (Sovereign Local)",
+                "configured": planner.model_router.is_ollama_online() if hasattr(planner, "model_router") else False,
+                "tier": "Zero-Cost Unlimited Sovereign Compute",
+                "rate_limit_rpm": "Unlimited",
+                "status": "Online (Local Host)" if (hasattr(planner, "model_router") and planner.model_router.is_ollama_online()) else "Offline"
+            }
+        }
+
+        mhac_info = active_mhac_broker.get_status()
+
+        return {
+            "total_requests": total_requests,
+            "tokens_estimated": {
+                "total": estimated_prompt_tokens + estimated_completion_tokens,
+                "prompt": estimated_prompt_tokens,
+                "completion": estimated_completion_tokens
+            },
+            "providers": providers,
+            "rate_limits": {
+                "gemini": "15 RPM (Free) / 1000 RPM (Pay-as-you-go)",
+                "openai": "Tier 1: 500 RPM, Tier 2: 5000 RPM",
+                "anthropic": "Tier 1: 50 RPM",
+                "ollama": "Unlimited (Hardware bounded)"
+            },
+            "active_model": planner.get_active_model() or "offline_heuristic",
+            "mhac_mode": mhac_info.get("mode", "standalone"),
+            "system_vitals": vitals
+        }
+
+    # --- Companion Chatbot Endpoints ---
+
+    @app.post("/api/v1/chat", response_model=ChatResponse)
+    async def process_chat_message(req: ChatRequest):
+        """
+        Interactive AI Chatbot Query Endpoint:
+        Decomposes task, routes across local/cloud AI models, executes autonomous tools,
+        and returns rich structured message response with thought steps.
+        """
+        start_ts = time.perf_counter()
+        session_id = req.session_id or f"sess_{uuid.uuid4().hex[:10]}"
+        msg_id = f"msg_{uuid.uuid4().hex[:8]}"
+
+        context = req.context or {}
+        if req.model:
+            context["model"] = req.model
+        context["channel"] = "companion_app"
+        context["session_id"] = session_id
+
+        await connection_manager.broadcast_glyph("reasoning_pulse", duration_ms=600)
+
+        profile = state_manager.get_user_profile()
+        plan = await asyncio.to_thread(planner.plan_problem, req.message, context)
+        finished = await pipeline_engine.execute_pipeline(plan)
+        spoken = await asyncio.to_thread(planner.formulate_spoken_response, finished, profile=profile)
+
+        await connection_manager.broadcast_glyph(
+            "success_flash" if finished.status == "completed" else "alert_burst",
+            duration_ms=300
+        )
+
+        elapsed_ms = (time.perf_counter() - start_ts) * 1000.0
+        if isinstance(finished.final_output, (dict, list)):
+            response_content = json.dumps(finished.final_output, indent=2)
+        elif finished.final_output:
+            response_content = str(finished.final_output)
+        elif spoken:
+            response_content = spoken
+        else:
+            response_content = "Task executed successfully."
+
+        # Auto-record session into SQLite kv_state
+        try:
+            sess_key = f"chat_session:{session_id}"
+            existing = state_manager.get_kv(sess_key, default=None)
+            now = time.time()
+            if not existing:
+                title = req.message[:36] + ("..." if len(req.message) > 36 else "")
+                existing = {
+                    "id": session_id,
+                    "title": title,
+                    "created_at": now,
+                    "updated_at": now,
+                    "messages": [],
+                    "model": planner.get_active_model()
+                }
+            existing["messages"].append({
+                "id": f"msg_user_{uuid.uuid4().hex[:6]}",
+                "role": "user",
+                "content": req.message,
+                "timestamp": start_ts
+            })
+            existing["messages"].append({
+                "id": msg_id,
+                "role": "assistant",
+                "content": response_content,
+                "spoken_response": spoken,
+                "steps": [s.model_dump(mode="json") for s in finished.steps],
+                "active_model": planner.get_active_model() or "offline_heuristic",
+                "pipeline_id": finished.id,
+                "timestamp": now
+            })
+            existing["updated_at"] = now
+            state_manager.set_kv(sess_key, existing)
+        except Exception as sess_err:
+            logger.error(f"Failed to auto-save chat session '{session_id}': {sess_err}")
+
+        return ChatResponse(
+            session_id=session_id,
+            message_id=msg_id,
+            status=finished.status,
+            content=response_content,
+            spoken_response=spoken,
+            steps=[s.model_dump(mode="json") for s in finished.steps],
+            active_model=planner.get_active_model() or "offline_heuristic",
+            pipeline_id=finished.id,
+            latency_ms=round(elapsed_ms, 2),
+            timestamp=time.time()
+        )
+
+    @app.get("/api/v1/chat/sessions")
+    def list_chat_sessions():
+        """Lists all saved chat conversation sessions from SQLite state."""
+        sessions = state_manager.list_kv(prefix="chat_session:")
+        sorted_sessions = sorted(
+            sessions.values(),
+            key=lambda s: s.get("updated_at", 0) if isinstance(s, dict) else 0,
+            reverse=True
+        )
+        return {"sessions": sorted_sessions}
+
+    @app.post("/api/v1/chat/sessions")
+    def save_chat_session(session: ChatSessionRecord):
+        """Saves or synchronizes a full chat conversation session."""
+        key = f"chat_session:{session.id}"
+        state_manager.set_kv(key, session.model_dump())
+        return {"status": "saved", "session_id": session.id}
+
+    @app.delete("/api/v1/chat/sessions/{session_id}")
+    def delete_chat_session(session_id: str):
+        """Deletes a chat conversation session from SQLite state."""
+        key = f"chat_session:{session_id}"
+        deleted = state_manager.delete_kv(key)
+        return {"status": "deleted" if deleted else "not_found", "session_id": session_id}
+
     @app.get("/api/v1/profile")
     def get_profile(x_trust_tier: Optional[str] = Header(default="owner")):
         """Returns personal user profile, protected from untrusted/guest devices."""
@@ -712,8 +909,33 @@ def create_gateway_app(
 
     @app.get("/api/v1/audio/devices")
     def list_audio_devices():
-        """Introspects host audio hardware for microphones, studio monitors, and ambient speakers."""
-        return audio_router.list_system_audio_devices()
+        """Introspects host audio hardware for microphones, studio monitors, ambient speakers, and neural voices."""
+        res = audio_router.list_system_audio_devices()
+        profile = state_manager.get_user_profile()
+        audio_prefs = profile.preferences.get("audio", {})
+        voices = [
+            {"alias": "killian", "name": "de-DE-KillianNeural", "desc": "Männlich (Dynamisch, modern, reaktiv - Empfohlen)"},
+            {"alias": "seraphina", "name": "de-DE-SeraphinaMultilingualNeural", "desc": "Weiblich (Modern, warm, ultra-realistisch)"},
+            {"alias": "florian", "name": "de-DE-FlorianMultilingualNeural", "desc": "Männlich (Natürlich, multilingual)"},
+            {"alias": "conrad", "name": "de-DE-ConradNeural", "desc": "Männlich (Tief, ruhig, autoritär - Jarvis-Stil)"},
+            {"alias": "katja", "name": "de-DE-KatjaNeural", "desc": "Weiblich (Klar, professionell)"},
+            {"alias": "amala", "name": "de-DE-AmalaNeural", "desc": "Weiblich (Jugendlich, frisch)"},
+            {"alias": "christopher", "name": "en-US-ChristopherNeural", "desc": "Englisch Männlich (Tech Lead)"},
+            {"alias": "aria", "name": "en-US-AriaNeural", "desc": "Englisch Weiblich (Expressive)"}
+        ]
+        inputs = res.get("inputs", [])
+        outputs = res.get("outputs", [])
+        return {
+            "inputs": inputs,
+            "outputs": outputs,
+            "microphones": inputs,
+            "speakers": outputs,
+            "voices": voices,
+            "current_mic": audio_prefs.get("mic_device"),
+            "current_speaker": audio_prefs.get("speaker_device"),
+            "current_voice": audio_prefs.get("voice", "de-DE-KillianNeural"),
+            "current_rate": audio_prefs.get("tts_rate", "+15%")
+        }
 
     @app.get("/api/v1/audio/routes")
     def list_audio_routes():
@@ -820,6 +1042,133 @@ def create_gateway_app(
     def get_logs(limit: int = 50):
         """Returns recent structured execution logs from database."""
         return state_manager.get_recent_execution_logs(limit=min(limit, 200))
+
+    @app.get("/api/v1/logs/tail")
+    def get_logs_tail(lines: int = 150, source: str = "all", filter_level: Optional[str] = None, search: Optional[str] = None):
+        """Returns recent log lines from disk files (core_ai.log and server_stdout.log) for real-time bug fixing."""
+        results = []
+        files = []
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        if source in ("all", "core"):
+            files.append(os.path.join(root, "logs", "core_ai.log"))
+        if source in ("all", "stdout", "server"):
+            files.append(os.path.join(root, "logs", "server_stdout.log"))
+
+        for fpath in files:
+            if os.path.exists(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                        file_lines = f.readlines()[-lines:]
+                        for line in file_lines:
+                            line_str = line.strip()
+                            if not line_str:
+                                continue
+                            if filter_level and filter_level.upper() not in line_str.upper():
+                                continue
+                            if search and search.lower() not in line_str.lower():
+                                continue
+                            results.append(line_str)
+                except Exception as e:
+                    results.append(f"[LogReadError] Failed to read {os.path.basename(fpath)}: {e}")
+
+        # Keep the latest N lines
+        tail_lines = results[-lines:]
+        return {"lines": tail_lines, "count": len(tail_lines)}
+
+    @app.get("/api/v1/voice/status")
+    def get_voice_listening_status():
+        """Returns whether Core AI room microphone listening is actively enabled or muted."""
+        profile = state_manager.get_user_profile()
+        audio_prefs = profile.preferences.get("audio", {})
+        listening_enabled = audio_prefs.get("listening_enabled", True)
+        return {
+            "listening_enabled": listening_enabled,
+            "status": "listening" if listening_enabled else "muted",
+            "active_mic": audio_prefs.get("mic_device"),
+            "active_speaker": audio_prefs.get("speaker_device"),
+            "active_satellites_count": connection_manager.get_active_satellites_count()
+        }
+
+    @app.post("/api/v1/voice/listening")
+    async def set_voice_listening_state(payload: Dict[str, Any]):
+        """
+        Activates, deactivates, or toggles Core AI room microphone listening.
+        Persists preference, halts or resumes audio capture, and broadcasts state to all nodes.
+        """
+        profile = state_manager.get_user_profile()
+        if "audio" not in profile.preferences:
+            profile.preferences["audio"] = {}
+
+        current = profile.preferences["audio"].get("listening_enabled", True)
+        action = str(payload.get("action", "")).lower()
+        enabled = payload.get("enabled")
+
+        if enabled is not None:
+            new_state = bool(enabled)
+        elif action in ("pause", "stop", "mute", "off", "disable"):
+            new_state = False
+        elif action in ("resume", "start", "unmute", "on", "enable"):
+            new_state = True
+        elif action == "toggle":
+            new_state = not current
+        else:
+            new_state = bool(payload.get("listening_enabled", True))
+
+        profile.preferences["audio"]["listening_enabled"] = new_state
+        state_manager.save_user_profile(profile)
+
+        # Dispatch command across bus to running VoiceInEngine
+        bus_action = "resume" if new_state else "pause"
+        bus.publish("voice_control", {"action": bus_action, "source": "gateway_api"})
+
+        # Broadcast state to all WebSocket clients & satellites
+        await connection_manager.broadcast_event(
+            "voice_listening_changed",
+            {"listening_enabled": new_state, "timestamp": time.time()}
+        )
+
+        status_str = "ACTIVE (Listening)" if new_state else "DEACTIVATED (Muted)"
+        logger.info(f"Microphone listening state set to: {status_str}")
+        return {
+            "status": "success",
+            "listening_enabled": new_state,
+            "mode": "listening" if new_state else "muted",
+            "message": f"Core AI microphone perception is now {status_str}."
+        }
+
+    @app.post("/api/v1/audio/config")
+    def set_audio_config(payload: Dict[str, Any]):
+        """Updates audio preferences (mic, speaker, voice, rate) in user profile and environment."""
+        profile = state_manager.get_user_profile()
+        if "audio" not in profile.preferences:
+            profile.preferences["audio"] = {}
+        for key in ("mic_device", "speaker_device", "voice", "tts_rate"):
+            if key in payload:
+                profile.preferences["audio"][key] = payload[key]
+        state_manager.save_user_profile(profile)
+        return {"status": "saved", "audio": profile.preferences["audio"]}
+
+    @app.post("/api/v1/system/backup")
+    def create_system_backup():
+        """Creates a complete state snapshot of SQLite database and configuration."""
+        from core.updater import CoreUpdater
+        updater = CoreUpdater()
+        db_snap, conf_snap = updater.create_state_snapshot()
+        return {
+            "status": "success",
+            "database_snapshot": str(db_snap),
+            "config_snapshot": str(conf_snap),
+            "timestamp": time.time()
+        }
+
+    @app.get("/api/v1/mesh/scan")
+    def scan_mesh_servers():
+        """Scans local subnet for active Core AI sovereign main servers."""
+        from core.mesh_client import MeshClient
+        client = MeshClient()
+        servers = client.scan_for_servers(timeout=2.0)
+        return {"servers": servers, "count": len(servers)}
+
 
     # --- WebSocket Endpoints ---
 
@@ -1053,6 +1402,50 @@ def create_gateway_app(
             "text": req.text
         })
         return {"status": "dispatched", "node_id": node_id, "text": req.text}
+
+    @app.post("/api/v1/mesh/satellites/{node_id}/deactivate")
+    async def deactivate_satellite(node_id: str):
+        """Sends a remote deactivation/halt directive to a specific voice satellite or all satellites."""
+        sent_ws = False
+        target_nodes = []
+        if node_id in connection_manager.edge_nodes:
+            target_nodes.append((node_id, connection_manager.edge_nodes[node_id]))
+        elif node_id == "all":
+            target_nodes.extend(list(connection_manager.edge_nodes.items()))
+
+        for nid, sock in target_nodes:
+            try:
+                await sock.send_text(json.dumps({
+                    "command": "DEACTIVATE",
+                    "type": "deactivate",
+                    "node_id": nid
+                }))
+                sent_ws = True
+            except Exception as e:
+                logger.warning(f"Failed to push deactivation command to edge node '{nid}': {e}")
+
+        # Update in-memory registry
+        if node_id == "all":
+            for s in connection_manager.registered_satellites.values():
+                s["status"] = "offline"
+                s["last_seen"] = 0
+            return {"status": "deactivated", "node_id": "all", "message": "All voice satellites deactivated."}
+
+        if node_id in connection_manager.registered_satellites:
+            connection_manager.registered_satellites[node_id]["status"] = "offline"
+            connection_manager.registered_satellites[node_id]["last_seen"] = 0
+            return {"status": "deactivated", "node_id": node_id, "message": f"Satellite '{node_id}' marked offline and halt signal dispatched.", "sent_ws": sent_ws}
+
+        return {"status": "deactivated", "node_id": node_id, "sent_ws": sent_ws}
+
+    @app.delete("/api/v1/mesh/satellites/{node_id}")
+    def deregister_satellite(node_id: str):
+        """Removes a voice satellite from the central gateway registry."""
+        if node_id in connection_manager.registered_satellites:
+            del connection_manager.registered_satellites[node_id]
+            return {"status": "removed", "node_id": node_id}
+        raise HTTPException(status_code=404, detail=f"Voice satellite '{node_id}' not found.")
+
 
     # --- Phase 4: Mobile Companion & Nothing OS Integration Endpoints ---
 
