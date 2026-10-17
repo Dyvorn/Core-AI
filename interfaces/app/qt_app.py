@@ -37,7 +37,19 @@ from PyQt6.QtGui import (
     QPen, QBrush, QFontDatabase, QPaintEvent
 )
 
-GATEWAY_URL = os.getenv("CORE_GATEWAY_URL", "http://127.0.0.1:8000")
+def get_gateway_url() -> str:
+    """Resolves target gateway URL from env var or state manager mesh config."""
+    url = os.getenv("CORE_GATEWAY_URL")
+    if not url:
+        try:
+            from core.state import StateManager
+            profile = StateManager().get_user_profile()
+            url = profile.preferences.get("mesh", {}).get("main_server_url")
+        except Exception:
+            url = None
+    return (url or "http://127.0.0.1:8000").rstrip("/")
+
+GATEWAY_URL = get_gateway_url()
 
 # --- Color Palette Constants (Nothing OS Obsidian Void & Engineering Monochrome) ---
 C_BG_VOID = "#0B0B0B"          # Pure matte obsidian void
@@ -59,6 +71,8 @@ C_GRID_LINE = "#161616"        # Subtle architectural grid line
 
 def load_system_fonts():
     """Registers system fonts into Qt for crisp high-DPI font and symbol rendering."""
+    if QApplication.instance() is None:
+        return
     font_candidates = [
         "C:/Windows/Fonts/consola.ttf",
         "C:/Windows/Fonts/consolab.ttf",
@@ -1759,11 +1773,11 @@ class CoreAIDesktopApp(QMainWindow):
 
 def run_qt_app() -> int:
     """Launches the native PyQt6 Desktop Application."""
-    load_system_fonts()
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
     app.setApplicationName("Core AI Companion")
+    load_system_fonts()
 
     window = CoreAIDesktopApp()
     window.show()
