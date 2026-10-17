@@ -124,7 +124,7 @@ def test_native_launcher_and_desktop_capabilities():
 
     # Test PyQt6 and Core AI Desktop GUI components
     from PyQt6.QtWidgets import QApplication
-    from interfaces.app.qt_app import (
+    from interfaces.app.app import (
         ChatMessageItem, SettingsDialog, SystemDialog,
         LogsDialog, HelpDialog, CoreAIDesktopApp
     )
@@ -198,7 +198,7 @@ def test_logs_tail_and_audio_endpoints(app_client):
 
 def test_native_desktop_dialogs_and_toggles():
     from PyQt6.QtWidgets import QApplication
-    from interfaces.app.qt_app import (
+    from interfaces.app.app import (
         CoreAIDesktopApp, SettingsDialog, SystemDialog,
         LogsDialog, HelpDialog
     )
@@ -282,7 +282,7 @@ def test_qt_custom_paint_widgets():
     import sys
     from PyQt6.QtWidgets import QApplication
     from PyQt6.QtGui import QImage, QPainter
-    from interfaces.app.qt_app import (
+    from interfaces.app.app import (
         DotRingGlyph, UserSilhouetteAvatar, PixelAvatar, GridContainerWidget
     )
 
