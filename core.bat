@@ -229,7 +229,8 @@ shift
 goto :eof
 
 :setup
-"%PYTHON%" interfaces\install\setup_service.py
+shift
+"%PYTHON%" interfaces\install\setup_service.py %1 %2 %3 %4 %5
 goto end
 
 :uninstall

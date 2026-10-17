@@ -70,4 +70,5 @@ Write-Host "[+] Dependencies verified successfully." -ForegroundColor Green
 # 5. Execute Interactive Setup Wizard & Launch
 Write-Host ""
 Write-Host "[*] Launching Core AI Setup Wizard..." -ForegroundColor Cyan
-& $VenvPython interfaces\install\setup_service.py
+& $VenvPython interfaces\install\setup_service.py $args
+

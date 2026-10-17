@@ -171,3 +171,33 @@ def test_service_cards_output(capsys, tmp_path):
     out_auto = capsys.readouterr().out
     assert "24/7 ALWAYS-ON AUTOSTART STATUS" in out_auto
 
+
+def test_setup_service_modes(tmp_path, monkeypatch):
+    from interfaces.install.setup_service import (
+        probe_gateway, update_env_gateway, create_desktop_launcher
+    )
+    # Test probe gateway
+    ok, data = probe_gateway("http://127.0.0.1:99999", timeout=0.1)
+    assert ok is False
+
+    # Test update_env_gateway
+    update_env_gateway(str(tmp_path), "http://192.168.2.153:8000")
+    env_file = tmp_path / "config" / ".env"
+    assert env_file.exists()
+    assert "CORE_GATEWAY_URL=http://192.168.2.153:8000" in env_file.read_text(encoding="utf-8")
+
+    # Test launcher creation for app vs terminal
+    fake_desktop = tmp_path / "Desktop"
+    fake_desktop.mkdir(exist_ok=True)
+    if os.name == "nt":
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    else:
+        monkeypatch.setenv("HOME", str(tmp_path))
+
+    app_launcher = create_desktop_launcher(root_dir=str(tmp_path), for_app=True)
+    assert app_launcher is not None
+    assert os.path.isfile(app_launcher)
+    content = open(app_launcher, encoding="utf-8").read()
+    assert "app" in content
+
+
