@@ -644,6 +644,17 @@ class QuotaStatusResponse(BaseModel):
     system_vitals: Dict[str, Any]
 
 
+class ChatFeedbackRequest(BaseModel):
+    """User feedback telemetry on chat response."""
+    session_id: str
+    message_id: Optional[str] = None
+    message_index: Optional[int] = None
+    rating: str  # 'positive', 'negative'
+    comment: Optional[str] = None
+    timestamp: float = Field(default_factory=lambda: time.time())
+
+
+
 
 
 

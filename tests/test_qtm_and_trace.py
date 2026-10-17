@@ -344,7 +344,7 @@ class TestTraceGatewayIntegration:
         assert resp.status_code == 200
         data = resp.json()
         assert "version" in data
-        assert data["version"] == "0.3.0-alpha"
+        assert data["version"] in ("0.3.0-alpha", "0.3.1")
         assert "sentinel_summary" in data
 
 

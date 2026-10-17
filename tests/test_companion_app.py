@@ -230,6 +230,16 @@ def test_native_desktop_dialogs_and_toggles():
     assert "LISTENING" in main_win.mic_top_btn.text()
     assert "LISTENING" in main_win.mic_sidebar_btn.text()
 
+    # Clean up timers and widgets to prevent background events during subsequent tests
+    logs_dlg.poll_timer.stop()
+    main_win.health_timer.stop()
+    main_win.close()
+    set_dlg.close()
+    sys_dlg.close()
+    logs_dlg.close()
+    help_dlg.close()
+
+
 
 def test_voice_listening_deactivation_and_reactivation(app_client):
     client, state, planner = app_client

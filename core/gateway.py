@@ -25,7 +25,8 @@ from core.schemas import (
     MeshSyncFullRequest, MeshSyncFullResponse, MeshDeviceMessage, MeshDeviceMessageResponse, MeshSyncPayload,
     ClientComputeSignature, MHACHandshakeRequest, MHACHandshakeResponse, MHACProbeRequest, MHACPullRequest,
     MHACConnectRequest, TraceInteractiveRequest,
-    ChatRequest, ChatResponse, ChatSessionRecord, APIKeyUpdateRequest, QuotaStatusResponse
+    ChatRequest, ChatResponse, ChatSessionRecord, APIKeyUpdateRequest, QuotaStatusResponse,
+    ChatFeedbackRequest
 )
 from core.state import StateManager
 from core.bus import EventBus
@@ -791,6 +792,14 @@ def create_gateway_app(
         key = f"chat_session:{session_id}"
         deleted = state_manager.delete_kv(key)
         return {"status": "deleted" if deleted else "not_found", "session_id": session_id}
+
+    @app.post("/api/v1/chat/feedback")
+    def record_chat_feedback(feedback: ChatFeedbackRequest):
+        """Records user thumbs-up/down feedback with optional comments."""
+        fb_key = f"feedback:{int(feedback.timestamp)}:{feedback.session_id}"
+        state_manager.set_kv(fb_key, feedback.model_dump())
+        logger.info(f"Recorded chat feedback [{feedback.rating}] for session {feedback.session_id}")
+        return {"status": "recorded", "session_id": feedback.session_id, "rating": feedback.rating}
 
     @app.get("/api/v1/profile")
     def get_profile(x_trust_tier: Optional[str] = Header(default="owner")):
